@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MixRead</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <div class="popup-header">
+      <h1>MixRead</h1>
+      <p class="subtitle">Learn English through reading</p>
+    </div>
+
+    <div class="popup-section">
+      <label for="difficulty-slider" class="slider-label">Reading Difficulty</label>
+      <div class="difficulty-labels">
+        <span class="label-easy">A1 (Easy)</span>
+        <span class="label-hard">C2 (Hard)</span>
+      </div>
+      <input type="range" id="difficulty-slider" min="1" max="6" value="3" step="1">
+      <div class="difficulty-display">
+        <span id="current-level">B1</span>
+      </div>
+    </div>
+
+    <div class="popup-section">
+      <div class="toggle-setting">
+        <label for="toggle-chinese" class="toggle-label">
+          <span>显示中文释义 Show Chinese</span>
+          <input type="checkbox" id="toggle-chinese" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="popup-section">
+      <button id="btn-view-vocabulary" class="btn btn-primary">
+        View Vocabulary (<span id="vocab-count">0</span>)
+      </button>
+      <button id="btn-reset-vocab" class="btn btn-secondary">
+        Clear All
+      </button>
+    </div>
+
+    <div class="popup-section">
+      <div class="stats">
+        <div class="stat-item">
+          <span class="stat-label">Words Learned Today</span>
+          <span class="stat-value" id="today-count">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Total Words</span>
+          <span class="stat-value" id="total-count">0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="popup-section">
+      <p class="help-text">
+        📖 Hover over <span class="highlight-demo">highlighted words</span> to see definitions.
+        <br>
+        🎚️ Adjust difficulty to show more or fewer words.
+      </p>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
