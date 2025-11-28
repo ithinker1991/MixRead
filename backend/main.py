@@ -165,22 +165,29 @@ async def highlight_words(batch: WordBatch):
     """
     Check which words in a batch should be highlighted based on user's difficulty level.
     Returns list of words that meet the highlighting criteria.
+
+    IMPORTANT: Only highlights words that have Chinese translations!
+    This ensures every highlighted word shows Chinese.
     """
     highlighted = []
     word_details = []
 
     for word in batch.words:
+        # Check if word meets difficulty level AND has Chinese translation
         if should_highlight_word(word, batch.difficulty_level):
-            highlighted.append(word)
-            if word.lower() in cefr_data:
-                word_info = cefr_data[word.lower()]
-                chinese = chinese_dict.get(word.lower())
-                word_details.append({
-                    "word": word,
-                    "cefr_level": word_info.get("cefr_level"),
-                    "pos": word_info.get("pos"),
-                    "chinese": chinese
-                })
+            chinese = chinese_dict.get(word.lower())
+
+            # Only highlight if Chinese translation exists
+            if chinese:
+                highlighted.append(word)
+                if word.lower() in cefr_data:
+                    word_info = cefr_data[word.lower()]
+                    word_details.append({
+                        "word": word,
+                        "cefr_level": word_info.get("cefr_level"),
+                        "pos": word_info.get("pos"),
+                        "chinese": chinese
+                    })
 
     return {
         "difficulty_level": batch.difficulty_level,
