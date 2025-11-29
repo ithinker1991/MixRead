@@ -19,12 +19,23 @@ const todayCountDisplay = document.getElementById("today-count");
 const totalCountDisplay = document.getElementById("total-count");
 const toggleChinese = document.getElementById("toggle-chinese");
 
+// New stat elements for week and reading time
+let weekCountDisplay = document.getElementById("week-count");
+let readingTimeDisplay = document.getElementById("reading-time");
+
 const btnViewVocab = document.getElementById("btn-view-vocabulary");
 const btnResetVocab = document.getElementById("btn-reset-vocab");
 
+// Helper function to get date X days ago
+function getDateXDaysAgo(days) {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().split("T")[0];
+}
+
 // Load and display current settings
 chrome.storage.local.get(
-  ["difficultyLevel", "vocabulary", "vocabulary_dates", "showChinese"],
+  ["difficultyLevel", "vocabulary", "vocabulary_dates", "showChinese", "reading_sessions"],
   (result) => {
     // Load difficulty level
     const difficultyLevel = result.difficultyLevel || "B1";
@@ -47,13 +58,47 @@ chrome.storage.local.get(
     const dates = result.vocabulary_dates || {};
     const today = new Date().toISOString().split("T")[0];
     let todayCount = 0;
+    let weekCount = 0;
 
+    // Count words added today and this week
     for (const word in dates) {
-      if (dates[word] === today) {
+      const wordDate = dates[word];
+      if (wordDate === today) {
         todayCount++;
+      }
+      // Check if word was added in the last 7 days
+      const wordTime = new Date(wordDate).getTime();
+      const sevenDaysAgo = new Date().getTime() - (7 * 24 * 60 * 60 * 1000);
+      if (wordTime >= sevenDaysAgo) {
+        weekCount++;
       }
     }
     todayCountDisplay.textContent = todayCount;
+
+    // Display week count if element exists
+    if (weekCountDisplay) {
+      weekCountDisplay.textContent = weekCount;
+    }
+
+    // Calculate reading time
+    const sessions = result.reading_sessions || {};
+    let todayReading = sessions[today] || 0;
+    let weekReading = 0;
+
+    // Sum up reading time for the week
+    for (let i = 0; i < 7; i++) {
+      const date = getDateXDaysAgo(i);
+      weekReading += sessions[date] || 0;
+    }
+
+    // Display reading time if element exists
+    if (readingTimeDisplay) {
+      if (weekReading > 60) {
+        readingTimeDisplay.textContent = Math.round(weekReading / 60) + "h " + (weekReading % 60) + "m";
+      } else {
+        readingTimeDisplay.textContent = weekReading + "m";
+      }
+    }
   }
 );
 

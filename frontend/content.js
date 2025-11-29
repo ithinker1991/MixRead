@@ -10,6 +10,7 @@ let userVocabulary = new Set();
 let isHighlighting = false; // Prevent infinite loop
 let showChinese = true; // Show Chinese translation by default
 let definitionCache = {}; // Cache for word definitions
+let sessionStartTime = Date.now(); // Track reading session start
 
 // Load settings on startup
 chrome.storage.local.get(
@@ -379,14 +380,23 @@ function speakWord(word) {
 }
 
 /**
- * Add word to user's vocabulary
+ * Add word to user's vocabulary with timestamp
  */
 function addWordToVocabulary(word) {
-  userVocabulary.add(word.toLowerCase());
+  const wordLower = word.toLowerCase();
+  userVocabulary.add(wordLower);
 
-  // Save to storage
-  chrome.storage.local.set({
-    vocabulary: Array.from(userVocabulary),
+  // Get current vocabulary dates
+  chrome.storage.local.get(["vocabulary_dates"], (result) => {
+    const dates = result.vocabulary_dates || {};
+    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
+    dates[wordLower] = today; // Record when word was added
+
+    // Save to storage
+    chrome.storage.local.set({
+      vocabulary: Array.from(userVocabulary),
+      vocabulary_dates: dates,
+    });
   });
 }
 
@@ -425,3 +435,36 @@ if (document.readyState === "loading") {
 //   childList: true,
 //   subtree: true,
 // });
+
+/**
+ * Track reading session time and update stats
+ */
+function recordReadingSession() {
+  const sessionDurationMs = Date.now() - sessionStartTime;
+  const sessionDurationMinutes = Math.round(sessionDurationMs / 60000); // Convert to minutes
+
+  if (sessionDurationMinutes > 0) {
+    chrome.storage.local.get(["reading_sessions"], (result) => {
+      const sessions = result.reading_sessions || {};
+      const today = new Date().toISOString().split("T")[0];
+
+      // Add session duration to today's total
+      sessions[today] = (sessions[today] || 0) + sessionDurationMinutes;
+
+      chrome.storage.local.set({
+        reading_sessions: sessions,
+      });
+
+      console.log(`[MixRead] Recorded ${sessionDurationMinutes} minutes of reading for ${today}`);
+    });
+  }
+}
+
+// Record session time when user leaves the page
+window.addEventListener("beforeunload", recordReadingSession);
+
+// Also record session periodically (every 5 minutes)
+setInterval(() => {
+  recordReadingSession();
+  sessionStartTime = Date.now(); // Reset for next interval
+}, 5 * 60 * 1000);
