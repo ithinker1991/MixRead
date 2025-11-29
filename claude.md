@@ -245,6 +245,140 @@ These three principles guide all development decisions:
 
 7. **No Over-Optimization**: Simple, working code > perfect but delayed code. Optimize only when real user data shows bottlenecks.
 
+## Chrome Extension Development Guidelines
+
+**Critical Rule**: NEVER rely on self-testing with only unit tests. Backend unit tests passing ≠ frontend extension works in Chrome.
+
+### 1. Browser Environment Compatibility Checklist
+Before writing any frontend code, verify:
+- ❌ NO `process.env` - doesn't exist in browsers
+- ❌ NO `require()` / `module.exports` - use ES6 modules or globals only
+- ❌ NO Node.js built-ins (fs, path, crypto, etc.)
+- ✅ Use `localStorage`, `sessionStorage` for client storage
+- ✅ Use `chrome.storage` API for extension persistent storage
+- ✅ Use `fetch()` for HTTP requests
+- ✅ Use `console.log/warn/error` for debugging
+
+**Code Review Rule**: Every file in `frontend/` must be checked for these incompatibilities BEFORE submission.
+
+### 2. Global Variable Declaration Rule
+- **ONE place only** for variable declarations
+- ✅ Declare in `content.js` top-level: `let userStore;`
+- ❌ DO NOT redeclare in module files like `user-store.js`
+- ❌ DO NOT instantiate module variables (e.g., `const userStore = new UserStore()`) at module level
+
+**Pattern**:
+```javascript
+// ✅ CORRECT: content.js
+let userStore;
+async function initializeModules() {
+  userStore = new UserStore(); // Instantiate here
+}
+
+// ❌ WRONG: user-store.js
+let userStore = new UserStore(); // Duplicate declaration!
+```
+
+### 3. Module Load Order Dependency
+Document dependencies clearly in `manifest.json`:
+```json
+"js": [
+  "scripts/logger.js",           // No dependencies
+  "scripts/api-client.js",       // Depends on logger
+  "modules/user/user-store.js",  // Depends on logger, storage
+  "content.js"                   // Depends on all above
+]
+```
+
+**Validation Rule**: Before submitting, verify each module can reference all its dependencies without errors.
+
+### 4. CORS and Private Network Access
+When accessing `localhost:8000` from extension:
+
+**Backend Config Required**:
+```python
+# Add Private Network Access headers
+@app.middleware("http")
+async def add_private_network_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
+
+# Add CORS middleware
+app.add_middleware(CORSMiddleware, allow_origins=["*"], ...)
+```
+
+**Frontend Awareness**: Extension content scripts running on HTTPS pages may get CORS errors. Test on both:
+- Local HTTP pages (http://localhost:8001/test.html)
+- Public HTTPS pages (https://github.com)
+
+### 5. Testing Checklist - MANDATORY BEFORE SUBMISSION
+
+Do NOT just run unit tests. Do this:
+
+```
+[ ] Unit tests pass (backend)
+[ ] Backend health check works (curl http://localhost:8000/health)
+[ ] Extension loads in Chrome without errors
+[ ] Open DevTools on actual test page
+[ ] Check Console for [MixRead] logs - should see initialization sequence
+[ ] Verify page has highlighted words (yellow background)
+[ ] Test right-click context menu on a word
+[ ] Check Network tab - verify API requests to localhost:8000 succeed
+[ ] Test multiple pages (local HTTP + public HTTPS)
+```
+
+**Red Flags** (stop and debug):
+- ❌ Empty Console (no [MixRead] logs)
+- ❌ Red errors in Console
+- ❌ No highlighted words after 3 seconds
+- ❌ 404 or CORS errors in Network tab
+- ❌ Functions not defined (reference errors)
+
+### 6. Real Environment Testing
+**ALWAYS test in actual Chrome before claiming "done"**:
+
+```bash
+# Start backend
+cd backend && python main.py
+
+# In ANOTHER terminal, start local HTTP server for test page
+cd frontend && python -m http.server 8001 --bind localhost
+
+# In Chrome:
+# 1. chrome://extensions → Load unpacked → select frontend/
+# 2. Open http://localhost:8001/test.html
+# 3. F12 → Console
+# 4. Verify all [MixRead] initialization logs appear
+```
+
+### 7. Code Review for Frontend
+Every frontend change must check:
+
+1. **Syntax errors**:
+   - Balanced braces `{}`
+   - All function definitions complete
+   - No typos in class names or method calls
+
+2. **Variable scope**:
+   - Check for duplicate `let`/`const` declarations
+   - Verify global variables declared in content.js, not modules
+   - Ensure all `this.` references are in methods, not top-level
+
+3. **Dependency completeness**:
+   - If file uses `logger`, verify logger.js loaded before it
+   - If file uses `apiClient`, verify scripts/api-client.js loaded before it
+   - Check manifest.json load order
+
+4. **Browser compatibility**:
+   - Search file for `process.`, `require(`, `Buffer`, `fs.`, `path.`
+   - Verify all external references exist in Chrome
+
+5. **Event handling**:
+   - Check all event listeners have corresponding cleanup
+   - Verify no memory leaks from anonymous functions
+   - Test event handlers with Console logging
+
 ## References
 
 - Full product roadmap: `DevelopPlan.md`
