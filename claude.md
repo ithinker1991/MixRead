@@ -135,6 +135,86 @@ Full Chinese translation creates dependency. MVP uses English definitions only t
 - High setting: Fewer annotations, challenges learner
 - Allows progressive transition from mixed to pure English reading
 
+## API Design Guidelines
+
+### RESTful Architecture Principles
+
+All backend APIs follow **RESTful design patterns** with the following rules:
+
+#### 1. Resource-Based URL Structure
+- **Resource** (user, vocabulary, words) is always in the URL path
+- **user_id** goes in the URL path: `/users/{user_id}/vocabulary`
+- HTTP methods (GET, POST, PUT, DELETE) represent actions
+- No action verbs in URLs (❌ `/api/get-vocabulary`, ✅ `GET /users/{user_id}/vocabulary`)
+
+#### 2. Current API Design (No Authentication)
+All user-specific endpoints include `user_id` in the path:
+
+```
+GET /users/{user_id}
+  Retrieve all user data
+
+GET /users/{user_id}/vocabulary
+  List all words in user's vocabulary
+
+POST /users/{user_id}/vocabulary
+  Add word to vocabulary (body: {"word": "serendipity"})
+
+PUT /users/{user_id}/vocabulary/{word}
+  Update word metadata (body: {"status": "learning"})
+
+DELETE /users/{user_id}/vocabulary/{word}
+  Remove word from vocabulary
+
+GET /users/{user_id}/known-words
+  List all words marked as "known"
+
+POST /users/{user_id}/known-words
+  Mark word as known (body: {"word": "beautiful"})
+
+DELETE /users/{user_id}/known-words/{word}
+  Unmark word as known
+
+POST /highlight-words
+  Get highlighted words list
+  (body: {"user_id": "...", "words": [...], "difficulty_level": "B1"})
+```
+
+#### 3. Future Authentication Upgrade (Phase 2+)
+When adding authentication (JWT/OAuth):
+- **Same URL paths** - no changes needed
+- **user_id comes from JWT token**, not the request body
+- **Backend verifies** path user_id matches token user_id
+- **Frontend code changes minimally** - just add Authorization header
+
+Backend middleware pattern:
+```python
+@middleware
+def authenticate(request):
+    # Extract user_id from token
+    user_id = decode_jwt_token(request.headers['Authorization'])
+    request.state.user_id = user_id
+    # Route handler uses request.state.user_id
+```
+
+#### 4. Benefits of This Approach
+- ✅ **Clear resource identification** in URLs
+- ✅ **Easier debugging** - logs and tools show user_id directly
+- ✅ **Consistent with industry standards** (GitHub, Stripe, AWS)
+- ✅ **Minimal migration path** to authenticated system
+- ✅ **Better for error tracking** - failures are tied to specific users
+
+#### 5. Response Format
+All endpoints return consistent JSON format:
+```json
+{
+  "success": true/false,
+  "data": { /* response data */ },
+  "error": "error message if applicable",
+  "timestamp": "2025-11-29T10:30:00Z"
+}
+```
+
 ## Core Development Principles
 
 ### 简单、适用、演进 (Simplicity, Applicability, Evolution)
