@@ -15,10 +15,8 @@
 ### 🔧 [02-development](02-development/) - 开发文档
 
 #### [planning](02-development/planning/) - 项目规划和任务
-- **[development-plan.md](02-development/planning/development-plan.md)** - 中文核心开发规划，包含产品使命、核心价值、四个开发阶段的详细说明
-- **[phase-1-tasks.md](02-development/planning/phase-1-tasks.md)** - MVP 第一阶段任务拆解和验证方案
-- **[next-phase-plan.md](02-development/planning/next-phase-plan.md)** - 下一阶段（Phase 2）计划和自动化测试框架任务
-- **[current-status.md](02-development/planning/current-status.md)** - 当前项目状态和已完成功能列表
+- **[PROJECT_STATUS.md](02-development/planning/PROJECT_STATUS.md)** ⭐ **当前项目实时进度**（包含完成度、当前问题、下一步行动）
+- **[development-plan.md](02-development/planning/development-plan.md)** - 产品规划总览（产品使命、核心价值、4 个开发阶段）
 
 #### [debugging](02-development/debugging/) - 开发调试和测试
 - **[debugging-guide.md](02-development/debugging/debugging-guide.md)** - 常见问题调试指南（如悬停没有显示定义）
@@ -36,14 +34,13 @@
 
 | 场景 | 推荐文档 |
 |------|---------|
-| **我是新手，不知道从哪开始** | → 👉 [01-guides/getting-started.md](01-guides/getting-started.md) |
-| **我要完全安装和测试扩展** | → 👉 [01-guides/installation-guide.md](01-guides/installation-guide.md) |
-| **我修改了代码，扩展不工作** | → 👉 [01-guides/extension-reload.md](01-guides/extension-reload.md) |
-| **我想了解 MixRead 的产品规划** | → 👉 [02-development/planning/development-plan.md](02-development/planning/development-plan.md) |
-| **我想知道当前完成了什么功能** | → 👉 [02-development/planning/current-status.md](02-development/planning/current-status.md) |
-| **我要调试某个问题** | → 👉 [02-development/debugging/quick-debug.md](02-development/debugging/quick-debug.md) |
-| **我想了解 VSCode 环境设置** | → 👉 [01-guides/vscode-setup.md](01-guides/vscode-setup.md) |
-| **我想了解中文翻译功能** | → 👉 [03-features/chinese-translation.md](03-features/chinese-translation.md) |
+| **我需要知道当前进度和下一步做什么** | → 👉 [PROJECT_STATUS.md](02-development/planning/PROJECT_STATUS.md) ⭐ |
+| **我是新手，不知道从哪开始** | → 👉 [getting-started.md](01-guides/getting-started.md) |
+| **我要完全安装和测试扩展** | → 👉 [installation-guide.md](01-guides/installation-guide.md) |
+| **我修改了代码，扩展不工作** | → 👉 [extension-reload.md](01-guides/extension-reload.md) |
+| **我想了解 MixRead 的产品规划和愿景** | → 👉 [development-plan.md](02-development/planning/development-plan.md) |
+| **我要快速调试问题** | → 👉 [quick-debug.md](02-development/debugging/quick-debug.md) |
+| **我想了解中文翻译功能** | → 👉 [chinese-translation.md](03-features/chinese-translation.md) |
 
 ## 📝 主项目文档
 
