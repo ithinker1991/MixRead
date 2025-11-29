@@ -6,11 +6,17 @@ An intelligent English reading enhancement tool that helps you improve reading a
 
 ```
 MixRead/
-├── backend/              # FastAPI backend server
+├── docs/                # 📚 Complete documentation (see docs/README.md)
+│   ├── 01-guides/              # Quick start guides
+│   ├── 02-development/         # Development planning & debugging
+│   ├── 03-features/            # Feature documentation
+│   └── 06-ai-guides/           # AI assistant guides
+│
+├── backend/             # FastAPI backend server
 │   ├── main.py          # FastAPI app with API endpoints
-│   ├── download_cefr_data.py  # Script to download/process CEFR word data
+│   ├── download_cefr_data.py   # Script to download/process CEFR word data
 │   ├── data/            # Word data (generated after download)
-│   ├── requirements.txt  # Python dependencies
+│   ├── requirements.txt # Python dependencies
 │   └── venv/            # Virtual environment
 │
 ├── frontend/            # Chrome Extension (Manifest V3)
@@ -22,10 +28,17 @@ MixRead/
 │   ├── popup.css        # Popup styles
 │   └── popup.js         # Popup functionality
 │
-├── CLAUDE.md            # Development guidelines
-├── DevelopPlan.md       # Product roadmap
 └── README.md            # This file
 ```
+
+## 📖 Documentation
+
+All project documentation is organized in the [docs/](docs/) folder. Here are some quick links:
+
+- **Getting Started?** → [Quick Start Guide](docs/01-guides/getting-started.md)
+- **First Time Setup?** → [Complete Installation Guide](docs/01-guides/installation-guide.md)
+- **Debugging Issues?** → [Debugging Guide](docs/02-development/debugging/quick-debug.md)
+- **Want Full Details?** → [Complete Docs Index](docs/README.md)
 
 ## Quick Start (Local Development)
 
