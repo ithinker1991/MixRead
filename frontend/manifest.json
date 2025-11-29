@@ -17,7 +17,17 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "js": [
+        "scripts/logger.js",
+        "scripts/storage.js",
+        "scripts/api-client.js",
+        "modules/user/user-store.js",
+        "modules/unknown-words/unknown-words-store.js",
+        "modules/unknown-words/unknown-words-service.js",
+        "modules/highlight/context-menu.js",
+        "modules/highlight/highlight-filter.js",
+        "content.js"
+      ],
       "css": ["content.css"]
     }
   ],

@@ -1,9 +1,10 @@
 /**
  * MixRead Content Script
  * Tokenizes page content and highlights difficult words
+ * Integrates modular architecture for unknown words management
  */
 
-// Track current difficulty level
+// ===== Global State =====
 let currentDifficultyLevel = "B1";
 let highlightedWordsMap = {};
 let userVocabulary = new Set();
@@ -12,7 +13,57 @@ let showChinese = true; // Show Chinese translation by default
 let definitionCache = {}; // Cache for word definitions
 let sessionStartTime = Date.now(); // Track reading session start
 
-// Load settings on startup
+// ===== Module Instances =====
+let userStore;
+let unknownWordsStore;
+let unknownWordsService;
+let contextMenu;
+let highlightFilter;
+
+// ===== Initialize Modules =====
+async function initializeModules() {
+  logger.info('Initializing MixRead modules...');
+
+  // 1. Initialize user store
+  userStore = new UserStore();
+  await userStore.initialize();
+  const userId = userStore.getUserId();
+  const difficultyLevel = userStore.getDifficultyLevel();
+  logger.info(`User initialized - ID: ${userId}, Difficulty: ${difficultyLevel}`);
+
+  // 2. Initialize unknown words store
+  unknownWordsStore = new UnknownWordsStore();
+  await unknownWordsStore.load();
+
+  // 3. Initialize unknown words service
+  unknownWordsService = new UnknownWordsService(
+    unknownWordsStore,
+    apiClient,
+    userStore
+  );
+
+  // 4. Sync unknown words from backend
+  const backendWords = await unknownWordsService.loadFromBackend();
+  backendWords.forEach(word => unknownWordsStore.add(word));
+  await unknownWordsStore.sync();
+  logger.info(`Loaded ${backendWords.length} unknown words from backend`);
+
+  // 5. Initialize context menu
+  contextMenu = new ContextMenu(unknownWordsService);
+
+  // 6. Initialize highlight filter
+  highlightFilter = new HighlightFilter(unknownWordsStore, userStore);
+
+  logger.info('All modules initialized successfully');
+}
+
+// Initialize modules on startup
+initializeModules().catch(error => {
+  logger.error('Failed to initialize modules', error);
+});
+
+// ===== Legacy Settings Initialization =====
+// Load settings on startup for backward compatibility
 chrome.storage.local.get(
   ["difficultyLevel", "vocabulary", "showChinese"],
   (result) => {
@@ -71,12 +122,16 @@ function highlightPageWords() {
   const uniqueWords = [...new Set(allWords)];
   console.log('[MixRead] Found', uniqueWords.length, 'unique words');
 
+  // Get user_id for API call (use userStore if initialized, fallback to legacy)
+  const userId = userStore ? userStore.getUserId() : null;
+
   // Send to background script to query API
   chrome.runtime.sendMessage(
     {
       type: "GET_HIGHLIGHTED_WORDS",
       words: uniqueWords,
       difficulty_level: currentDifficultyLevel,
+      user_id: userId,
     },
     (response) => {
       if (response.success) {
@@ -183,6 +238,13 @@ function highlightWordsInDOM(highlightedWords) {
           console.log('[MixRead] Click event triggered for word:', word);
           e.stopPropagation();
           showTooltip(e, word);
+        });
+
+        // Add right-click handler for context menu
+        span.addEventListener("contextmenu", (e) => {
+          if (contextMenu) {
+            contextMenu.show(e, word);
+          }
         });
 
         fragment.appendChild(span);
@@ -400,11 +462,24 @@ function addWordToVocabulary(word) {
   });
 }
 
+// ===== Event Listeners =====
+
+// Listen for unknown words updates (from context menu)
+window.addEventListener('unknown-words-updated', () => {
+  logger.log('Unknown words updated, re-highlighting page');
+  highlightPageWords();
+});
+
 // Listen for difficulty level changes from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "DIFFICULTY_CHANGED") {
     currentDifficultyLevel = request.difficulty_level;
     chrome.storage.local.set({ difficultyLevel: currentDifficultyLevel });
+
+    // Update user store if initialized
+    if (userStore) {
+      userStore.setDifficultyLevel(request.difficulty_level);
+    }
 
     // Re-highlight the page
     highlightPageWords();

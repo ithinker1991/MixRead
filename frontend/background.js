@@ -20,7 +20,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
  */
 async function handleGetHighlightedWords(request, sendResponse) {
   try {
-    const { words, difficulty_level } = request;
+    const { words, difficulty_level, user_id } = request;
 
     const response = await fetch(`${API_BASE}/highlight-words`, {
       method: "POST",
@@ -28,8 +28,9 @@ async function handleGetHighlightedWords(request, sendResponse) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        words,
-        difficulty_level,
+        user_id: user_id,
+        words: words,
+        difficulty_level: difficulty_level,
       }),
     });
 
