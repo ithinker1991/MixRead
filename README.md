@@ -88,6 +88,7 @@ curl http://localhost:8000/health
 ## API Endpoints
 
 ### GET /health
+
 Health check endpoint
 - Response: `{"status": "ok", "words_loaded": 6860}`
 
