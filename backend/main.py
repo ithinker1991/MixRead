@@ -1,20 +1,38 @@
 """
-MixRead Backend - MVP Phase 1
-Simple FastAPI server for word difficulty detection and definition lookup
+MixRead Backend - MVP Phase 1 with DDD Architecture
+
+Layered architecture:
+- Domain: Core business logic (models, services)
+- Application: Use case orchestration
+- Infrastructure: Database, ORM, repositories
+- Presentation: API routes
 """
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 import json
 import os
-from typing import Optional
-import httpx
 import asyncio
+from typing import Optional
 
-app = FastAPI(title="MixRead Backend", version="0.1.0")
+import httpx
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-# Add CORS middleware to allow requests from Chrome extension
+# Import DDD layers
+from infrastructure.database import get_db, init_db
+from infrastructure.repositories import UserRepository
+from application.services import UserApplicationService, HighlightApplicationService
+from api.routes import router as user_router
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="MixRead Backend",
+    version="0.2.0",
+    description="English reading enhancement with word difficulty control"
+)
+
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,10 +41,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global CEFR data cache
+# Global data caches
 cefr_data = {}
-chinese_dict = {}  # Chinese translation dictionary
-definition_cache = {}  # Cache for word definitions to reduce API calls
+chinese_dict = {}
+definition_cache = {}
+
+# Pydantic models for API
+class WordBatch(BaseModel):
+    user_id: str
+    words: list[str]
+    difficulty_level: str = "B1"
+
 
 class WordInfo(BaseModel):
     word: str
@@ -34,12 +59,10 @@ class WordInfo(BaseModel):
     frequency_rank: Optional[int] = None
     definition: Optional[str] = None
     example: Optional[str] = None
-    chinese: Optional[str] = None  # Chinese translation
+    chinese: Optional[str] = None
 
-class WordBatch(BaseModel):
-    words: list[str]
-    difficulty_level: str = "B1"  # A1, A2, B1, B2, C1, C2
 
+# Data loading functions
 def load_cefr_data():
     """Load CEFR word database from JSON file"""
     global cefr_data
@@ -47,9 +70,10 @@ def load_cefr_data():
     if os.path.exists(cefr_path):
         with open(cefr_path, 'r', encoding='utf-8') as f:
             cefr_data = json.load(f)
-        print(f"Loaded {len(cefr_data)} words from CEFR database")
+        print(f"✓ Loaded {len(cefr_data)} words from CEFR database")
     else:
-        print(f"Warning: CEFR database not found at {cefr_path}")
+        print(f"⚠ Warning: CEFR database not found at {cefr_path}")
+
 
 def load_chinese_dict():
     """Load Chinese translation dictionary"""
@@ -58,102 +82,84 @@ def load_chinese_dict():
     if os.path.exists(dict_path):
         with open(dict_path, 'r', encoding='utf-8') as f:
             chinese_dict = json.load(f)
-        print(f"Loaded {len(chinese_dict)} Chinese translations")
+        print(f"✓ Loaded {len(chinese_dict)} Chinese translations")
     else:
-        print(f"Warning: Chinese dictionary not found at {dict_path}")
+        print(f"⚠ Warning: Chinese dictionary not found at {dict_path}")
 
-def get_cefr_level_rank(level: str) -> int:
-    """Convert CEFR level string to numeric rank for comparison"""
-    levels = {"A1": 1, "A2": 2, "B1": 3, "B2": 4, "C1": 5, "C2": 6}
-    return levels.get(level, 0)
-
-def should_highlight_word(word: str, user_level: str) -> bool:
-    """
-    Determine if a word should be highlighted based on:
-    CEFR level >= user level
-    """
-    if word.lower() not in cefr_data:
-        return False
-
-    word_info = cefr_data[word.lower()]
-    cefr_level = word_info.get("cefr_level", "A1")
-
-    # Check difficulty level
-    word_level_rank = get_cefr_level_rank(cefr_level)
-    user_level_rank = get_cefr_level_rank(user_level)
-
-    # Only highlight if word difficulty >= user level
-    return word_level_rank >= user_level_rank
 
 async def get_word_definition(word: str) -> dict:
     """
     Fetch word definition from Free Dictionary API with caching
-    Returns: {"definition": "...", "example": "..."}
     """
     word_lower = word.lower()
 
-    # Check cache first
     if word_lower in definition_cache:
         return definition_cache[word_lower]
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word_lower}")
+            response = await client.get(
+                f"https://api.dictionaryapi.dev/api/v2/entries/en/{word_lower}"
+            )
             if response.status_code == 200:
                 data = response.json()
                 if data and len(data) > 0:
                     entry = data[0]
-                    # Extract definition (keep it concise, < 100 chars)
                     definition = ""
                     if "meanings" in entry and len(entry["meanings"]) > 0:
                         meanings = entry["meanings"][0]
                         if "definitions" in meanings and len(meanings["definitions"]) > 0:
                             definition = meanings["definitions"][0].get("definition", "")
-                            # Truncate long definitions
                             if len(definition) > 150:
                                 definition = definition[:150] + "..."
 
-                    # Extract example
                     example = ""
                     if "meanings" in entry and len(entry["meanings"]) > 0:
                         meanings = entry["meanings"][0]
                         if "definitions" in meanings and len(meanings["definitions"]) > 0:
                             example = meanings["definitions"][0].get("example", "")
 
-                    result = {
-                        "definition": definition,
-                        "example": example
-                    }
-                    # Cache the result
+                    result = {"definition": definition, "example": example}
                     definition_cache[word_lower] = result
                     return result
     except Exception as e:
         print(f"Error fetching definition for {word}: {e}")
 
     result = {"definition": "", "example": ""}
-    # Cache empty result too to avoid repeated failed requests
     definition_cache[word_lower] = result
     return result
 
+
+# Startup event
 @app.on_event("startup")
 async def startup_event():
-    """Load CEFR data and Chinese dictionary on startup"""
+    """Initialize on startup"""
+    print("\n🚀 MixRead Backend Starting...")
     load_cefr_data()
     load_chinese_dict()
+    init_db()
+    print("✓ Database initialized\n")
 
+
+# Health check
 @app.get("/health")
 async def health():
     """Health check endpoint"""
-    return {"status": "ok", "words_loaded": len(cefr_data)}
+    return {
+        "status": "ok",
+        "version": "0.2.0",
+        "words_loaded": len(cefr_data),
+        "chinese_translations": len(chinese_dict)
+    }
 
+
+# Word information endpoints
 @app.get("/word/{word}")
 async def get_word(word: str):
     """Get word information including CEFR level, definition, and Chinese translation"""
-    # Get Chinese translation
     chinese = chinese_dict.get(word.lower())
 
     if word.lower() not in cefr_data:
-        # Try to fetch from external API anyway
         definition_data = await get_word_definition(word)
         return {
             "word": word,
@@ -176,56 +182,45 @@ async def get_word(word: str):
         "chinese": chinese
     }
 
+
+# Highlight endpoint (core feature)
 @app.post("/highlight-words")
-async def highlight_words(batch: WordBatch):
+async def highlight_words(request: WordBatch, db: Session = Depends(get_db)):
     """
-    Check which words in a batch should be highlighted based on user's difficulty level.
-    Returns list of words that meet the highlighting criteria.
+    Get highlighted words based on user's difficulty level and word lists
 
-    IMPORTANT: Only highlights words that have Chinese translations!
-    This ensures every highlighted word shows Chinese.
+    Priority for highlighting:
+    1. unknown_words - user explicitly marked as not knowing
+    2. known_words - user explicitly marked as knowing
+    3. difficulty_level - default CEFR level-based rule
     """
-    highlighted = []
-    word_details = []
+    try:
+        service = HighlightApplicationService(
+            UserRepository(db),
+            cefr_data,
+            chinese_dict
+        )
+        result = service.get_highlighted_words(
+            request.user_id,
+            request.words,
+            request.difficulty_level
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    for word in batch.words:
-        # Check if word meets difficulty level AND has Chinese translation
-        if should_highlight_word(word, batch.difficulty_level):
-            chinese = chinese_dict.get(word.lower())
-
-            # Only highlight if Chinese translation exists
-            if chinese:
-                highlighted.append(word)
-                if word.lower() in cefr_data:
-                    word_info = cefr_data[word.lower()]
-                    word_details.append({
-                        "word": word,
-                        "cefr_level": word_info.get("cefr_level"),
-                        "pos": word_info.get("pos"),
-                        "chinese": chinese
-                    })
-
-    return {
-        "difficulty_level": batch.difficulty_level,
-        "total_words": len(batch.words),
-        "highlighted_count": len(highlighted),
-        "highlighted_words": highlighted,
-        "word_details": word_details
-    }
 
 @app.post("/batch-word-info")
-async def batch_word_info(batch: WordBatch):
+async def batch_word_info(request: WordBatch):
     """
-    Get detailed information for multiple words including definitions.
-    Used for getting definitions when user hovers over highlighted words.
+    Get detailed information for multiple words including definitions
     """
     results = []
 
-    # Fetch definitions concurrently
-    tasks = [get_word_definition(word) for word in batch.words]
+    tasks = [get_word_definition(word) for word in request.words]
     definitions = await asyncio.gather(*tasks)
 
-    for word, definition_data in zip(batch.words, definitions):
+    for word, definition_data in zip(request.words, definitions):
         if word.lower() in cefr_data:
             word_info = cefr_data[word.lower()]
             results.append({
@@ -245,6 +240,29 @@ async def batch_word_info(batch: WordBatch):
             })
 
     return {"words": results}
+
+
+# Include user routes (known_words, unknown_words, vocabulary)
+app.include_router(user_router)
+
+# Root endpoint
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "name": "MixRead Backend",
+        "version": "0.2.0",
+        "endpoints": {
+            "health": "/health",
+            "word_info": "/word/{word}",
+            "highlight": "POST /highlight-words",
+            "users": "GET /users/{user_id}",
+            "known_words": "GET /users/{user_id}/known-words",
+            "unknown_words": "GET /users/{user_id}/unknown-words",
+            "vocabulary": "GET /users/{user_id}/vocabulary"
+        }
+    }
+
 
 if __name__ == "__main__":
     import uvicorn
