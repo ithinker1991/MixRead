@@ -32,13 +32,22 @@ app = FastAPI(
     description="English reading enhancement with word difficulty control"
 )
 
-# Add CORS middleware
+# Add Private Network Access support (for accessing localhost from HTTPS sites)
+@app.middleware("http")
+async def add_private_network_headers(request, call_next):
+    response = await call_next(request)
+    # Always allow private network access
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
+
+# Add CORS middleware with Private Network Access support
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Global data caches
@@ -151,6 +160,12 @@ async def health():
         "words_loaded": len(cefr_data),
         "chinese_translations": len(chinese_dict)
     }
+
+# Handle OPTIONS requests for CORS preflight (including Private Network Access)
+@app.options("/{full_path:path}")
+async def options_handler(full_path: str):
+    """Handle OPTIONS requests for CORS preflight"""
+    return {"detail": "ok"}
 
 
 # Word information endpoints
