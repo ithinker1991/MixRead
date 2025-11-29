@@ -26,6 +26,7 @@ app.add_middleware(
 # Global CEFR data cache
 cefr_data = {}
 chinese_dict = {}  # Chinese translation dictionary
+definition_cache = {}  # Cache for word definitions to reduce API calls
 
 class WordInfo(BaseModel):
     word: str
@@ -86,22 +87,31 @@ def should_highlight_word(word: str, user_level: str) -> bool:
 
 async def get_word_definition(word: str) -> dict:
     """
-    Fetch word definition from Free Dictionary API
+    Fetch word definition from Free Dictionary API with caching
     Returns: {"definition": "...", "example": "..."}
     """
+    word_lower = word.lower()
+
+    # Check cache first
+    if word_lower in definition_cache:
+        return definition_cache[word_lower]
+
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word.lower()}")
+            response = await client.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word_lower}")
             if response.status_code == 200:
                 data = response.json()
                 if data and len(data) > 0:
                     entry = data[0]
-                    # Extract definition
+                    # Extract definition (keep it concise, < 100 chars)
                     definition = ""
                     if "meanings" in entry and len(entry["meanings"]) > 0:
                         meanings = entry["meanings"][0]
                         if "definitions" in meanings and len(meanings["definitions"]) > 0:
                             definition = meanings["definitions"][0].get("definition", "")
+                            # Truncate long definitions
+                            if len(definition) > 150:
+                                definition = definition[:150] + "..."
 
                     # Extract example
                     example = ""
@@ -110,14 +120,20 @@ async def get_word_definition(word: str) -> dict:
                         if "definitions" in meanings and len(meanings["definitions"]) > 0:
                             example = meanings["definitions"][0].get("example", "")
 
-                    return {
+                    result = {
                         "definition": definition,
                         "example": example
                     }
+                    # Cache the result
+                    definition_cache[word_lower] = result
+                    return result
     except Exception as e:
         print(f"Error fetching definition for {word}: {e}")
 
-    return {"definition": "", "example": ""}
+    result = {"definition": "", "example": ""}
+    # Cache empty result too to avoid repeated failed requests
+    definition_cache[word_lower] = result
+    return result
 
 @app.on_event("startup")
 async def startup_event():

@@ -9,6 +9,7 @@ let highlightedWordsMap = {};
 let userVocabulary = new Set();
 let isHighlighting = false; // Prevent infinite loop
 let showChinese = true; // Show Chinese translation by default
+let definitionCache = {}; // Cache for word definitions
 
 // Load settings on startup
 chrome.storage.local.get(
@@ -256,21 +257,58 @@ function createTooltip(event, word, wordInfo) {
   const tooltip = document.createElement("div");
   tooltip.className = "mixread-tooltip";
 
-  let html = `<div class="mixread-tooltip-word">${word}</div>`;
+  let html = `
+    <div class="mixread-tooltip-header">
+      <div class="mixread-tooltip-word">${word}</div>
+  `;
 
   if (wordInfo.cefr_level) {
     html += `<span class="mixread-tooltip-cefr">${wordInfo.cefr_level}</span>`;
   }
 
+  html += `
+    </div>
+  `;
+
+  // English definition - FIRST (most important)
   if (wordInfo.definition) {
-    html += `<div class="mixread-tooltip-definition">${wordInfo.definition}</div>`;
+    html += `
+      <div class="mixread-tooltip-section">
+        <div class="mixread-tooltip-label">📖 Definition</div>
+        <div class="mixread-tooltip-definition">${wordInfo.definition}</div>
+      </div>
+    `;
   }
 
+  // Example sentence
   if (wordInfo.example) {
-    html += `<div class="mixread-tooltip-example">Example: "${wordInfo.example}"</div>`;
+    html += `
+      <div class="mixread-tooltip-section">
+        <div class="mixread-tooltip-label">💡 Example</div>
+        <div class="mixread-tooltip-example">"${wordInfo.example}"</div>
+      </div>
+    `;
+  }
+
+  // Pronunciation button and Chinese (collapsible)
+  html += `
+    <div class="mixread-tooltip-section">
+      <button class="mixread-btn-pronounce" id="btn-pronounce" title="Click to pronounce">
+        🔊 Pronounce
+      </button>
+  `;
+
+  if (wordInfo.chinese) {
+    html += `
+      <div class="mixread-tooltip-chinese-toggle">
+        <input type="checkbox" id="toggle-chinese-detail" checked>
+        <label for="toggle-chinese-detail">中文: <strong>${wordInfo.chinese}</strong></label>
+      </div>
+    `;
   }
 
   html += `
+    </div>
     <div class="mixread-tooltip-actions">
       <button class="mixread-btn primary" id="btn-add-to-vocab">Add to Library</button>
       <button class="mixread-btn" id="btn-close">Close</button>
@@ -284,10 +322,28 @@ function createTooltip(event, word, wordInfo) {
   tooltip.style.top = rect.bottom + 5 + window.scrollY + "px";
   tooltip.style.left = rect.left + window.scrollX + "px";
 
+  // Add pronunciation button handler
+  const pronounceBtn = tooltip.querySelector("#btn-pronounce");
+  if (pronounceBtn) {
+    pronounceBtn.onclick = (e) => {
+      e.stopPropagation();
+      speakWord(word);
+    };
+  }
+
+  // Add Chinese toggle handler
+  const chineseToggle = tooltip.querySelector("#toggle-chinese-detail");
+  if (chineseToggle) {
+    const chineseLabel = tooltip.querySelector("label[for='toggle-chinese-detail']");
+    chineseToggle.onchange = () => {
+      chineseLabel.style.display = chineseToggle.checked ? "block" : "none";
+    };
+  }
+
   // Add button handlers
   tooltip.querySelector("#btn-add-to-vocab").onclick = () => {
     addWordToVocabulary(word);
-    tooltip.querySelector("#btn-add-to-vocab").textContent = "Added!";
+    tooltip.querySelector("#btn-add-to-vocab").textContent = "Added! ✓";
     setTimeout(() => tooltip.remove(), 1500);
   };
 
@@ -303,6 +359,23 @@ function createTooltip(event, word, wordInfo) {
       tooltip.remove();
     }, { once: true });
   }, 0);
+}
+
+/**
+ * Speak word pronunciation using Web Speech API
+ */
+function speakWord(word) {
+  if ('speechSynthesis' in window) {
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(word);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.8; // Slower speed for clarity
+    window.speechSynthesis.speak(utterance);
+  } else {
+    console.warn('Speech Synthesis API not supported');
+  }
 }
 
 /**
