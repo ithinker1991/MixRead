@@ -27,7 +27,6 @@ class ApiClient {
           'Content-Type': 'application/json',
         },
         mode: 'cors',
-        credentials: 'include',
       };
 
       if (data) {

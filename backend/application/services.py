@@ -158,16 +158,22 @@ class HighlightApplicationService:
                 user.known_words,
                 user.unknown_words
             ):
-                # Only highlight if has Chinese translation
+                # Try to get Chinese translation from two sources:
+                # 1. Chinese dictionary (for older words with high confidence)
+                # 2. Word info (for newly added words from CEFR-J)
                 chinese = self.chinese_dict.get(word_lower)
-                if chinese:
-                    highlighted.append(word_text)
-                    word_details.append({
-                        "word": word_text,
-                        "cefr_level": word_info.get("cefr_level"),
-                        "pos": word_info.get("pos"),
-                        "chinese": chinese
-                    })
+                if not chinese:
+                    # Fallback to Chinese translation in word info (from expanded vocabulary)
+                    chinese = word_info.get("chinese", "")
+
+                # Highlight the word (with or without translation)
+                highlighted.append(word_text)
+                word_details.append({
+                    "word": word_text,
+                    "cefr_level": word_info.get("cefr_level"),
+                    "pos": word_info.get("pos"),
+                    "chinese": chinese  # May be empty for C1/C2 words, but still highlighted
+                })
 
         return {
             "success": True,

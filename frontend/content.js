@@ -114,8 +114,72 @@ function tokenizeText(text) {
 }
 
 /**
+ * Send message to background script with retry logic
+ */
+function sendMessageWithRetry(message, callback, maxRetries = 3) {
+  let retries = 0;
+
+  function attempt() {
+    retries++;
+    try {
+      chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError) {
+          console.warn(`[MixRead] sendMessage error: ${chrome.runtime.lastError.message}`);
+          if (retries < maxRetries) {
+            console.log(`[MixRead] Retrying message send (attempt ${retries + 1}/${maxRetries})...`);
+            setTimeout(attempt, 100 * retries); // Exponential backoff
+          } else {
+            console.error('[MixRead] Failed to send message after', maxRetries, 'retries');
+            callback({ success: false, error: chrome.runtime.lastError.message });
+          }
+        } else if (response) {
+          callback(response);
+        } else {
+          console.error('[MixRead] No response from background script');
+          if (retries < maxRetries) {
+            console.log(`[MixRead] Retrying message send (attempt ${retries + 1}/${maxRetries})...`);
+            setTimeout(attempt, 100 * retries);
+          } else {
+            callback({ success: false, error: 'No response from background script' });
+          }
+        }
+      });
+    } catch (error) {
+      console.error('[MixRead] Exception sending message:', error);
+      if (retries < maxRetries) {
+        console.log(`[MixRead] Retrying message send (attempt ${retries + 1}/${maxRetries})...`);
+        setTimeout(attempt, 100 * retries);
+      } else {
+        callback({ success: false, error: error.message });
+      }
+    }
+  }
+
+  attempt();
+}
+
+/**
  * Walk through all text nodes and highlight words
  */
+/**
+ * Create a mapping of stems to original words
+ * Example: { drop: [drop, dropped, drops, dropping], run: [run, running, runs, ran] }
+ */
+function createStemMapping(words) {
+  const stemMap = {};
+
+  for (const word of words) {
+    const stem = Stemmer.stem(word);
+    if (!stemMap[stem]) {
+      stemMap[stem] = [];
+    }
+    stemMap[stem].push(word);
+  }
+
+  console.log('[MixRead] Created stem mapping for', Object.keys(stemMap).length, 'unique stems');
+  return stemMap;
+}
+
 function highlightPageWords() {
   // Prevent infinite loop from MutationObserver
   if (isHighlighting) {
@@ -125,6 +189,11 @@ function highlightPageWords() {
 
   isHighlighting = true;
   console.log('[MixRead] highlightPageWords called');
+  console.log('[MixRead] userStore initialized:', !!userStore);
+  console.log('[MixRead] currentDifficultyLevel:', currentDifficultyLevel);
+
+  // Clear previous highlights first to prevent duplicates
+  clearHighlights();
 
   // Get all words from the page
   const textNodes = getTextNodes(document.body);
@@ -135,33 +204,81 @@ function highlightPageWords() {
     allWords.push(...words);
   }
 
-  // Get unique words and send to backend
+  // Get unique words
   const uniqueWords = [...new Set(allWords)];
   console.log('[MixRead] Found', uniqueWords.length, 'unique words');
+  console.log('[MixRead] Sample words:', uniqueWords.slice(0, 10).join(', '));
+
+  // Create stem mapping: stem → [original words]
+  const stemMap = createStemMapping(uniqueWords);
+
+  // Get stems to query (unique stems instead of all words)
+  const stemsToQuery = Object.keys(stemMap);
+  console.log('[MixRead] Query backend with', stemsToQuery.length, 'unique stems');
+  console.log('[MixRead] Sample stems:', stemsToQuery.slice(0, 10).join(', '));
+
+  // Debug: Check if test words are in the mapping
+  const testWords = ['stranger', 'strangers', 'dream', 'dreamed', 'make', 'making', 'build', 'building'];
+  console.log('[MixRead] Test words stem mapping:');
+  testWords.forEach(word => {
+    const stem = Stemmer.stem(word);
+    const isInQuery = stemsToQuery.includes(stem);
+    console.log(`  ${word} → stem: ${stem}, in query: ${isInQuery}`);
+  });
 
   // Get user_id for API call (use userStore if initialized, fallback to legacy)
   const userId = userStore ? userStore.getUserId() : null;
+  console.log('[MixRead] user_id for API call:', userId);
 
-  // Send to background script to query API
-  chrome.runtime.sendMessage(
+  // Send to background script to query API with retry logic
+  console.log('[MixRead] === Sending to Background Script ===');
+  console.log('[MixRead] words (stemsToQuery):', stemsToQuery.slice(0, 20).join(', '), `... (${stemsToQuery.length} total)`);
+  console.log('[MixRead] difficulty_level:', currentDifficultyLevel);
+  console.log('[MixRead] user_id:', userId);
+
+  sendMessageWithRetry(
     {
       type: "GET_HIGHLIGHTED_WORDS",
-      words: uniqueWords,
+      words: stemsToQuery,  // Send stems instead of all variants
       difficulty_level: currentDifficultyLevel,
       user_id: userId,
     },
     (response) => {
       if (response.success) {
         highlightedWordsMap = {};
+
+        console.log('[MixRead] === API Response ===');
+        console.log('[MixRead] API returned highlighted_words:', response.highlighted_words);
+        console.log('[MixRead] API returned word_details count:', response.word_details?.length || 0);
+
+        // Expand highlighted stems back to all their original variants
+        const highlightedVariants = [];
         response.word_details.forEach((detail) => {
-          highlightedWordsMap[detail.word.toLowerCase()] = detail;
+          const stem = detail.word.toLowerCase();
+
+          // Get all variants of this stem from our mapping
+          const variants = stemMap[stem] || [stem];
+
+          // Debug: show mapping for test words
+          const testWords = ['stranger', 'dream', 'make', 'build', 'explore'];
+          if (testWords.includes(stem)) {
+            console.log(`[MixRead] Stem "${stem}" maps to variants:`, variants);
+          }
+
+          // Map each variant to the detail info
+          variants.forEach(variant => {
+            highlightedWordsMap[variant.toLowerCase()] = detail;
+            highlightedVariants.push(variant);
+          });
         });
 
-        console.log('[MixRead] Will highlight', response.highlighted_words.length, 'words');
+        console.log('[MixRead] Will highlight', highlightedVariants.length, 'word variants from', response.word_details.length, 'stems');
+        console.log('[MixRead] Highlighted stems:', response.highlighted_words);
         console.log('[MixRead] Sample word details:', response.word_details.slice(0, 3));
+        console.log('[MixRead] highlightedWordsMap keys:', Object.keys(highlightedWordsMap).slice(0, 20).join(', '));
 
         // Now walk through and actually highlight the words in the DOM
-        highlightWordsInDOM(response.highlighted_words);
+        highlightWordsInDOM(highlightedVariants);
       } else {
         console.error("[MixRead] Error getting highlighted words:", response.error);
       }
@@ -170,6 +287,34 @@ function highlightPageWords() {
       isHighlighting = false;
     }
   );
+}
+
+/**
+ * Clear all previous highlights before re-highlighting
+ * This prevents duplicate highlights and Chinese translations
+ */
+function clearHighlights() {
+  console.log('[MixRead] Clearing previous highlights...');
+
+  // Find all highlight spans
+  const highlightSpans = document.querySelectorAll('.mixread-highlight');
+  const chineseSpans = document.querySelectorAll('.mixread-chinese');
+
+  console.log('[MixRead] Found', highlightSpans.length, 'highlight spans and', chineseSpans.length, 'chinese spans to remove');
+
+  // For each highlight span, replace it with just the text
+  highlightSpans.forEach(span => {
+    const text = span.textContent;
+    const textNode = document.createTextNode(text);
+    span.parentNode.replaceChild(textNode, span);
+  });
+
+  // Remove all Chinese translation spans
+  chineseSpans.forEach(span => {
+    span.remove();
+  });
+
+  console.log('[MixRead] Highlights cleared');
 }
 
 /**
@@ -183,13 +328,17 @@ function getTextNodes(element) {
       // Skip if parent is script, style, or our own elements
       if (
         !["SCRIPT", "STYLE", "NOSCRIPT"].includes(node.parentElement.tagName) &&
-        !node.parentElement.classList.contains("mixread-tooltip")
+        !node.parentElement.classList.contains("mixread-tooltip") &&
+        !node.parentElement.classList.contains("mixread-highlight") &&
+        !node.parentElement.classList.contains("mixread-chinese")
       ) {
         textNodes.push(node);
       }
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       // Skip MixRead elements
-      if (!node.classList.contains("mixread-tooltip")) {
+      if (!node.classList.contains("mixread-tooltip") &&
+          !node.classList.contains("mixread-highlight") &&
+          !node.classList.contains("mixread-chinese")) {
         for (let child of node.childNodes) {
           walk(child);
         }
@@ -257,13 +406,6 @@ function highlightWordsInDOM(highlightedWords) {
           showTooltip(e, word);
         });
 
-        // Add right-click handler for context menu
-        span.addEventListener("contextmenu", (e) => {
-          if (contextMenu) {
-            contextMenu.show(e, word);
-          }
-        });
-
         fragment.appendChild(span);
 
         // Add Chinese translation if enabled and available
@@ -305,8 +447,8 @@ function showTooltip(event, word) {
     existingTooltip.remove();
   }
 
-  // Get word info from backend
-  chrome.runtime.sendMessage(
+  // Get word info from backend with retry logic
+  sendMessageWithRetry(
     {
       type: "GET_WORD_INFO",
       word: word,
@@ -433,12 +575,15 @@ function createTooltip(event, word, wordInfo) {
 
   document.body.appendChild(tooltip);
 
-  // Close tooltip when clicking outside
-  setTimeout(() => {
-    document.addEventListener("click", () => {
+  // Close tooltip when clicking outside (only click once)
+  const closeOnClickOutside = (e) => {
+    // Don't close if clicking inside the tooltip
+    if (!tooltip.contains(e.target)) {
+      document.removeEventListener("click", closeOnClickOutside);
       tooltip.remove();
-    }, { once: true });
-  }, 0);
+    }
+  };
+  document.addEventListener("click", closeOnClickOutside);
 }
 
 /**
@@ -483,9 +628,90 @@ function addWordToVocabulary(word) {
 
 // Listen for unknown words updates (from context menu)
 window.addEventListener('unknown-words-updated', () => {
+  console.log('[MixRead] Received "unknown-words-updated" event, re-highlighting page');
   logger.log('Unknown words updated, re-highlighting page');
+
+  if (unknownWordsStore) {
+    console.log('[MixRead] Current unknown words in store:', unknownWordsStore.getAll());
+  }
+
   highlightPageWords();
 });
+
+// Global context menu for any text on page
+document.addEventListener('contextmenu', (e) => {
+  if (!contextMenu) {
+    console.log('[MixRead] contextMenu not initialized yet');
+    return;
+  }
+
+  // Get the word at cursor position
+  const selection = window.getSelection();
+  let word = '';
+  const target = e.target;
+
+  // Try to get selected text first
+  if (selection.toString().length > 0) {
+    word = selection.toString().trim();
+  } else if (target.classList && target.classList.contains('mixread-highlight')) {
+    // Clicked on highlighted word (span)
+    word = target.dataset.word || target.textContent;
+  } else if (target.parentElement && target.parentElement.classList && target.parentElement.classList.contains('mixread-highlight')) {
+    // Clicked inside highlighted word span
+    word = target.parentElement.dataset.word || target.parentElement.textContent;
+  } else {
+    // Try to extract word from anywhere on page (including plain text nodes)
+    try {
+      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+
+      if (range) {
+        // Get the text node or container
+        let textNode = range.startContainer;
+
+        // If we got an element node, try to get its text content
+        if (textNode.nodeType !== Node.TEXT_NODE) {
+          // For element nodes, create a range and extract text
+          const nodeRange = document.createRange();
+          nodeRange.selectNodeContents(textNode);
+          const rangeText = nodeRange.toString();
+          const offset = range.startOffset;
+
+          // Try to find word at position
+          const wordPattern = /\b[a-z''-]+\b/gi;
+          let match;
+          while ((match = wordPattern.exec(rangeText)) !== null) {
+            if (match.index <= offset && match.index + match[0].length >= offset) {
+              word = match[0];
+              break;
+            }
+          }
+        } else {
+          // For text nodes, use the text directly
+          const text = textNode.textContent || '';
+          const offset = range.startOffset;
+
+          const wordPattern = /\b[a-z''-]+\b/gi;
+          let match;
+          while ((match = wordPattern.exec(text)) !== null) {
+            if (match.index <= offset && match.index + match[0].length >= offset) {
+              word = match[0];
+              break;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[MixRead] Error extracting word from context menu:', error);
+    }
+  }
+
+  if (word && word.length > 0) {
+    console.log('[MixRead] Showing context menu for word:', word);
+    contextMenu.show(e, word);
+  } else {
+    console.log('[MixRead] No word detected at context menu position');
+  }
+}, true); // Use capture phase to intercept right-click
 
 // Listen for difficulty level changes from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

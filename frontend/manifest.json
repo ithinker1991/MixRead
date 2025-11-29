@@ -21,6 +21,7 @@
         "scripts/logger.js",
         "scripts/storage.js",
         "scripts/api-client.js",
+        "scripts/stemmer.js",
         "modules/user/user-store.js",
         "modules/unknown-words/unknown-words-store.js",
         "modules/unknown-words/unknown-words-service.js",
