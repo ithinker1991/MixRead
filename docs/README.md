@@ -32,9 +32,6 @@
 - **[chinese-display-fix.md](03-features/chinese-display-fix.md)** - 中文显示不全问题修复方案
 - **[chinese-coverage-solution.md](03-features/chinese-coverage-solution.md)** - 保证高亮词都有中文翻译的解决方案
 
-### 🎯 [06-ai-guides](06-ai-guides/) - AI 助手指南
-- **[claude-guide.md](06-ai-guides/claude-guide.md)** - Claude Code AI 助手的项目指导文档（告诉 AI 如何帮你开发）
-
 ## 🎯 按使用场景快速导航
 
 | 场景 | 推荐文档 |
