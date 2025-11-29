@@ -11,6 +11,7 @@ Layered architecture:
 import json
 import os
 import asyncio
+import sys
 from typing import Optional
 
 import httpx
@@ -32,22 +33,29 @@ app = FastAPI(
     description="English reading enhancement with word difficulty control"
 )
 
-# Add Private Network Access support (for accessing localhost from HTTPS sites)
+# Add Private Network Access support FIRST (executes LAST in middleware stack)
+# This ensures headers are added to all responses
 @app.middleware("http")
 async def add_private_network_headers(request, call_next):
     response = await call_next(request)
-    # Always allow private network access
+    # Always allow private network access for all requests
     response.headers["Access-Control-Allow-Private-Network"] = "true"
+    sys.stderr.write(f"[CORS DEBUG] Added Private-Network header to {request.method} {request.url.path}\n")
+    sys.stderr.flush()
+    # For OPTIONS requests, also set these
+    if request.method == "OPTIONS":
+        response.headers["Access-Control-Request-Private-Network"] = "true"
     return response
 
-# Add CORS middleware with Private Network Access support
+# Add CORS middleware AFTER private network middleware
+# (will execute BEFORE in the stack)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
-    expose_headers=["*"],
+    expose_headers=["Access-Control-Allow-Private-Network"],
 )
 
 # Global data caches
