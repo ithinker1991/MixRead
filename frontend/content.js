@@ -22,45 +22,62 @@ let highlightFilter;
 
 // ===== Initialize Modules =====
 async function initializeModules() {
-  logger.info('Initializing MixRead modules...');
+  try {
+    console.log('[MixRead] Starting module initialization...');
+    logger.info('Initializing MixRead modules...');
 
-  // 1. Initialize user store
-  userStore = new UserStore();
-  await userStore.initialize();
-  const userId = userStore.getUserId();
-  const difficultyLevel = userStore.getDifficultyLevel();
-  logger.info(`User initialized - ID: ${userId}, Difficulty: ${difficultyLevel}`);
+    // 1. Initialize user store
+    userStore = new UserStore();
+    console.log('[MixRead] UserStore created');
+    await userStore.initialize();
+    const userId = userStore.getUserId();
+    const difficultyLevel = userStore.getDifficultyLevel();
+    console.log(`[MixRead] User initialized - ID: ${userId}, Difficulty: ${difficultyLevel}`);
+    logger.info(`User initialized - ID: ${userId}, Difficulty: ${difficultyLevel}`);
 
-  // 2. Initialize unknown words store
-  unknownWordsStore = new UnknownWordsStore();
-  await unknownWordsStore.load();
+    // 2. Initialize unknown words store
+    unknownWordsStore = new UnknownWordsStore();
+    console.log('[MixRead] UnknownWordsStore created');
+    await unknownWordsStore.load();
 
-  // 3. Initialize unknown words service
-  unknownWordsService = new UnknownWordsService(
-    unknownWordsStore,
-    apiClient,
-    userStore
-  );
+    // 3. Initialize unknown words service
+    unknownWordsService = new UnknownWordsService(
+      unknownWordsStore,
+      apiClient,
+      userStore
+    );
+    console.log('[MixRead] UnknownWordsService created');
 
-  // 4. Sync unknown words from backend
-  const backendWords = await unknownWordsService.loadFromBackend();
-  backendWords.forEach(word => unknownWordsStore.add(word));
-  await unknownWordsStore.sync();
-  logger.info(`Loaded ${backendWords.length} unknown words from backend`);
+    // 4. Sync unknown words from backend (with error handling)
+    try {
+      const backendWords = await unknownWordsService.loadFromBackend();
+      backendWords.forEach(word => unknownWordsStore.add(word));
+      await unknownWordsStore.sync();
+      console.log(`[MixRead] Loaded ${backendWords.length} unknown words from backend`);
+      logger.info(`Loaded ${backendWords.length} unknown words from backend`);
+    } catch (syncError) {
+      console.warn('[MixRead] Failed to sync with backend, continuing offline:', syncError);
+      logger.warn('Failed to sync unknown words from backend', syncError);
+    }
 
-  // 5. Initialize context menu
-  contextMenu = new ContextMenu(unknownWordsService);
+    // 5. Initialize context menu
+    contextMenu = new ContextMenu(unknownWordsService);
+    console.log('[MixRead] ContextMenu created');
 
-  // 6. Initialize highlight filter
-  highlightFilter = new HighlightFilter(unknownWordsStore, userStore);
+    // 6. Initialize highlight filter
+    highlightFilter = new HighlightFilter(unknownWordsStore, userStore);
+    console.log('[MixRead] HighlightFilter created');
 
-  logger.info('All modules initialized successfully');
+    console.log('[MixRead] ✅ All modules initialized successfully');
+    logger.info('All modules initialized successfully');
+  } catch (error) {
+    console.error('[MixRead] ❌ Failed to initialize modules:', error);
+    logger.error('Failed to initialize modules', error);
+  }
 }
 
-// Initialize modules on startup
-initializeModules().catch(error => {
-  logger.error('Failed to initialize modules', error);
-});
+// Modules will be initialized after highlighting starts
+// (see initializeModules().then(...) below)
 
 // ===== Legacy Settings Initialization =====
 // Load settings on startup for backward compatibility
@@ -494,12 +511,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// Start highlighting when page loads
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", highlightPageWords);
-} else {
-  highlightPageWords();
+// Start highlighting when page loads (after modules are initialized)
+function startHighlighting() {
+  console.log('[MixRead] Starting page highlighting...');
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      console.log('[MixRead] DOMContentLoaded, calling highlightPageWords');
+      highlightPageWords();
+    });
+  } else {
+    console.log('[MixRead] Document already loaded, calling highlightPageWords');
+    highlightPageWords();
+  }
 }
+
+// Call after initialization
+initializeModules().then(() => {
+  console.log('[MixRead] Modules initialized, starting highlighting');
+  startHighlighting();
+}).catch((error) => {
+  console.error('[MixRead] Initialization failed, but attempting to highlight anyway:', error);
+  startHighlighting();
+});
 
 // TODO: Re-enable MutationObserver for dynamic content (disabled to prevent infinite loop)
 // const observer = new MutationObserver(() => {
