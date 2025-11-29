@@ -108,6 +108,3 @@ class ContextMenu {
     }
   }
 }
-
-// Create global context menu instance (will be initialized in content.js)
-let contextMenu;

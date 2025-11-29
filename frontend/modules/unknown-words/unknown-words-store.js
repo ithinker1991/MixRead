@@ -117,6 +117,3 @@ class UnknownWordsStore {
     }
   }
 }
-
-// Create global store instance
-const unknownWordsStore = new UnknownWordsStore();

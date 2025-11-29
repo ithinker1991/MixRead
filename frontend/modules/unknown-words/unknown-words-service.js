@@ -166,6 +166,3 @@ class UnknownWordsService {
     return this.store.getAll();
   }
 }
-
-// Create global service instance (will be initialized in content.js)
-let unknownWordsService;

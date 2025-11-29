@@ -132,6 +132,3 @@ class UserStore {
     });
   }
 }
-
-// Create global user store instance
-const userStore = new UserStore();

@@ -75,6 +75,3 @@ class HighlightFilter {
     return true;
   }
 }
-
-// Create global highlight filter instance
-let highlightFilter;
