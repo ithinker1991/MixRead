@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Encyclopedia & Biography</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      line-height: 1.6;
+      background: #f5f5f5;
+    }
+    .test-section {
+      background: white;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      border-bottom: 2px solid #4CAF50;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #666;
+      margin-top: 30px;
+    }
+    .instructions {
+      background: #fff3cd;
+      border-left: 4px solid #ff9800;
+      padding: 15px;
+      margin: 20px 0;
+    }
+    .test-word {
+      font-weight: bold;
+      color: #2196F3;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔬 Test Page: Encyclopedia & Biography</h1>
+
+  <div class="instructions">
+    <h3>📋 Instructions</h3>
+    <ol>
+      <li>Make sure the MixRead extension is loaded</li>
+      <li>Set difficulty level to <strong>B1 or B2</strong></li>
+      <li>Check if the blue words below are highlighted (yellow background)</li>
+      <li>Open DevTools (F12) → Console to see diagnostic logs</li>
+    </ol>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Case 1: Lowercase Words</h2>
+    <p>
+      I love reading <span class="test-word">encyclopedia</span> articles and <span class="test-word">biography</span> books.
+      The <span class="test-word">encyclopedia</span> provides comprehensive information.
+    </p>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Case 2: Capitalized Words (Sentence Start)</h2>
+    <p>
+      <span class="test-word">Encyclopedia</span> is a great resource. <span class="test-word">Biography</span> tells life stories.
+      <span class="test-word">Encyclopedia</span> Britannica is famous.
+    </p>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Case 3: All Caps</h2>
+    <p>
+      The <span class="test-word">ENCYCLOPEDIA</span> and <span class="test-word">BIOGRAPHY</span> sections are popular.
+    </p>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Case 4: Mixed Content</h2>
+    <p>
+      Reading a <span class="test-word">biography</span> helps understand history.
+      The <span class="test-word">Encyclopedia</span> Britannica contains many <span class="test-word">biographies</span>.
+      I bought an <span class="test-word">encyclopedia</span> yesterday.
+    </p>
+  </div>
+
+  <div class="test-section">
+    <h2>Test Case 5: Other Problem Words</h2>
+    <p>
+      The word <span class="test-word">jockish</span> is not in the dictionary (should NOT highlight).
+      Britannica is a proper noun (should NOT highlight).
+    </p>
+  </div>
+
+  <div class="test-section">
+    <h2>Expected Results</h2>
+    <ul>
+      <li>✅ <code>encyclopedia</code> (lowercase) - Should highlight</li>
+      <li>✅ <code>Encyclopedia</code> (capitalized) - Should highlight</li>
+      <li>✅ <code>ENCYCLOPEDIA</code> (uppercase) - Should highlight</li>
+      <li>✅ <code>biography</code> (lowercase) - Should highlight</li>
+      <li>✅ <code>Biography</code> (capitalized) - Should highlight</li>
+      <li>✅ <code>BIOGRAPHY</code> (uppercase) - Should highlight</li>
+      <li>✅ <code>biographies</code> (plural) - Should highlight (via stemming)</li>
+      <li>❌ <code>jockish</code> - Should NOT highlight (not in DB)</li>
+      <li>❌ <code>Britannica</code> - Should NOT highlight (not in DB)</li>
+    </ul>
+  </div>
+
+  <script>
+    console.log('%c=== Encyclopedia & Biography Test Page ===', 'color: #4CAF50; font-size: 16px; font-weight: bold;');
+    console.log('This page tests if encyclopedia and biography are highlighted correctly');
+    console.log('Check the Console for [MixRead] logs to see the processing flow');
+
+    // Wait for page load and extension initialization
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        console.log('%cPage loaded. Waiting for extension to process...', 'color: blue;');
+      }, 500);
+
+      setTimeout(() => {
+        const highlights = document.querySelectorAll('.mixread-highlight');
+        console.log(`%cFound ${highlights.length} highlighted words`, 'color: green; font-weight: bold;');
+
+        const highlightedText = Array.from(highlights).map(h => h.textContent);
+        console.log('Highlighted words:', highlightedText);
+
+        // Check specific words
+        const testWords = ['encyclopedia', 'Encyclopedia', 'ENCYCLOPEDIA', 'biography', 'Biography', 'BIOGRAPHY', 'biographies'];
+        console.log('\nTest word results:');
+        testWords.forEach(word => {
+          const found = highlightedText.some(h => h.toLowerCase() === word.toLowerCase());
+          console.log(`  ${found ? '✅' : '❌'} ${word}: ${found ? 'HIGHLIGHTED' : 'NOT highlighted'}`);
+        });
+      }, 3000);
+    });
+  </script>
+</body>
+</html>

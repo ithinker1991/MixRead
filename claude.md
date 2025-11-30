@@ -131,9 +131,33 @@ Full Chinese translation creates dependency. MVP uses English definitions only t
 - Minimal, non-intrusive design
 
 ### Difficulty Slider (Core Innovation)
-- Low setting: More words annotated, easier to understand
-- High setting: Fewer annotations, challenges learner
-- Allows progressive transition from mixed to pure English reading
+
+**Product Logic**: The difficulty slider represents **the user's current English proficiency level**, not the difficulty of content they want to read.
+
+**Highlighting Rule**: The system highlights **words at or above the user's level** (word_difficulty >= user_level).
+
+**Rationale**:
+- If a user sets their level to B1, they already know A1-A2 words
+- We highlight B1-C2 words that match or exceed their current level
+- This helps users learn words appropriate for their next learning stage
+- As users improve, they raise the slider to reduce annotations
+
+**Example Behavior**:
+| User Level | Highlights | Purpose |
+|------------|-----------|----------|
+| A1 | A1 words only | Complete beginners learning basics |
+| A2 | A2-C2 words | Elementary learners building vocabulary |
+| B1 | B1-C2 words | Intermediate learners improving reading |
+| B2 | B2-C2 words | Upper-intermediate focusing on advanced words |
+| C1 | C1-C2 words | Advanced readers, minimal annotations |
+| C2 | C2 words only | Near-native, only most challenging words |
+
+**UI Description** (in popup):
+- "Your English Level" (not "Reading Difficulty")
+- Dynamic explanation: "Highlights [range] words - [description]"
+- Clear labeling: A1 (Beginner) ... C2 (Mastery)
+
+This design allows progressive learning: users gradually increase their level setting as they master more vocabulary, naturally transitioning from annotated to pure English reading.
 
 ## API Design Guidelines
 

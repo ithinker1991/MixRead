@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quick Diagnosis</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px;
+      margin: 0;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #252526;
+      padding: 20px;
+      border-radius: 5px;
+    }
+    h1 { color: #4ec9b0; margin-top: 0; }
+    .check {
+      padding: 10px;
+      margin: 10px 0;
+      border-left: 4px solid;
+      border-radius: 3px;
+    }
+    .check.pass { border-color: #4ec9b0; background: #0d3d2a; }
+    .check.fail { border-color: #f48771; background: #3d1a1a; }
+    .check.pending { border-color: #569cd6; background: #1a2d3d; }
+    button {
+      background: #569cd6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 3px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    button:hover { background: #4ec9b0; }
+    pre {
+      background: #1e1e1e;
+      padding: 10px;
+      border-radius: 3px;
+      overflow-x: auto;
+    }
+    .article {
+      background: white;
+      color: black;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 5px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚡ Quick Diagnosis Tool</h1>
+
+    <button onclick="runFullCheck()">🔍 Run Full Check</button>
+    <button onclick="testAPI()">🌐 Test Backend API</button>
+    <button onclick="checkExtension()">🧩 Check Extension</button>
+
+    <div id="results"></div>
+
+    <h2>Test Article</h2>
+    <div class="article">
+      <p>
+        I love reading encyclopedia articles and biography books.
+        The Encyclopedia Britannica is famous.
+        Biography tells life stories.
+      </p>
+    </div>
+
+    <h2>Diagnostic Logs</h2>
+    <pre id="logs"></pre>
+  </div>
+
+  <script>
+    const results = document.getElementById('results');
+    const logs = document.getElementById('logs');
+    let logLines = [];
+
+    function log(msg, type = 'info') {
+      const icons = { pass: '✅', fail: '❌', info: 'ℹ️', pending: '⏳' };
+      const line = `${icons[type] || 'ℹ️'} ${msg}`;
+      logLines.push(line);
+      logs.textContent = logLines.join('\n');
+      console.log(msg);
+    }
+
+    function addCheck(title, status, details) {
+      const div = document.createElement('div');
+      div.className = `check ${status}`;
+      div.innerHTML = `<strong>${title}</strong><br>${details}`;
+      results.appendChild(div);
+    }
+
+    async function testAPI() {
+      log('Testing backend API...', 'pending');
+      results.innerHTML = '';
+
+      // Test 1: Health check
+      try {
+        const res = await fetch('http://localhost:8000/health');
+        const data = await res.json();
+        addCheck('Backend Health', 'pass', `Status: ${data.status}, Words: ${data.words_loaded}`);
+        log(`Backend is running, ${data.words_loaded} words loaded`, 'pass');
+      } catch (e) {
+        addCheck('Backend Health', 'fail', `Error: ${e.message}`);
+        log(`Backend connection failed: ${e.message}`, 'fail');
+        return;
+      }
+
+      // Test 2: Word lookup
+      try {
+        const res = await fetch('http://localhost:8000/word/encyclopedia');
+        const data = await res.json();
+        if (data.found) {
+          addCheck('Word: encyclopedia', 'pass', `CEFR: ${data.cefr_level}, Chinese: ${data.chinese}`);
+          log(`encyclopedia found in database (${data.cefr_level})`, 'pass');
+        } else {
+          addCheck('Word: encyclopedia', 'fail', 'Not found in database');
+          log('encyclopedia NOT found in database', 'fail');
+        }
+      } catch (e) {
+        addCheck('Word: encyclopedia', 'fail', `Error: ${e.message}`);
+      }
+
+      // Test 3: Highlight API
+      try {
+        const res = await fetch('http://localhost:8000/highlight-words', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: 'test-user',
+            words: ['encyclopedia', 'biography'],
+            difficulty_level: 'B1'
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          addCheck('Highlight API', 'pass', `Returned ${data.highlighted_count} words: ${data.highlighted_words.join(', ')}`);
+          log(`Highlight API works: ${data.highlighted_count} words`, 'pass');
+        } else {
+          addCheck('Highlight API', 'fail', `Error: ${data.error}`);
+          log(`Highlight API failed: ${data.error}`, 'fail');
+        }
+      } catch (e) {
+        addCheck('Highlight API', 'fail', `Error: ${e.message}`);
+      }
+    }
+
+    function checkExtension() {
+      results.innerHTML = '';
+      log('Checking extension status...', 'pending');
+
+      // Check 1: Chrome extension API
+      if (typeof chrome !== 'undefined' && chrome.runtime) {
+        addCheck('Chrome Extension API', 'pass', 'Available');
+        log('Chrome extension API available', 'pass');
+      } else {
+        addCheck('Chrome Extension API', 'fail', 'Not available');
+        log('Chrome extension API NOT available', 'fail');
+        return;
+      }
+
+      // Check 2: Stemmer loaded
+      if (typeof Stemmer !== 'undefined') {
+        addCheck('Stemmer Module', 'pass', 'Loaded');
+        log('Stemmer module loaded', 'pass');
+
+        // Test stemmer
+        const test = Stemmer.stem('Encyclopedia');
+        log(`Stemmer test: "Encyclopedia" → "${test}"`, test === 'encyclopedia' ? 'pass' : 'fail');
+      } else {
+        addCheck('Stemmer Module', 'fail', 'Not loaded');
+        log('Stemmer module NOT loaded', 'fail');
+      }
+
+      // Check 3: Content script loaded
+      setTimeout(() => {
+        const highlights = document.querySelectorAll('.mixread-highlight');
+        if (highlights.length > 0) {
+          addCheck('Content Script', 'pass', `Found ${highlights.length} highlights`);
+          log(`Content script working: ${highlights.length} highlights`, 'pass');
+        } else {
+          addCheck('Content Script', 'fail', 'No highlights found after 3 seconds');
+          log('Content script NOT working: no highlights', 'fail');
+        }
+      }, 3000);
+
+      // Check 4: Look for MixRead logs
+      log('Check browser console for [MixRead] logs', 'info');
+    }
+
+    async function runFullCheck() {
+      logLines = [];
+      results.innerHTML = '';
+      log('=== Starting Full Diagnostic ===', 'info');
+
+      await testAPI();
+      checkExtension();
+    }
+
+    // Auto-run on load
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        log('Page loaded. Click "Run Full Check" to diagnose.', 'info');
+      }, 500);
+    });
+  </script>
+</body>
+</html>

@@ -12,6 +12,34 @@ const DIFFICULTY_LEVELS = {
   6: "C2",
 };
 
+// Level descriptions - explains what each level means
+const LEVEL_DESCRIPTIONS = {
+  "A1": {
+    range: "A1 only",
+    description: "Beginner - highlights only the most basic words for complete beginners"
+  },
+  "A2": {
+    range: "A2-C2",
+    description: "Elementary - highlights words from basic to advanced, helping you build vocabulary"
+  },
+  "B1": {
+    range: "B1-C2",
+    description: "Intermediate - highlights intermediate and advanced words to improve reading"
+  },
+  "B2": {
+    range: "B2-C2",
+    description: "Upper-Intermediate - highlights advanced words for skilled readers"
+  },
+  "C1": {
+    range: "C1-C2",
+    description: "Advanced - highlights only difficult words, minimal annotations"
+  },
+  "C2": {
+    range: "C2 only",
+    description: "Mastery - highlights only the most challenging words for near-native readers"
+  }
+};
+
 const difficultySlider = document.getElementById("difficulty-slider");
 const currentLevelDisplay = document.getElementById("current-level");
 const vocabCountDisplay = document.getElementById("vocab-count");
@@ -124,6 +152,22 @@ function updateDifficultyDisplay(value) {
 
   display.style.background = bgColor;
   display.style.color = textColor;
+
+  // Update level description
+  updateLevelDescription(level);
+}
+
+/**
+ * Update level description text
+ */
+function updateLevelDescription(level) {
+  const descriptionElement = document.getElementById("level-description");
+  if (!descriptionElement) return;
+
+  const info = LEVEL_DESCRIPTIONS[level];
+  if (!info) return;
+
+  descriptionElement.innerHTML = `Highlights <strong>${info.range}</strong> words - ${info.description}`;
 }
 
 /**
