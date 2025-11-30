@@ -34,3 +34,4 @@ diagnose.html
 # Temporary files
 *.tmp
 *.bak
+*.db
