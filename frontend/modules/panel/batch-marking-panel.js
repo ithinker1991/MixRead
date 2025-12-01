@@ -138,18 +138,24 @@ class BatchMarkingPanel {
     const contentArea = document.querySelector('#panel-content-area');
     if (!contentArea) return;
 
-    contentArea.addEventListener('mousedown', (e) => this.handleSelectionStart(e));
-    contentArea.addEventListener('mousemove', (e) => this.handleSelectionMove(e));
-    contentArea.addEventListener('mouseup', (e) => this.handleSelectionEnd(e));
-    contentArea.addEventListener('mouseleave', (e) => this.handleSelectionEnd(e));
+    // Use document-level listeners for better tracking
+    document.addEventListener('mousedown', (e) => this.handleSelectionStart(e));
+    document.addEventListener('mousemove', (e) => this.handleSelectionMove(e));
+    document.addEventListener('mouseup', (e) => this.handleSelectionEnd(e));
   }
 
   /**
    * Handle rectangle selection start
    */
   handleSelectionStart(e) {
-    // Don't select if clicking on checkbox or word
-    if (e.target.closest('.word-item') || e.target.type === 'checkbox') {
+    // Check if we're inside the panel
+    const panel = this.panelElement;
+    if (!panel) return;
+
+    // Don't select if clicking on checkbox, word, or outside content area
+    if (e.target.closest('.word-item') ||
+        e.target.type === 'checkbox' ||
+        !e.target.closest('#panel-content-area')) {
       return;
     }
 
@@ -165,27 +171,37 @@ class BatchMarkingPanel {
     if (!this.isSelecting || !this.selectionStart) return;
 
     const canvas = this.panelElement.querySelector('.selection-canvas');
-    const contentArea = document.querySelector('#panel-content-area');
-    const rect = contentArea.getBoundingClientRect();
 
-    const startX = this.selectionStart.x - rect.left;
-    const startY = this.selectionStart.y - rect.top;
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
+    // Calculate current position relative to viewport
+    const currentX = e.clientX;
+    const currentY = e.clientY;
+    const startX = this.selectionStart.x;
+    const startY = this.selectionStart.y;
 
+    // Calculate rectangle dimensions
     const x = Math.min(startX, currentX);
     const y = Math.min(startY, currentY);
     const width = Math.abs(currentX - startX);
     const height = Math.abs(currentY - startY);
 
-    // Draw selection rectangle - relative to content area
+    // Position canvas relative to viewport (no transforms)
     canvas.style.left = x + 'px';
     canvas.style.top = y + 'px';
     canvas.style.width = width + 'px';
     canvas.style.height = height + 'px';
     canvas.classList.add('active');
 
+    // Store for later use in word selection
     this.selectionRect = { x, y, width, height };
+
+    // Debug info
+    if (console.debug) {
+      console.debug('[BatchMarkingPanel] Selection updated:', {
+        start: { x: startX, y: startY },
+        current: { x: currentX, y: currentY },
+        rect: this.selectionRect
+      });
+    }
   }
 
   /**
@@ -220,28 +236,22 @@ class BatchMarkingPanel {
       const label = checkbox.closest('.word-item');
       if (!label) return;
 
+      // Get label's position in viewport
       const labelRect = label.getBoundingClientRect();
-      const contentArea = document.querySelector('#panel-content-area');
-      const contentRect = contentArea.getBoundingClientRect();
 
-      // Get label position relative to content area
-      const labelX = labelRect.left - contentRect.left;
-      const labelY = labelRect.top - contentRect.top;
-      const labelWidth = labelRect.width;
-      const labelHeight = labelRect.height;
-
-      // Check if label overlaps with selection rectangle
-      // The rect coordinates are already relative to content area
-      if (labelX + labelWidth > rect.x &&
-          labelX < rect.x + rect.width &&
-          labelY + labelHeight > rect.y &&
-          labelY < rect.y + rect.height) {
+      // Check if label overlaps with selection rectangle (both in viewport coordinates)
+      if (labelRect.right > rect.x &&
+          labelRect.left < rect.x + rect.width &&
+          labelRect.bottom > rect.y &&
+          labelRect.top < rect.y + rect.height) {
         checkbox.checked = !checkbox.checked;
         selectedCount++;
+        console.log(`[BatchMarkingPanel] Toggled word: ${checkbox.dataset.word}`);
       }
     });
 
     console.log(`[BatchMarkingPanel] Selected ${selectedCount} words in rectangle`);
+    console.log('[BatchMarkingPanel] Rectangle bounds:', rect);
   }
 
   /**
