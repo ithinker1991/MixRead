@@ -5,7 +5,8 @@
   "description": "Improve your English reading with intelligent word highlighting and definitions",
   "permissions": [
     "storage",
-    "scripting"
+    "scripting",
+    "contextMenus"
   ],
   "host_permissions": [
     "http://localhost:8000/*",

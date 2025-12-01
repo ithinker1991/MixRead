@@ -533,6 +533,7 @@ function createTooltip(event, word, wordInfo) {
     </div>
     <div class="mixread-tooltip-actions">
       <button class="mixread-btn primary" id="btn-add-to-vocab">Add to Library</button>
+      <button class="mixread-btn success" id="btn-mark-known">Mark as Known</button>
       <button class="mixread-btn" id="btn-close">Close</button>
     </div>
   `;
@@ -566,6 +567,13 @@ function createTooltip(event, word, wordInfo) {
   tooltip.querySelector("#btn-add-to-vocab").onclick = () => {
     addWordToVocabulary(word);
     tooltip.querySelector("#btn-add-to-vocab").textContent = "Added! ✓";
+    setTimeout(() => tooltip.remove(), 1500);
+  };
+
+  // Mark as Known button handler
+  tooltip.querySelector("#btn-mark-known").onclick = () => {
+    markWordAsKnown(word);
+    tooltip.querySelector("#btn-mark-known").textContent = "Marked as Known ✓";
     setTimeout(() => tooltip.remove(), 1500);
   };
 
@@ -622,6 +630,52 @@ function addWordToVocabulary(word) {
       vocabulary_dates: dates,
     });
   });
+}
+
+/**
+ * Mark a word as known (user already knows it)
+ * Calls backend API to persist the marking
+ */
+function markWordAsKnown(word) {
+  const wordLower = word.toLowerCase();
+
+  // Get user ID from userStore
+  if (!userStore) {
+    console.warn('[MixRead] userStore not initialized');
+    logger.warn('Failed to mark word as known: userStore not initialized');
+    return;
+  }
+
+  const userId = userStore.getUserId();
+  if (!userId) {
+    console.warn('[MixRead] No user ID available');
+    logger.warn('Failed to mark word as known: no user ID');
+    return;
+  }
+
+  console.log(`[MixRead] Marking "${word}" as known for user: ${userId}`);
+  logger.log(`Marking "${word}" as known`);
+
+  // Call backend API to mark word as known
+  chrome.runtime.sendMessage(
+    {
+      type: "MARK_AS_KNOWN",
+      user_id: userId,
+      word: wordLower,
+    },
+    (response) => {
+      if (response?.success) {
+        console.log(`[MixRead] Successfully marked "${word}" as known`);
+        logger.info(`"${word}" marked as known`);
+
+        // Trigger page re-highlight to update highlights
+        highlightPageWords();
+      } else {
+        console.error(`[MixRead] Failed to mark "${word}" as known:`, response?.error);
+        logger.error(`Failed to mark "${word}" as known`, response?.error);
+      }
+    }
+  );
 }
 
 // ===== Event Listeners =====
@@ -733,6 +787,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     // Re-highlight the page to show/hide Chinese
     highlightPageWords();
+    sendResponse({ success: true });
+  } else if (request.type === "CONTEXT_MARK_UNKNOWN") {
+    // Handle Mark as Unknown from context menu
+    const word = request.word;
+    console.log('[MixRead] Context menu: Marking as unknown:', word);
+    unknownWordsService.markAsUnknown(word).then(() => {
+      console.log('[MixRead] Successfully marked as unknown:', word);
+      highlightPageWords();
+      sendResponse({ success: true });
+    }).catch((error) => {
+      console.error('[MixRead] Error marking as unknown:', error);
+      sendResponse({ success: false, error: error.message });
+    });
+    return true; // Keep the message channel open for async response
+  } else if (request.type === "CONTEXT_MARK_KNOWN") {
+    // Handle Mark as Known from context menu
+    const word = request.word;
+    console.log('[MixRead] Context menu: Marking as known:', word);
+    markWordAsKnown(word);
     sendResponse({ success: true });
   }
 });

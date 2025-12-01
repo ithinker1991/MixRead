@@ -5,6 +5,55 @@
 
 const API_BASE = "http://localhost:8000";
 
+// ===== Context Menu Setup =====
+
+/**
+ * Create context menu items when extension loads
+ */
+chrome.runtime.onInstalled.addListener(() => {
+  console.log('[Background] Creating context menus');
+
+  // Create context menu for selecting text
+  chrome.contextMenus.create({
+    id: 'mixread-mark-unknown',
+    title: 'Mark as Unknown (MixRead)',
+    contexts: ['selection', 'page'],
+  });
+
+  chrome.contextMenus.create({
+    id: 'mixread-mark-known',
+    title: 'Mark as Known (MixRead)',
+    contexts: ['selection', 'page'],
+  });
+});
+
+/**
+ * Handle context menu item clicks
+ */
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  console.log('[Background] Context menu clicked:', info.menuItemId);
+  console.log('[Background] Selected text:', info.selectionText);
+
+  const word = info.selectionText?.trim().toLowerCase();
+
+  if (!word) {
+    console.warn('[Background] No word selected');
+    return;
+  }
+
+  try {
+    // Send message to content script to handle the action
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: info.menuItemId === 'mixread-mark-unknown' ? 'CONTEXT_MARK_UNKNOWN' : 'CONTEXT_MARK_KNOWN',
+      word: word,
+    });
+
+    console.log('[Background] Content script response:', response);
+  } catch (error) {
+    console.error('[Background] Error sending message to content script:', error);
+  }
+});
+
 // Listen for messages from content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "GET_HIGHLIGHTED_WORDS") {
@@ -13,6 +62,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleGetWordInfo(request, sendResponse);
   } else if (request.type === "GET_USER_DATA") {
     handleGetUserData(request, sendResponse);
+  } else if (request.type === "MARK_AS_KNOWN") {
+    handleMarkAsKnown(request, sendResponse);
   }
   return true; // Keep the message channel open for async response
 });
@@ -129,6 +180,49 @@ async function handleGetUserData(request, sendResponse) {
     });
   } catch (error) {
     console.error("Error in handleGetUserData:", error);
+    sendResponse({
+      success: false,
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Mark a word as known (user already knows it)
+ */
+async function handleMarkAsKnown(request, sendResponse) {
+  try {
+    const { user_id, word } = request;
+
+    if (!user_id || !word) {
+      throw new Error("user_id and word are required");
+    }
+
+    console.log('[Background] Marking word as known:', word, 'for user:', user_id);
+
+    const response = await fetch(`${API_BASE}/users/${encodeURIComponent(user_id)}/known-words`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        word: word.toLowerCase(),
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('[Background] Word marked as known:', data);
+
+    sendResponse({
+      success: true,
+      message: `"${word}" marked as known`,
+    });
+  } catch (error) {
+    console.error("Error in handleMarkAsKnown:", error);
     sendResponse({
       success: false,
       error: error.message,
