@@ -30,11 +30,20 @@ class BatchMarkingPanel {
 
         <div class="panel-stats">
           📊 <span id="panel-total-words">0</span> 个高亮单词
+          <span class="selection-hint">💡 拖动框选或使用快速选择</span>
         </div>
 
-        <div class="panel-content">
+        <div class="panel-quick-select">
+          <button id="quick-select-high" class="quick-btn" title="快速选择高频词">🔴 高频</button>
+          <button id="quick-select-medium" class="quick-btn" title="快速选择中频词">🟡 中频</button>
+          <button id="quick-select-low" class="quick-btn" title="快速选择低频词">🟢 低频</button>
+        </div>
+
+        <div class="panel-content" id="panel-content-area">
           <div class="loading">加载中...</div>
         </div>
+
+        <div class="selection-canvas"></div>
 
         <div class="panel-toolbar">
           <button id="select-all-btn" class="toolbar-btn">全选</button>
@@ -62,7 +71,13 @@ class BatchMarkingPanel {
     document.body.insertAdjacentHTML('beforeend', panelHTML);
     this.panelElement = document.querySelector('#mixread-batch-panel');
 
+    // Initialize selection state
+    this.isSelecting = false;
+    this.selectionStart = null;
+    this.selectionRect = null;
+
     this.attachEventListeners();
+    this.attachSelectionListeners();
     console.log('[BatchMarkingPanel] Panel initialized');
   }
 
@@ -73,6 +88,16 @@ class BatchMarkingPanel {
     // Close button
     this.panelElement.querySelector('.panel-close-btn')
       .addEventListener('click', () => this.close());
+
+    // Quick select buttons
+    document.querySelector('#quick-select-high')
+      .addEventListener('click', () => this.quickSelectByFrequency('high'));
+
+    document.querySelector('#quick-select-medium')
+      .addEventListener('click', () => this.quickSelectByFrequency('medium'));
+
+    document.querySelector('#quick-select-low')
+      .addEventListener('click', () => this.quickSelectByFrequency('low'));
 
     // Toolbar buttons
     document.querySelector('#select-all-btn')
@@ -104,6 +129,136 @@ class BatchMarkingPanel {
         this.close();
       }
     });
+  }
+
+  /**
+   * Attach selection (lasso/rectangle select) listeners
+   */
+  attachSelectionListeners() {
+    const contentArea = document.querySelector('#panel-content-area');
+    if (!contentArea) return;
+
+    contentArea.addEventListener('mousedown', (e) => this.handleSelectionStart(e));
+    contentArea.addEventListener('mousemove', (e) => this.handleSelectionMove(e));
+    contentArea.addEventListener('mouseup', (e) => this.handleSelectionEnd(e));
+    contentArea.addEventListener('mouseleave', (e) => this.handleSelectionEnd(e));
+  }
+
+  /**
+   * Handle rectangle selection start
+   */
+  handleSelectionStart(e) {
+    // Don't select if clicking on checkbox or word
+    if (e.target.closest('.word-item') || e.target.type === 'checkbox') {
+      return;
+    }
+
+    this.isSelecting = true;
+    this.selectionStart = { x: e.clientX, y: e.clientY };
+    console.log('[BatchMarkingPanel] Selection started at', this.selectionStart);
+  }
+
+  /**
+   * Handle rectangle selection move
+   */
+  handleSelectionMove(e) {
+    if (!this.isSelecting || !this.selectionStart) return;
+
+    const canvas = this.panelElement.querySelector('.selection-canvas');
+    const contentArea = document.querySelector('#panel-content-area');
+    const rect = contentArea.getBoundingClientRect();
+
+    const startX = this.selectionStart.x - rect.left;
+    const startY = this.selectionStart.y - rect.top;
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+
+    const x = Math.min(startX, currentX);
+    const y = Math.min(startY, currentY);
+    const width = Math.abs(currentX - startX);
+    const height = Math.abs(currentY - startY);
+
+    // Draw selection rectangle
+    canvas.style.left = x + 'px';
+    canvas.style.top = y + 'px';
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    canvas.classList.add('active');
+
+    this.selectionRect = { x, y, width, height };
+  }
+
+  /**
+   * Handle rectangle selection end
+   */
+  handleSelectionEnd(e) {
+    if (!this.isSelecting || !this.selectionRect) {
+      this.isSelecting = false;
+      const canvas = this.panelElement.querySelector('.selection-canvas');
+      canvas.classList.remove('active');
+      return;
+    }
+
+    // Select words in rectangle
+    this.selectWordsInRect(this.selectionRect);
+
+    this.isSelecting = false;
+    const canvas = this.panelElement.querySelector('.selection-canvas');
+    canvas.classList.remove('active');
+
+    console.log('[BatchMarkingPanel] Selection ended');
+  }
+
+  /**
+   * Select words within rectangle
+   */
+  selectWordsInRect(rect) {
+    const checkboxes = this.panelElement.querySelectorAll('.word-checkbox');
+    let selectedCount = 0;
+
+    checkboxes.forEach(checkbox => {
+      const label = checkbox.closest('.word-item');
+      if (!label) return;
+
+      const labelRect = label.getBoundingClientRect();
+      const contentArea = document.querySelector('#panel-content-area');
+      const contentRect = contentArea.getBoundingClientRect();
+
+      const labelX = labelRect.left - contentRect.left;
+      const labelY = labelRect.top - contentRect.top;
+
+      // Check if label overlaps with selection rectangle
+      if (labelX < rect.x + rect.width &&
+          labelX + labelRect.width > rect.x &&
+          labelY < rect.y + rect.height &&
+          labelY + labelRect.height > rect.y) {
+        checkbox.checked = !checkbox.checked;
+        selectedCount++;
+      }
+    });
+
+    console.log(`[BatchMarkingPanel] Selected ${selectedCount} words in rectangle`);
+  }
+
+  /**
+   * Quick select by frequency
+   */
+  quickSelectByFrequency(frequency) {
+    if (!this.groups || !this.groups[frequency]) return;
+
+    const wordsInGroup = this.groups[frequency].map(item => item.word);
+    const checkboxes = this.panelElement.querySelectorAll('.word-checkbox');
+
+    let selectedCount = 0;
+    checkboxes.forEach(checkbox => {
+      if (wordsInGroup.includes(checkbox.dataset.word)) {
+        checkbox.checked = !checkbox.checked;
+        selectedCount++;
+      }
+    });
+
+    const groupNames = { high: '高频', medium: '中频', low: '低频' };
+    console.log(`[BatchMarkingPanel] Quick selected ${selectedCount} ${groupNames[frequency]} words`);
   }
 
   /**
