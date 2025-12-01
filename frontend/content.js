@@ -637,7 +637,8 @@ function addWordToVocabulary(word) {
  * Calls backend API to persist the marking
  */
 function markWordAsKnown(word) {
-  const wordLower = word.toLowerCase();
+  // Use stemmer to normalize word form (evaluates → evalu)
+  const stemmedWord = Stemmer.stem(word);
 
   // Get user ID from userStore
   if (!userStore) {
@@ -653,7 +654,7 @@ function markWordAsKnown(word) {
     return;
   }
 
-  console.log(`[MixRead] Marking "${word}" as known for user: ${userId}`);
+  console.log(`[MixRead] Marking "${word}" as known (stem: "${stemmedWord}") for user: ${userId}`);
   logger.log(`Marking "${word}" as known`);
 
   // Call backend API to mark word as known
@@ -661,11 +662,11 @@ function markWordAsKnown(word) {
     {
       type: "MARK_AS_KNOWN",
       user_id: userId,
-      word: wordLower,
+      word: stemmedWord,
     },
     (response) => {
       if (response?.success) {
-        console.log(`[MixRead] Successfully marked "${word}" as known`);
+        console.log(`[MixRead] Successfully marked "${stemmedWord}" as known`);
         logger.info(`"${word}" marked as known`);
 
         // Trigger page re-highlight to update highlights
@@ -721,9 +722,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.type === "CONTEXT_MARK_UNKNOWN") {
     // Handle Mark as Unknown from context menu
     const word = request.word;
-    console.log('[MixRead] Context menu: Marking as unknown:', word);
-    unknownWordsService.markAsUnknown(word).then(() => {
-      console.log('[MixRead] Successfully marked as unknown:', word);
+    // Use stemmer to normalize word form (recognizing → recogniz)
+    const stemmedWord = Stemmer.stem(word);
+    console.log(`[MixRead] Context menu: Marking as unknown: "${word}" (stem: "${stemmedWord}")`);
+    unknownWordsService.markAsUnknown(stemmedWord).then(() => {
+      console.log('[MixRead] Successfully marked as unknown:', stemmedWord);
       highlightPageWords();
       sendResponse({ success: true });
     }).catch((error) => {
@@ -734,8 +737,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.type === "CONTEXT_MARK_KNOWN") {
     // Handle Mark as Known from context menu
     const word = request.word;
-    console.log('[MixRead] Context menu: Marking as known:', word);
-    markWordAsKnown(word);
+    // Use stemmer to normalize word form (emphasizes → emphas)
+    const stemmedWord = Stemmer.stem(word);
+    console.log(`[MixRead] Context menu: Marking as known: "${word}" (stem: "${stemmedWord}")`);
+    markWordAsKnown(word);  // markWordAsKnown will apply stemming internally
     sendResponse({ success: true });
   }
 });
