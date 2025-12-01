@@ -178,7 +178,7 @@ class BatchMarkingPanel {
     const width = Math.abs(currentX - startX);
     const height = Math.abs(currentY - startY);
 
-    // Draw selection rectangle
+    // Draw selection rectangle - relative to content area
     canvas.style.left = x + 'px';
     canvas.style.top = y + 'px';
     canvas.style.width = width + 'px';
@@ -224,14 +224,18 @@ class BatchMarkingPanel {
       const contentArea = document.querySelector('#panel-content-area');
       const contentRect = contentArea.getBoundingClientRect();
 
+      // Get label position relative to content area
       const labelX = labelRect.left - contentRect.left;
       const labelY = labelRect.top - contentRect.top;
+      const labelWidth = labelRect.width;
+      const labelHeight = labelRect.height;
 
       // Check if label overlaps with selection rectangle
-      if (labelX < rect.x + rect.width &&
-          labelX + labelRect.width > rect.x &&
-          labelY < rect.y + rect.height &&
-          labelY + labelRect.height > rect.y) {
+      // The rect coordinates are already relative to content area
+      if (labelX + labelWidth > rect.x &&
+          labelX < rect.x + rect.width &&
+          labelY + labelHeight > rect.y &&
+          labelY < rect.y + rect.height) {
         checkbox.checked = !checkbox.checked;
         selectedCount++;
       }

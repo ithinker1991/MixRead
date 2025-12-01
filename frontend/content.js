@@ -756,8 +756,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: true });
     } else {
       console.error('[MixRead] Batch marking panel not initialized');
-      sendResponse({ success: false, error: 'Panel not initialized' });
+      console.log('[MixRead] Waiting for initialization...');
+      setTimeout(() => {
+        if (batchMarkingPanel) {
+          console.log('[MixRead] Panel initialized, now opening');
+          batchMarkingPanel.toggle();
+          sendResponse({ success: true });
+        } else {
+          sendResponse({ success: false, error: 'Panel initialization failed' });
+        }
+      }, 1000);
     }
+    return true; // Keep message channel open
   }
 });
 

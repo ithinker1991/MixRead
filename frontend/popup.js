@@ -256,12 +256,26 @@ btnResetVocab.addEventListener("click", () => {
  */
 if (btnBatchMark) {
   btnBatchMark.addEventListener("click", () => {
+    console.log('[Popup] Batch mark button clicked');
+
     // Send message to content script to open batch marking panel
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      console.log('[Popup] Current tabs:', tabs);
+
       if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, {
+        const tabId = tabs[0].id;
+        console.log('[Popup] Sending message to tab:', tabId);
+
+        chrome.tabs.sendMessage(tabId, {
           type: "OPEN_BATCH_PANEL",
+        }, (response) => {
+          console.log('[Popup] Message response:', response);
+          if (chrome.runtime.lastError) {
+            console.error('[Popup] Error sending message:', chrome.runtime.lastError);
+          }
         });
+      } else {
+        console.error('[Popup] No active tab found');
       }
     });
   });
