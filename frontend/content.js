@@ -693,79 +693,9 @@ window.addEventListener('unknown-words-updated', () => {
 });
 
 // Global context menu for any text on page
-document.addEventListener('contextmenu', (e) => {
-  if (!contextMenu) {
-    console.log('[MixRead] contextMenu not initialized yet');
-    return;
-  }
-
-  // Get the word at cursor position
-  const selection = window.getSelection();
-  let word = '';
-  const target = e.target;
-
-  // Try to get selected text first
-  if (selection.toString().length > 0) {
-    word = selection.toString().trim();
-  } else if (target.classList && target.classList.contains('mixread-highlight')) {
-    // Clicked on highlighted word (span)
-    word = target.dataset.word || target.textContent;
-  } else if (target.parentElement && target.parentElement.classList && target.parentElement.classList.contains('mixread-highlight')) {
-    // Clicked inside highlighted word span
-    word = target.parentElement.dataset.word || target.parentElement.textContent;
-  } else {
-    // Try to extract word from anywhere on page (including plain text nodes)
-    try {
-      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
-
-      if (range) {
-        // Get the text node or container
-        let textNode = range.startContainer;
-
-        // If we got an element node, try to get its text content
-        if (textNode.nodeType !== Node.TEXT_NODE) {
-          // For element nodes, create a range and extract text
-          const nodeRange = document.createRange();
-          nodeRange.selectNodeContents(textNode);
-          const rangeText = nodeRange.toString();
-          const offset = range.startOffset;
-
-          // Try to find word at position
-          const wordPattern = /\b[a-z''-]+\b/gi;
-          let match;
-          while ((match = wordPattern.exec(rangeText)) !== null) {
-            if (match.index <= offset && match.index + match[0].length >= offset) {
-              word = match[0];
-              break;
-            }
-          }
-        } else {
-          // For text nodes, use the text directly
-          const text = textNode.textContent || '';
-          const offset = range.startOffset;
-
-          const wordPattern = /\b[a-z''-]+\b/gi;
-          let match;
-          while ((match = wordPattern.exec(text)) !== null) {
-            if (match.index <= offset && match.index + match[0].length >= offset) {
-              word = match[0];
-              break;
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('[MixRead] Error extracting word from context menu:', error);
-    }
-  }
-
-  if (word && word.length > 0) {
-    console.log('[MixRead] Showing context menu for word:', word);
-    contextMenu.show(e, word);
-  } else {
-    console.log('[MixRead] No word detected at context menu position');
-  }
-}, true); // Use capture phase to intercept right-click
+// Note: Custom context menu disabled to allow Chrome native context menus
+// Users now use Chrome's native right-click menu with "Mark as Unknown" and "Mark as Known" options
+// See background.js for chrome.contextMenus implementation
 
 // Listen for difficulty level changes from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
