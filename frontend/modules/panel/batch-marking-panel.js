@@ -13,6 +13,7 @@ class BatchMarkingPanel {
     this.isOpen = false;
     this.wordFrequency = {};
     this.groups = null;
+    this.showChinese = true; // Default to show Chinese
   }
 
   /**
@@ -31,6 +32,14 @@ class BatchMarkingPanel {
         <div class="panel-stats">
           📊 <span id="panel-total-words">0</span> 个高亮单词
           <span class="selection-hint">💡 拖动框选或使用快速选择</span>
+        </div>
+
+        <div class="panel-settings">
+          <label class="toggle-switch">
+            <input type="checkbox" id="show-chinese-toggle" checked>
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">显示中文释义</span>
+          </label>
         </div>
 
         <div class="panel-quick-select">
@@ -122,6 +131,13 @@ class BatchMarkingPanel {
 
     document.querySelector('#confirm-ok')
       .addEventListener('click', () => this.executeAction());
+
+    // Chinese toggle
+    document.querySelector('#show-chinese-toggle')
+      .addEventListener('change', (e) => {
+        this.showChinese = e.target.checked;
+        this.renderContent(); // Re-render with new setting
+      });
 
     // Close on outside click
     this.panelElement.addEventListener('click', (e) => {
@@ -283,7 +299,31 @@ class BatchMarkingPanel {
       const word = element.dataset.word || element.textContent;
       const wordLower = word.toLowerCase();
 
-      wordFrequency[wordLower] = (wordFrequency[wordLower] || 0) + 1;
+      if (!wordFrequency[wordLower]) {
+        wordFrequency[wordLower] = {
+          count: 0,
+          originalWords: new Set(),
+          baseWord: wordLower,
+          chinese: element.dataset.chinese || '',
+          definition: element.dataset.definition || ''
+        };
+      }
+
+      wordFrequency[wordLower].count++;
+      wordFrequency[wordLower].originalWords.add(word);
+    });
+
+    // Load word details from storage if available
+    chrome.storage.local.get(['wordDetails'], (result) => {
+      const wordDetails = result.wordDetails || {};
+
+      // Enhance word frequency data with storage info
+      Object.keys(wordFrequency).forEach(word => {
+        if (wordDetails[word]) {
+          wordFrequency[word].chinese = wordFrequency[word].chinese || wordDetails[word].chinese || '';
+          wordFrequency[word].definition = wordFrequency[word].definition || wordDetails[word].definition || '';
+        }
+      });
     });
 
     return wordFrequency;
@@ -299,13 +339,22 @@ class BatchMarkingPanel {
       low: []      // 1 time
     };
 
-    Object.entries(wordFrequency).forEach(([word, count]) => {
-      if (count >= 5) {
-        groups.high.push({ word, count });
-      } else if (count >= 2) {
-        groups.medium.push({ word, count });
+    Object.entries(wordFrequency).forEach(([word, data]) => {
+      const wordData = {
+        word: word,
+        baseWord: Stemmer.stem(word),
+        originalWords: Array.from(data.originalWords),
+        count: data.count,
+        chinese: data.chinese || '',
+        definition: data.definition || ''
+      };
+
+      if (data.count >= 5) {
+        groups.high.push(wordData);
+      } else if (data.count >= 2) {
+        groups.medium.push(wordData);
       } else {
-        groups.low.push({ word, count });
+        groups.low.push(wordData);
       }
     });
 
@@ -355,7 +404,7 @@ class BatchMarkingPanel {
       const listDiv = document.createElement('div');
       listDiv.className = 'word-list';
 
-      words.forEach(({ word, count }) => {
+      words.forEach(({ word, count, baseWord, originalWords, chinese }) => {
         const label = document.createElement('label');
         label.className = 'word-item';
 
@@ -364,16 +413,46 @@ class BatchMarkingPanel {
         checkbox.className = 'word-checkbox';
         checkbox.dataset.word = word;
 
-        const wordSpan = document.createElement('span');
-        wordSpan.className = 'word-text';
-        wordSpan.textContent = word;
+        // Create word container
+        const wordContainer = document.createElement('div');
+        wordContainer.className = 'word-container';
 
+        // Main word (original form if different)
+        const wordMain = document.createElement('span');
+        wordMain.className = 'word-main';
+
+        if (baseWord && baseWord !== word) {
+          wordMain.innerHTML = `${word}<span class="word-base">→ ${baseWord}</span>`;
+        } else {
+          wordMain.textContent = word;
+        }
+
+        // Additional forms
+        if (originalWords.length > 1) {
+          const formsSpan = document.createElement('span');
+          formsSpan.className = 'word-forms';
+          formsSpan.textContent = `[${Array.from(originalWords).join(', ')}]`;
+          wordContainer.appendChild(formsSpan);
+        }
+
+        wordContainer.appendChild(wordMain);
+
+        // Chinese (if toggle is on)
+        if (this.showChinese && chinese) {
+          const chineseSpan = document.createElement('span');
+          chineseSpan.className = 'word-chinese';
+          chineseSpan.textContent = chinese;
+
+          wordContainer.appendChild(chineseSpan);
+        }
+
+        // Count
         const countSpan = document.createElement('span');
         countSpan.className = 'word-count';
         countSpan.textContent = `(${count}×)`;
 
         label.appendChild(checkbox);
-        label.appendChild(wordSpan);
+        label.appendChild(wordContainer);
         label.appendChild(countSpan);
         listDiv.appendChild(label);
       });
