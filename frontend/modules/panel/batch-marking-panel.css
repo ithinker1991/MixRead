@@ -117,16 +117,17 @@
 
 /* Selection Canvas */
 .selection-canvas {
-  position: absolute;
+  position: fixed;
   background: rgba(100, 150, 255, 0.1);
   border: 2px dashed #4096ff;
   pointer-events: none;
   display: none;
-  z-index: 100;
+  z-index: 10000;
   left: 0;
   top: 0;
   width: 0;
   height: 0;
+  box-sizing: border-box;
 }
 
 .selection-canvas.active {

@@ -161,6 +161,11 @@ class BatchMarkingPanel {
 
     this.isSelecting = true;
     this.selectionStart = { x: e.clientX, y: e.clientY };
+
+    // Get the canvas
+    const canvas = this.panelElement.querySelector('.selection-canvas');
+    console.log('[BatchMarkingPanel] Canvas element:', canvas);
+
     console.log('[BatchMarkingPanel] Selection started at', this.selectionStart);
   }
 
@@ -171,6 +176,7 @@ class BatchMarkingPanel {
     if (!this.isSelecting || !this.selectionStart) return;
 
     const canvas = this.panelElement.querySelector('.selection-canvas');
+    console.log('[BatchMarkingPanel] Canvas element in move:', canvas);
 
     // Calculate current position relative to viewport
     const currentX = e.clientX;
@@ -191,17 +197,27 @@ class BatchMarkingPanel {
     canvas.style.height = height + 'px';
     canvas.classList.add('active');
 
+    // Add inline styles for debugging
+    canvas.setAttribute('data-debug', `x:${x}, y:${y}, w:${width}, h:${height}`);
+
     // Store for later use in word selection
     this.selectionRect = { x, y, width, height };
 
     // Debug info
-    if (console.debug) {
-      console.debug('[BatchMarkingPanel] Selection updated:', {
-        start: { x: startX, y: startY },
-        current: { x: currentX, y: currentY },
-        rect: this.selectionRect
-      });
-    }
+    console.log('[BatchMarkingPanel] Selection updated:', {
+      start: { x: startX, y: startY },
+      current: { x: currentX, y: currentY },
+      rect: this.selectionRect,
+      canvasClasses: canvas.className,
+      canvasStyles: {
+        left: canvas.style.left,
+        top: canvas.style.top,
+        width: canvas.style.width,
+        height: canvas.style.height,
+        display: window.getComputedStyle(canvas).display,
+        zIndex: window.getComputedStyle(canvas).zIndex
+      }
+    });
   }
 
   /**
