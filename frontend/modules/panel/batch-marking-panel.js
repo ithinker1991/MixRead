@@ -148,24 +148,15 @@ class BatchMarkingPanel {
    * Handle rectangle selection start
    */
   handleSelectionStart(e) {
-    // Check if we're inside the panel
-    const panel = this.panelElement;
-    if (!panel) return;
-
-    // Don't select if clicking on checkbox, word, or outside content area
-    if (e.target.closest('.word-item') ||
-        e.target.type === 'checkbox' ||
-        !e.target.closest('#panel-content-area')) {
+    // Check if we're inside the panel content area
+    if (!e.target.closest('#panel-content-area') ||
+        e.target.closest('.word-item') ||
+        e.target.type === 'checkbox') {
       return;
     }
 
     this.isSelecting = true;
     this.selectionStart = { x: e.clientX, y: e.clientY };
-
-    // Get the canvas
-    const canvas = this.panelElement.querySelector('.selection-canvas');
-    console.log('[BatchMarkingPanel] Canvas element:', canvas);
-
     console.log('[BatchMarkingPanel] Selection started at', this.selectionStart);
   }
 
@@ -176,47 +167,36 @@ class BatchMarkingPanel {
     if (!this.isSelecting || !this.selectionStart) return;
 
     const canvas = this.panelElement.querySelector('.selection-canvas');
-    console.log('[BatchMarkingPanel] Canvas element in move:', canvas);
 
-    // Calculate current position relative to viewport
-    const currentX = e.clientX;
-    const currentY = e.clientY;
+    // Calculate rectangle
     const startX = this.selectionStart.x;
     const startY = this.selectionStart.y;
+    const endX = e.clientX;
+    const endY = e.clientY;
 
-    // Calculate rectangle dimensions
-    const x = Math.min(startX, currentX);
-    const y = Math.min(startY, currentY);
-    const width = Math.abs(currentX - startX);
-    const height = Math.abs(currentY - startY);
+    // Position and size
+    const left = Math.min(startX, endX);
+    const top = Math.min(startY, endY);
+    const width = Math.abs(endX - startX);
+    const height = Math.abs(endY - startY);
 
-    // Position canvas relative to viewport (no transforms)
-    canvas.style.left = x + 'px';
-    canvas.style.top = y + 'px';
+    // Only show if minimum size
+    if (width < 5 || height < 5) return;
+
+    // Apply styles
+    canvas.style.left = left + 'px';
+    canvas.style.top = top + 'px';
     canvas.style.width = width + 'px';
     canvas.style.height = height + 'px';
     canvas.classList.add('active');
 
-    // Add inline styles for debugging
-    canvas.setAttribute('data-debug', `x:${x}, y:${y}, w:${width}, h:${height}`);
+    // Store rectangle
+    this.selectionRect = { left, top, width, height };
 
-    // Store for later use in word selection
-    this.selectionRect = { x, y, width, height };
-
-    // Debug info
-    console.log('[BatchMarkingPanel] Selection updated:', {
+    console.log('[BatchMarkingPanel] Rectangle:', {
+      left, top, width, height,
       start: { x: startX, y: startY },
-      current: { x: currentX, y: currentY },
-      rect: this.selectionRect,
-      canvasClasses: canvas.className,
-      canvasStyles: {
-        left: canvas.style.left,
-        top: canvas.style.top,
-        width: canvas.style.width,
-        height: canvas.style.height,
-        display: window.getComputedStyle(canvas).display,
-        zIndex: window.getComputedStyle(canvas).zIndex
-      }
+      end: { x: endX, y: endY }
     });
   }
 
@@ -255,14 +235,13 @@ class BatchMarkingPanel {
       // Get label's position in viewport
       const labelRect = label.getBoundingClientRect();
 
-      // Check if label overlaps with selection rectangle (both in viewport coordinates)
-      if (labelRect.right > rect.x &&
-          labelRect.left < rect.x + rect.width &&
-          labelRect.bottom > rect.y &&
-          labelRect.top < rect.y + rect.height) {
+      // Check if label overlaps with selection rectangle
+      if (labelRect.right > rect.left &&
+          labelRect.left < rect.left + rect.width &&
+          labelRect.bottom > rect.top &&
+          labelRect.top < rect.top + rect.height) {
         checkbox.checked = !checkbox.checked;
         selectedCount++;
-        console.log(`[BatchMarkingPanel] Toggled word: ${checkbox.dataset.word}`);
       }
     });
 
@@ -428,34 +407,6 @@ class BatchMarkingPanel {
     // Show panel
     this.panelElement.classList.add('open');
     this.isOpen = true;
-
-    // Test canvas visibility
-    const canvas = this.panelElement.querySelector('.selection-canvas');
-    console.log('[BatchMarkingPanel] Canvas test:', {
-      element: canvas,
-      classes: canvas.className,
-      styles: window.getComputedStyle(canvas),
-      parent: canvas.parentElement,
-      nextElement: canvas.nextElementSibling
-    });
-
-    // Temporarily show canvas for testing
-    setTimeout(() => {
-      canvas.style.left = '100px';
-      canvas.style.top = '100px';
-      canvas.style.width = '200px';
-      canvas.style.height = '100px';
-      canvas.classList.add('active');
-      console.log('[BatchMarkingPanel] Test canvas shown for 2 seconds');
-
-      setTimeout(() => {
-        canvas.classList.remove('active');
-        canvas.style.left = '';
-        canvas.style.top = '';
-        canvas.style.width = '';
-        canvas.style.height = '';
-      }, 2000);
-    }, 1000);
 
     console.log('[BatchMarkingPanel] Panel opened', {
       totalWords: Object.values(this.groups).flat().length,
