@@ -429,6 +429,34 @@ class BatchMarkingPanel {
     this.panelElement.classList.add('open');
     this.isOpen = true;
 
+    // Test canvas visibility
+    const canvas = this.panelElement.querySelector('.selection-canvas');
+    console.log('[BatchMarkingPanel] Canvas test:', {
+      element: canvas,
+      classes: canvas.className,
+      styles: window.getComputedStyle(canvas),
+      parent: canvas.parentElement,
+      nextElement: canvas.nextElementSibling
+    });
+
+    // Temporarily show canvas for testing
+    setTimeout(() => {
+      canvas.style.left = '100px';
+      canvas.style.top = '100px';
+      canvas.style.width = '200px';
+      canvas.style.height = '100px';
+      canvas.classList.add('active');
+      console.log('[BatchMarkingPanel] Test canvas shown for 2 seconds');
+
+      setTimeout(() => {
+        canvas.classList.remove('active');
+        canvas.style.left = '';
+        canvas.style.top = '';
+        canvas.style.width = '';
+        canvas.style.height = '';
+      }, 2000);
+    }, 1000);
+
     console.log('[BatchMarkingPanel] Panel opened', {
       totalWords: Object.values(this.groups).flat().length,
       groups: this.groups

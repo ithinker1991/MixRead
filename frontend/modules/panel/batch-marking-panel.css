@@ -118,8 +118,9 @@
 /* Selection Canvas */
 .selection-canvas {
   position: fixed;
-  background: rgba(100, 150, 255, 0.1);
-  border: 2px dashed #4096ff;
+  background: rgba(100, 150, 255, 0.15);
+  border: 2px solid #4096ff;
+  border-style: dashed;
   pointer-events: none;
   display: none;
   z-index: 10000;
