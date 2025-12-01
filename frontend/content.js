@@ -19,6 +19,7 @@ let unknownWordsStore;
 let unknownWordsService;
 let contextMenu;
 let highlightFilter;
+let batchMarkingPanel;
 
 // ===== Initialize Modules =====
 async function initializeModules() {
@@ -67,6 +68,11 @@ async function initializeModules() {
     // 6. Initialize highlight filter
     highlightFilter = new HighlightFilter(unknownWordsStore, userStore);
     console.log('[MixRead] HighlightFilter created');
+
+    // 7. Initialize batch marking panel
+    batchMarkingPanel = new BatchMarkingPanel(unknownWordsService, userStore);
+    batchMarkingPanel.init();
+    console.log('[MixRead] BatchMarkingPanel created');
 
     console.log('[MixRead] ✅ All modules initialized successfully');
     logger.info('All modules initialized successfully');
@@ -742,6 +748,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log(`[MixRead] Context menu: Marking as known: "${word}" (stem: "${stemmedWord}")`);
     markWordAsKnown(word);  // markWordAsKnown will apply stemming internally
     sendResponse({ success: true });
+  } else if (request.type === "OPEN_BATCH_PANEL") {
+    // Handle batch marking panel open request
+    console.log('[MixRead] Opening batch marking panel');
+    if (batchMarkingPanel) {
+      batchMarkingPanel.toggle();
+      sendResponse({ success: true });
+    } else {
+      console.error('[MixRead] Batch marking panel not initialized');
+      sendResponse({ success: false, error: 'Panel not initialized' });
+    }
   }
 });
 

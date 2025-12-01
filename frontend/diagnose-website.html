@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Website Compatibility Diagnosis</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px;
+      margin: 0;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #252526;
+      padding: 20px;
+      border-radius: 5px;
+    }
+    h1 { color: #4ec9b0; margin-top: 0; }
+    h2 { color: #569cd6; }
+    .section {
+      background: #1e1e1e;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 3px;
+      border-left: 3px solid #569cd6;
+    }
+    .check {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 3px;
+      border-left: 4px solid;
+    }
+    .check.pass { border-color: #4ec9b0; background: #0d3d2a; }
+    .check.fail { border-color: #f48771; background: #3d1a1a; }
+    .check.info { border-color: #569cd6; background: #1a2d3d; }
+    .check.warning { border-color: #ce9178; background: #3d2a10; }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      background: #1e1e1e;
+      border: 1px solid #569cd6;
+      color: #d4d4d4;
+      border-radius: 3px;
+    }
+    button {
+      background: #569cd6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 3px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    button:hover { background: #4ec9b0; }
+    pre {
+      background: #1e1e1e;
+      padding: 10px;
+      border-radius: 3px;
+      overflow-x: auto;
+      font-size: 11px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 12px;
+    }
+    table th, table td {
+      border: 1px solid #569cd6;
+      padding: 8px;
+      text-align: left;
+    }
+    table th {
+      background: #1a2d3d;
+      color: #4ec9b0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Website Compatibility Diagnosis Tool</h1>
+
+    <div class="section">
+      <h3>📋 Diagnosis Target</h3>
+      <label>Enter website URL to diagnose:</label>
+      <input type="text" id="website-url" placeholder="https://waitbutwhy.com/2015/05/elon-musk-introduction.html" value="https://waitbutwhy.com/2015/05/elon-musk-introduction.html">
+      <button onclick="runDiagnosis()">🔬 Run Full Diagnosis</button>
+      <button onclick="quickCheck()">⚡ Quick Check</button>
+    </div>
+
+    <div id="results"></div>
+
+    <div class="section">
+      <h2>📝 How to Use</h2>
+      <ol>
+        <li>Enter a website URL that has issues with MixRead highlighting</li>
+        <li>Click "Run Full Diagnosis" to analyze multiple factors</li>
+        <li>Check the results to understand what's blocking text extraction</li>
+        <li>Share the diagnosis results to help fix the issue</li>
+      </ol>
+    </div>
+
+    <div class="section">
+      <h2>🎯 Expected Issues</h2>
+      <ul>
+        <li><strong>Dynamic Content Loading</strong>: Content loaded by JavaScript after page load</li>
+        <li><strong>iframe Isolation</strong>: Main content inside iframe elements</li>
+        <li><strong>CSS Hidden</strong>: Text hidden by CSS (display:none, visibility:hidden, etc)</li>
+        <li><strong>Shadow DOM</strong>: Content in shadow trees</li>
+        <li><strong>Lazy Loading</strong>: Images/content loaded on scroll</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    const resultsDiv = document.getElementById('results');
+
+    function addResult(title, content, status = 'info') {
+      const div = document.createElement('div');
+      div.className = `check ${status}`;
+      div.innerHTML = `<strong>${title}</strong><br><small>${content}</small>`;
+      resultsDiv.appendChild(div);
+    }
+
+    function addSection(title) {
+      const div = document.createElement('div');
+      div.className = 'section';
+      div.innerHTML = `<h2>${title}</h2><div id="section-${title.replace(/\s/g, '-')}"></div>`;
+      resultsDiv.appendChild(div);
+      return div.querySelector('div');
+    }
+
+    async function quickCheck() {
+      const url = document.getElementById('website-url').value;
+      if (!url) {
+        alert('Please enter a URL');
+        return;
+      }
+
+      resultsDiv.innerHTML = '';
+      addResult('ℹ️ Quick Check Started', `Checking: ${url}`, 'info');
+
+      try {
+        const response = await fetch(url);
+        if (response.ok) {
+          addResult('✅ Server Accessible', 'Website is reachable', 'pass');
+        } else {
+          addResult('❌ Server Error', `Status: ${response.status}`, 'fail');
+        }
+      } catch (e) {
+        addResult('❌ Cannot Access', `CORS or Network Error: ${e.message}`, 'fail');
+        addResult('ℹ️ Note', 'This is expected due to CORS restrictions in browsers. Full diagnosis requires visiting the website directly.', 'info');
+      }
+    }
+
+    async function runDiagnosis() {
+      const url = document.getElementById('website-url').value;
+      if (!url) {
+        alert('Please enter a URL');
+        return;
+      }
+
+      resultsDiv.innerHTML = '';
+      addResult('ℹ️ Diagnosis Started', `Analyzing: ${url}`, 'info');
+
+      // Create analysis instructions
+      const analysisDiv = addSection('📊 How to Perform Full Diagnosis');
+      analysisDiv.innerHTML = `
+        <p>Due to CORS restrictions, a full diagnosis requires running commands in the browser's developer console while visiting the target website.</p>
+        <h4>Step 1: Open the website in a new tab</h4>
+        <p>Open: <a href="${url}" target="_blank">${url}</a></p>
+
+        <h4>Step 2: Open DevTools (F12) and go to Console tab</h4>
+
+        <h4>Step 3: Run this diagnostic script:</h4>
+        <pre>
+// === Website Compatibility Diagnostic ===
+const diagnosis = {
+  url: window.location.href,
+  timestamp: new Date().toISOString(),
+
+  // 1. Check page load status
+  pageReady: {
+    readyState: document.readyState,
+    documentComplete: document.readyState === 'complete',
+    bodyLoaded: !!document.body
+  },
+
+  // 2. Count text nodes
+  textNodes: {
+    total: Array.from(document.querySelectorAll('*'))
+      .reduce((count, el) => count + el.childNodes.length, 0),
+    visibleElements: document.querySelectorAll('body *:not([style*="display:none"]):not([style*="visibility:hidden"])').length
+  },
+
+  // 3. Check for iframes
+  iframes: {
+    count: document.querySelectorAll('iframe').length,
+    shadowRoots: Array.from(document.querySelectorAll('*'))
+      .filter(el => el.shadowRoot).length
+  },
+
+  // 4. Check for hidden content
+  hiddenElements: {
+    displayNone: document.querySelectorAll('[style*="display:none"]').length,
+    visibilityHidden: document.querySelectorAll('[style*="visibility:hidden"]').length,
+    ariaHidden: document.querySelectorAll('[aria-hidden="true"]').length
+  },
+
+  // 5. Sample text extraction
+  sampleText: {
+    plainText: document.body.innerText?.substring(0, 200) || 'NO TEXT FOUND',
+    wordCount: document.body.innerText?.split(/\s+/).length || 0
+  },
+
+  // 6. Check for lazy loading
+  lazyElements: {
+    lazyloadImages: document.querySelectorAll('[loading="lazy"]').length,
+    dataAttributes: Array.from(document.querySelectorAll('[data-src], [data-content]')).length
+  },
+
+  // 7. Check for dynamic content
+  scripts: {
+    totalScripts: document.querySelectorAll('script').length,
+    externalScripts: document.querySelectorAll('script[src]').length,
+    hasReact: !!window.React,
+    hasVue: !!window.Vue,
+    hasAngular: !!window.angular
+  }
+};
+
+console.log('=== WEBSITE COMPATIBILITY DIAGNOSIS ===');
+console.log(JSON.stringify(diagnosis, null, 2));
+console.log('=== END DIAGNOSIS ===');
+        </pre>
+
+        <h4>Step 4: Copy the output and share it</h4>
+        <p>The console will show detailed information about the page structure. Copy and share the output!</p>
+      `;
+
+      // Add detailed checks
+      const checksDiv = addSection('🔍 What We\'ll Check');
+      checksDiv.innerHTML = `
+        <table>
+          <tr>
+            <th>Check</th>
+            <th>What It Detects</th>
+            <th>Impact on Highlighting</th>
+          </tr>
+          <tr>
+            <td><strong>Document Ready State</strong></td>
+            <td>Whether page is fully loaded</td>
+            <td>❌ If not complete, content might not exist yet</td>
+          </tr>
+          <tr>
+            <td><strong>Text Nodes</strong></td>
+            <td>Number of text elements</td>
+            <td>❌ If count is 0, extension can't find words</td>
+          </tr>
+          <tr>
+            <td><strong>iframes</strong></td>
+            <td>Content isolation in frames</td>
+            <td>❌ Content inside iframes won't be highlighted</td>
+          </tr>
+          <tr>
+            <td><strong>Shadow DOM</strong></td>
+            <td>Encapsulated content</td>
+            <td>❌ Shadow DOM content is isolated</td>
+          </tr>
+          <tr>
+            <td><strong>Hidden Elements</strong></td>
+            <td>CSS hidden content</td>
+            <td>⚠️ Hidden content is extracted but won't be seen</td>
+          </tr>
+          <tr>
+            <td><strong>Lazy Loading</strong></td>
+            <td>Content loaded on scroll</td>
+            <td>❌ Initial content won't include lazy-loaded words</td>
+          </tr>
+          <tr>
+            <td><strong>JavaScript Frameworks</strong></td>
+            <td>React, Vue, Angular usage</td>
+            <td>⚠️ May require waiting for async rendering</td>
+          </tr>
+        </table>
+      `;
+
+      addResult('ℹ️ Next Step', 'Visit the website and run the diagnostic script in the console (see above)', 'warning');
+    }
+
+    // Auto-show instructions on load
+    window.addEventListener('load', () => {
+      addResult('ℹ️ Tool Ready', 'Enter a website URL and click "Run Full Diagnosis" to begin', 'info');
+    });
+  </script>
+</body>
+</html>

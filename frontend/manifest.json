@@ -28,9 +28,13 @@
         "modules/unknown-words/unknown-words-service.js",
         "modules/highlight/context-menu.js",
         "modules/highlight/highlight-filter.js",
+        "modules/panel/batch-marking-panel.js",
         "content.js"
       ],
-      "css": ["content.css"]
+      "css": [
+        "content.css",
+        "modules/panel/batch-marking-panel.css"
+      ]
     }
   ],
   "action": {

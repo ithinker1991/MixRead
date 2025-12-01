@@ -53,6 +53,7 @@ let readingTimeDisplay = document.getElementById("reading-time");
 
 const btnViewVocab = document.getElementById("btn-view-vocabulary");
 const btnResetVocab = document.getElementById("btn-reset-vocab");
+const btnBatchMark = document.getElementById("btn-batch-mark");
 
 // Helper function to get date X days ago
 function getDateXDaysAgo(days) {
@@ -249,6 +250,22 @@ btnResetVocab.addEventListener("click", () => {
     todayCountDisplay.textContent = "0";
   }
 });
+
+/**
+ * Batch marking panel button
+ */
+if (btnBatchMark) {
+  btnBatchMark.addEventListener("click", () => {
+    // Send message to content script to open batch marking panel
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]?.id) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          type: "OPEN_BATCH_PANEL",
+        });
+      }
+    });
+  });
+}
 
 // Update stats when vocabulary changes
 chrome.storage.onChanged.addListener((changes) => {
