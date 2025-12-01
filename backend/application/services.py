@@ -124,9 +124,12 @@ class HighlightApplicationService:
     ) -> Dict:
         """
         Use case: Get words that should be highlighted based on:
-        1. user_id's known_words and unknown_words
-        2. difficulty_level
+        1. user_id's known_words and unknown_words (Priority 1 - ALWAYS highlight if marked unknown)
+        2. difficulty_level (Priority 2 - use CEFR level if not explicitly marked)
         3. availability of Chinese translation
+
+        Key logic: If user explicitly marked a word as unknown/known, always highlight/skip it,
+        even if the word is not in the CEFR database.
         """
         # Validate difficulty level
         if not DifficultyService.is_valid_level(difficulty_level):
@@ -144,7 +147,37 @@ class HighlightApplicationService:
         for word_text in words:
             word_lower = word_text.lower()
 
-            # Skip if not in CEFR database
+            # Priority 1: Check if user explicitly marked as unknown
+            # IMPORTANT: Highlight REGARDLESS of whether word is in CEFR database
+            if word_lower in user.unknown_words:
+                # Get info from CEFR if available, otherwise use defaults
+                word_info = self.cefr_data.get(word_lower, {})
+                cefr_level = word_info.get("cefr_level", "Unknown")
+
+                # Try to get Chinese translation
+                chinese = self.chinese_dict.get(word_lower)
+                if not chinese:
+                    chinese = word_info.get("chinese", "")
+
+                # Highlight the word (user explicitly marked it)
+                highlighted.append(word_text)
+                word_details.append({
+                    "word": word_text,
+                    "cefr_level": cefr_level,
+                    "pos": word_info.get("pos", "unknown"),
+                    "chinese": chinese,
+                    "reason": "user_marked_unknown"  # For debugging/analytics
+                })
+                continue
+
+            # Priority 2: Check if user explicitly marked as known
+            # IMPORTANT: Skip highlighting REGARDLESS of CEFR level
+            if word_lower in user.known_words:
+                # Don't highlight - user already knows this word
+                continue
+
+            # Priority 3: Apply CEFR-based difficulty rules
+            # Only process if word is in CEFR database
             if word_lower not in self.cefr_data:
                 continue
 
@@ -172,7 +205,8 @@ class HighlightApplicationService:
                     "word": word_text,
                     "cefr_level": word_info.get("cefr_level"),
                     "pos": word_info.get("pos"),
-                    "chinese": chinese  # May be empty for C1/C2 words, but still highlighted
+                    "chinese": chinese,  # May be empty for C1/C2 words, but still highlighted
+                    "reason": "difficulty_based"  # For debugging/analytics
                 })
 
         return {
