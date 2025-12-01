@@ -8,24 +8,53 @@ const API_BASE = "http://localhost:8000";
 // ===== Context Menu Setup =====
 
 /**
- * Create context menu items when extension loads
+ * Create context menu items
  */
-chrome.runtime.onInstalled.addListener(() => {
+function createContextMenus() {
   console.log('[Background] Creating context menus');
 
-  // Create context menu for selecting text
+  // Clear existing context menus first
+  chrome.contextMenus.removeAll(() => {
+    console.log('[Background] Cleared old context menus');
+  });
+
+  // Create context menu for marking unknown
   chrome.contextMenus.create({
     id: 'mixread-mark-unknown',
     title: 'Mark as Unknown (MixRead)',
-    contexts: ['selection', 'page'],
+    contexts: ['selection'],
+  }, () => {
+    if (chrome.runtime.lastError) {
+      console.warn('[Background] Error creating mark-unknown menu:', chrome.runtime.lastError);
+    } else {
+      console.log('[Background] Created mark-unknown context menu');
+    }
   });
 
+  // Create context menu for marking known
   chrome.contextMenus.create({
     id: 'mixread-mark-known',
     title: 'Mark as Known (MixRead)',
-    contexts: ['selection', 'page'],
+    contexts: ['selection'],
+  }, () => {
+    if (chrome.runtime.lastError) {
+      console.warn('[Background] Error creating mark-known menu:', chrome.runtime.lastError);
+    } else {
+      console.log('[Background] Created mark-known context menu');
+    }
   });
+}
+
+/**
+ * Create context menus when extension loads
+ */
+chrome.runtime.onInstalled.addListener(() => {
+  console.log('[Background] Extension installed/updated, setting up context menus');
+  createContextMenus();
 });
+
+// Also try to create menus on startup (in case onInstalled didn't trigger)
+createContextMenus();
 
 /**
  * Handle context menu item clicks
