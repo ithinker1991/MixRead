@@ -3,6 +3,81 @@
  * Manages difficulty slider, vocabulary display, and statistics
  */
 
+// ===== Extension Context Management =====
+// Wrapper to safely handle chrome API calls even after context invalidation
+const ChromeAPI = {
+  isContextValid() {
+    try {
+      return chrome && chrome.storage && chrome.runtime;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  storage: {
+    get(keys, callback) {
+      if (!ChromeAPI.isContextValid()) {
+        console.warn('[MixRead] Extension context invalid, skipping storage.get');
+        if (callback) callback({});
+        return;
+      }
+      try {
+        ChromeAPI.storage.get(keys, (result) => {
+          if (chrome.runtime.lastError) {
+            console.warn('[MixRead] Storage error:', chrome.runtime.lastError.message);
+            if (callback) callback({});
+          } else {
+            if (callback) callback(result);
+          }
+        });
+      } catch (e) {
+        console.warn('[MixRead] Chrome storage error:', e.message);
+        if (callback) callback({});
+      }
+    },
+
+    set(data, callback) {
+      if (!ChromeAPI.isContextValid()) {
+        console.warn('[MixRead] Extension context invalid, skipping storage.set');
+        if (callback) callback();
+        return;
+      }
+      try {
+        ChromeAPI.storage.set(data, () => {
+          if (chrome.runtime.lastError) {
+            console.warn('[MixRead] Storage set error:', chrome.runtime.lastError.message);
+          }
+          if (callback) callback();
+        });
+      } catch (e) {
+        console.warn('[MixRead] Chrome storage set error:', e.message);
+        if (callback) callback();
+      }
+    }
+  },
+
+  runtime: {
+    sendMessage(message, callback) {
+      if (!ChromeAPI.isContextValid()) {
+        console.warn('[MixRead] Extension context invalid, skipping sendMessage');
+        if (callback) callback();
+        return;
+      }
+      try {
+        chrome.runtime.sendMessage(message, (response) => {
+          if (chrome.runtime.lastError) {
+            console.warn('[MixRead] Message error:', chrome.runtime.lastError.message);
+          }
+          if (callback) callback(response);
+        });
+      } catch (e) {
+        console.warn('[MixRead] Chrome sendMessage error:', e.message);
+        if (callback) callback();
+      }
+    }
+  }
+};
+
 const DIFFICULTY_LEVELS = {
   1: "A1",
   2: "A2",
@@ -71,14 +146,14 @@ function getDateXDaysAgo(days) {
 }
 
 // Load user management first
-chrome.storage.local.get(['mixread_users', 'mixread_current_user'], (result) => {
+ChromeAPI.storage.get(['mixread_users', 'mixread_current_user'], (result) => {
   allUsers = result.mixread_users || [];
   currentUser = result.mixread_current_user || "";
 
   // If no current user but have users, select the first one
   if (!currentUser && allUsers.length > 0) {
     currentUser = allUsers[0];
-    chrome.storage.local.set({ mixread_current_user: currentUser });
+    ChromeAPI.storage.set({ mixread_current_user: currentUser });
   }
 
   // Load users into selector
@@ -97,7 +172,7 @@ chrome.storage.local.get(['mixread_users', 'mixread_current_user'], (result) => 
   }
 
   // Load and display current settings
-  chrome.storage.local.get(
+  ChromeAPI.storage.get(
     ["difficultyLevel", "vocabulary", "vocabulary_dates", "showChinese", "reading_sessions"],
     (result) => {
     // Load difficulty level
@@ -212,7 +287,7 @@ toggleChinese.addEventListener("change", (e) => {
   const showChinese = e.target.checked;
 
   // Save to storage
-  chrome.storage.local.set({ showChinese });
+  ChromeAPI.storage.set({ showChinese });
 
   // Notify content script about the change
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -235,7 +310,7 @@ difficultySlider.addEventListener("input", (e) => {
   updateDifficultyDisplay(value);
 
   // Save to storage
-  chrome.storage.local.set({ difficultyLevel: level });
+  ChromeAPI.storage.set({ difficultyLevel: level });
 
   // Notify content script about the change
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -250,7 +325,7 @@ difficultySlider.addEventListener("input", (e) => {
  * View vocabulary button
  */
 btnViewVocab.addEventListener("click", () => {
-  chrome.storage.local.get(["vocabulary"], (result) => {
+  ChromeAPI.storage.get(["vocabulary"], (result) => {
     const vocabulary = result.vocabulary || [];
 
     if (vocabulary.length === 0) {
@@ -275,7 +350,7 @@ btnResetVocab.addEventListener("click", () => {
       "Are you sure? This will delete all your learned words. This action cannot be undone."
     )
   ) {
-    chrome.storage.local.set({
+    ChromeAPI.storage.set({
       vocabulary: [],
       vocabulary_dates: {},
     });
@@ -456,7 +531,7 @@ function createNewUser() {
   allUsers.push(newUserId);
   currentUser = newUserId;
 
-  chrome.storage.local.set({
+  ChromeAPI.storage.set({
     mixread_users: allUsers,
     mixread_current_user: currentUser
   }, () => {
@@ -476,7 +551,7 @@ function switchToUser(userId) {
   // Save current user's vocabulary
   saveCurrentUserVocabulary(() => {
     currentUser = userId;
-    chrome.storage.local.set({ mixread_current_user: userId }, () => {
+    ChromeAPI.storage.set({ mixread_current_user: userId }, () => {
       console.log('[Popup] Switched to user:', userId);
       updateUserDisplay();
       loadUserVocabulary();
@@ -486,7 +561,7 @@ function switchToUser(userId) {
 }
 
 function saveCurrentUserVocabulary(callback) {
-  chrome.storage.local.get(['vocabulary', 'vocabulary_dates', 'difficultyLevel', 'showChinese'], (result) => {
+  ChromeAPI.storage.get(['vocabulary', 'vocabulary_dates', 'difficultyLevel', 'showChinese'], (result) => {
     const userKey = `user_data_${currentUser}`;
     const userData = {
       vocabulary: result.vocabulary || [],
@@ -498,28 +573,28 @@ function saveCurrentUserVocabulary(callback) {
     const update = {};
     update[userKey] = userData;
 
-    chrome.storage.local.set(update, callback);
+    ChromeAPI.storage.set(update, callback);
   });
 }
 
 function loadUserVocabulary() {
   const userKey = `user_data_${currentUser}`;
-  chrome.storage.local.get([userKey], (result) => {
+  ChromeAPI.storage.get([userKey], (result) => {
     const userData = result[userKey] || {};
 
     // Apply user's settings
     if (userData.vocabulary) {
-      chrome.storage.local.set({ vocabulary: userData.vocabulary });
+      ChromeAPI.storage.set({ vocabulary: userData.vocabulary });
       vocabCountDisplay.textContent = userData.vocabulary.length;
       totalCountDisplay.textContent = userData.vocabulary.length;
     }
 
     if (userData.vocabulary_dates) {
-      chrome.storage.local.set({ vocabulary_dates: userData.vocabulary_dates });
+      ChromeAPI.storage.set({ vocabulary_dates: userData.vocabulary_dates });
     }
 
     if (userData.difficultyLevel) {
-      chrome.storage.local.set({ difficultyLevel: userData.difficultyLevel });
+      ChromeAPI.storage.set({ difficultyLevel: userData.difficultyLevel });
       const difficultyValue = Object.entries(DIFFICULTY_LEVELS).find(
         ([_, level]) => level === userData.difficultyLevel
       )?.[0] || "3";
@@ -528,14 +603,14 @@ function loadUserVocabulary() {
     }
 
     if (userData.showChinese !== undefined) {
-      chrome.storage.local.set({ showChinese: userData.showChinese });
+      ChromeAPI.storage.set({ showChinese: userData.showChinese });
       toggleChinese.checked = userData.showChinese;
     }
   });
 }
 
 function resetUserVocabulary() {
-  chrome.storage.local.set({
+  ChromeAPI.storage.set({
     vocabulary: [],
     vocabulary_dates: {}
   });
