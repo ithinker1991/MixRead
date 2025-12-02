@@ -683,7 +683,7 @@ function syncCurrentUserToContentScripts() {
 // ========== Domain Management UI Logic ==========
 
 let domainPolicyStore;
-let presetDialog;
+// Note: presetDialog is created in preset-dialog.js, don't re-declare here
 
 /**
  * Initialize domain management
@@ -692,8 +692,7 @@ async function initializeDomainManagement() {
   // Create store instance
   domainPolicyStore = new DomainPolicyStore();
 
-  // Create preset dialog instance
-  presetDialog = new PresetDialog();
+  // presetDialog is already created in preset-dialog.js, no need to recreate
 
   // Initialize from backend
   if (currentUser) {
