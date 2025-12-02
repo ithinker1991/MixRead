@@ -689,21 +689,30 @@ let domainPolicyStore;
  * Initialize domain management
  */
 async function initializeDomainManagement() {
-  // Create store instance
-  domainPolicyStore = new DomainPolicyStore();
+  try {
+    // Create store instance
+    domainPolicyStore = new DomainPolicyStore();
+    logger.log('[DomainPolicy] Store created, currentUser:', currentUser);
 
-  // presetDialog is already created in preset-dialog.js, no need to recreate
+    // presetDialog is already created in preset-dialog.js, no need to recreate
 
-  // Initialize from backend
-  if (currentUser) {
-    await domainPolicyStore.initialize(currentUser);
+    // Initialize from backend
+    if (currentUser) {
+      logger.log('[DomainPolicy] Starting initialization with userId:', currentUser);
+      const initResult = await domainPolicyStore.initialize(currentUser);
+      logger.log('[DomainPolicy] Initialization result:', initResult);
+    } else {
+      logger.warn('[DomainPolicy] No current user, skipping initialization');
+    }
+
+    // Setup event listeners
+    setupDomainEventListeners();
+
+    // Render blacklist
+    renderBlacklist();
+  } catch (error) {
+    logger.error('[DomainPolicy] Initialization error:', error);
   }
-
-  // Setup event listeners
-  setupDomainEventListeners();
-
-  // Render blacklist
-  renderBlacklist();
 }
 
 /**
