@@ -23,11 +23,16 @@ const ChromeAPI = {
       }
       try {
         chrome.storage.local.get(keys, (result) => {
-          if (chrome.runtime.lastError) {
-            console.warn('[MixRead] Storage error:', chrome.runtime.lastError.message);
+          try {
+            if (chrome.runtime.lastError) {
+              console.warn('[MixRead] Storage error:', chrome.runtime.lastError.message);
+              if (callback) callback({});
+            } else {
+              if (callback) callback(result);
+            }
+          } catch (callbackError) {
+            console.warn('[MixRead] Storage callback error:', callbackError.message);
             if (callback) callback({});
-          } else {
-            if (callback) callback(result);
           }
         });
       } catch (e) {
@@ -44,10 +49,15 @@ const ChromeAPI = {
       }
       try {
         chrome.storage.local.set(data, () => {
-          if (chrome.runtime.lastError) {
-            console.warn('[MixRead] Storage set error:', chrome.runtime.lastError.message);
+          try {
+            if (chrome.runtime.lastError) {
+              console.warn('[MixRead] Storage set error:', chrome.runtime.lastError.message);
+            }
+            if (callback) callback();
+          } catch (callbackError) {
+            console.warn('[MixRead] Storage set callback error:', callbackError.message);
+            if (callback) callback();
           }
-          if (callback) callback();
         });
       } catch (e) {
         console.warn('[MixRead] Chrome storage set error:', e.message);
@@ -65,10 +75,15 @@ const ChromeAPI = {
       }
       try {
         chrome.runtime.sendMessage(message, (response) => {
-          if (chrome.runtime.lastError) {
-            console.warn('[MixRead] Message error:', chrome.runtime.lastError.message);
+          try {
+            if (chrome.runtime.lastError) {
+              console.warn('[MixRead] Message error:', chrome.runtime.lastError.message);
+            }
+            if (callback) callback(response);
+          } catch (callbackError) {
+            console.warn('[MixRead] Message callback error:', callbackError.message);
+            if (callback) callback();
           }
-          if (callback) callback(response);
         });
       } catch (e) {
         console.warn('[MixRead] Chrome sendMessage error:', e.message);
