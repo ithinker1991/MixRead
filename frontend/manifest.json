@@ -6,7 +6,8 @@
   "permissions": [
     "storage",
     "scripting",
-    "contextMenus"
+    "contextMenus",
+    "tabs"
   ],
   "host_permissions": [
     "http://localhost:8000/*",
@@ -26,6 +27,8 @@
         "modules/user/user-store.js",
         "modules/unknown-words/unknown-words-store.js",
         "modules/unknown-words/unknown-words-service.js",
+        "modules/domain-policy/domain-policy-store.js",
+        "modules/domain-policy/domain-policy-filter.js",
         "modules/highlight/context-menu.js",
         "modules/highlight/highlight-filter.js",
         "modules/panel/batch-marking-panel.js",

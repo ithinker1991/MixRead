@@ -31,6 +31,14 @@ async function initializeModules() {
     userStore = new UserStore();
     console.log('[MixRead] UserStore created');
     await userStore.initialize();
+
+    // Check if there's a pending user ID from popup
+    if (window.pendingUserId) {
+      console.log('[MixRead] Using pending user ID:', window.pendingUserId);
+      userStore.user.id = window.pendingUserId;
+      window.pendingUserId = null; // Clear the pending ID
+    }
+
     const userId = userStore.getUserId();
     const difficultyLevel = userStore.getDifficultyLevel();
     console.log(`[MixRead] User initialized - ID: ${userId}, Difficulty: ${difficultyLevel}`);
@@ -76,6 +84,9 @@ async function initializeModules() {
 
     console.log('[MixRead] ✅ All modules initialized successfully');
     logger.info('All modules initialized successfully');
+
+    // Mark as initialized for popup detection
+    window.MixReadInitialized = true;
   } catch (error) {
     console.error('[MixRead] ❌ Failed to initialize modules:', error);
     logger.error('Failed to initialize modules', error);
@@ -123,6 +134,13 @@ function tokenizeText(text) {
  * Send message to background script with retry logic
  */
 function sendMessageWithRetry(message, callback, maxRetries = 3) {
+  // Check if chrome runtime is available
+  if (!chrome || !chrome.runtime) {
+    console.warn('[MixRead] Chrome runtime not available, cannot send message');
+    callback({ success: false, error: 'Extension context not available' });
+    return;
+  }
+
   let retries = 0;
 
   function attempt() {
@@ -130,13 +148,22 @@ function sendMessageWithRetry(message, callback, maxRetries = 3) {
     try {
       chrome.runtime.sendMessage(message, (response) => {
         if (chrome.runtime.lastError) {
-          console.warn(`[MixRead] sendMessage error: ${chrome.runtime.lastError.message}`);
+          const errorMsg = chrome.runtime.lastError.message;
+
+          // Check if it's a context invalidated error
+          if (errorMsg.includes('Extension context invalidated')) {
+            console.warn('[MixRead] Extension context invalidated, stopping retries');
+            callback({ success: false, error: 'Extension context invalidated' });
+            return;
+          }
+
+          console.warn(`[MixRead] sendMessage error: ${errorMsg}`);
           if (retries < maxRetries) {
             console.log(`[MixRead] Retrying message send (attempt ${retries + 1}/${maxRetries})...`);
             setTimeout(attempt, 100 * retries); // Exponential backoff
           } else {
             console.error('[MixRead] Failed to send message after', maxRetries, 'retries');
-            callback({ success: false, error: chrome.runtime.lastError.message });
+            callback({ success: false, error: errorMsg });
           }
         } else if (response) {
           callback(response);
@@ -621,21 +648,204 @@ function speakWord(word) {
  * Add word to user's vocabulary with timestamp
  */
 function addWordToVocabulary(word) {
+  console.log(`[MixRead] Adding word to vocabulary: ${word}`);
+
+  if (!userStore) {
+    console.warn('[MixRead] userStore not initialized');
+    return;
+  }
+
+  const userId = userStore.getUserId();
+  if (!userId) {
+    console.warn('[MixRead] No user ID available');
+    return;
+  }
+
+  // Also add to local vocabulary for statistics
   const wordLower = word.toLowerCase();
   userVocabulary.add(wordLower);
 
   // Get current vocabulary dates
   chrome.storage.local.get(["vocabulary_dates"], (result) => {
     const dates = result.vocabulary_dates || {};
-    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
-    dates[wordLower] = today; // Record when word was added
+    const today = new Date().toISOString().split("T")[0];
+    dates[wordLower] = today;
 
-    // Save to storage
+    // Save to local storage
     chrome.storage.local.set({
       vocabulary: Array.from(userVocabulary),
       vocabulary_dates: dates,
     });
   });
+
+  // Extract sentence context for the word
+  const pageUrl = window.location.href;
+  const pageTitle = document.title;
+
+  // Find the paragraph or container with the word
+  let paragraph = document.body;
+  const allElements = document.querySelectorAll('p, div, article, section');
+  for (let el of allElements) {
+    if (el.textContent.toLowerCase().includes(word.toLowerCase())) {
+      paragraph = el;
+      break;
+    }
+  }
+
+  // Extract sentences using simple method (find punctuation before/after)
+  let text = paragraph.textContent || paragraph.innerText || '';
+
+  // CRITICAL: Clean up frequency markers like (1×), (2×), etc. that some websites embed
+  // These appear as "word(1×)" in textContent from certain websites' DOM
+  // This is a common pattern in dictionary/reference websites
+  text = text.replace(/\(\d+×\)/g, '');  // Remove (1×), (2×), (3×), etc.
+  text = text.replace(/→\s*/g, ' ');     // Replace arrows with spaces
+
+  text = text.replace(/\s+/g, ' ').trim();
+
+  let sentences = [];
+  const wordLowerVar = word.toLowerCase();
+  const textLower = text.toLowerCase();
+
+  // Find word positions
+  let pos = textLower.indexOf(wordLowerVar);
+  while (pos !== -1) {
+    // Find start of sentence
+    let start = pos;
+    while (start > 0 && !text[start - 1].match(/[.!?]/)) {
+      start--;
+    }
+    if (start > 0) start++;
+
+    // Find end of sentence
+    let end = pos + word.length;
+    while (end < text.length && !text[end].match(/[.!?]/)) {
+      end++;
+    }
+    if (end < text.length) end++;
+
+    // Extract sentence
+    let sentence = text.substring(start, end).trim();
+    sentence = sentence.replace(/\s+/g, ' ');
+    if (sentence.length > 0) {
+      sentence = sentence.charAt(0).toUpperCase() + sentence.slice(1);
+      sentences.push(sentence);
+    }
+
+    pos = textLower.indexOf(wordLowerVar, pos + 1);
+  }
+
+  // Remove duplicates
+  sentences = [...new Set(sentences)];
+
+  // Filter sentences (minimum 10 chars, 3 words, no excessive special chars)
+  sentences = sentences.filter(s => {
+    if (s.length < 10) return false;
+    if (s.split(/\s+/).length < 3) return false;
+
+    // Skip sentences with excessive special characters (likely code or markup)
+    const specialCharCount = (s.match(/[×()[\]{}→]/g) || []).length;
+    if (specialCharCount > 2) return false;
+
+    // Skip if looks like it's mixing different languages/formats
+    if (s.includes('1x') || s.includes('→') || s.match(/\d+×/)) {
+      return false;
+    }
+
+    // CRITICAL: Skip sentences that contain multiple word-form patterns like "word(1×)"
+    // This indicates the paragraph contains stemming/dictionary information
+    const wordFormPatterns = (s.match(/\([0-9×]+\)/g) || []).length;
+    if (wordFormPatterns > 3) {
+      return false;
+    }
+
+    // Skip sentences with non-ASCII characters mixed in (multilingual content)
+    if (/[\u4E00-\u9FFF]/.test(s) || /[\u3040-\u309F]/.test(s)) {
+      return false;
+    }
+
+    return true;
+  }).slice(0, 3);
+
+  // Fallback if no sentences found
+  if (sentences.length === 0) {
+    const allSentences = text.split(/[.!?]/).filter(s => s.trim().length > 0);
+    const matching = allSentences.filter(s => {
+      const sLower = s.toLowerCase();
+      // Check if contains word
+      if (!sLower.includes(wordLowerVar)) return false;
+      // Check if long enough
+      if (s.trim().length < 5) return false;
+
+      // Apply same 6-layer filtering to fallback sentences
+      if (s.length < 10) return false;
+      if (s.split(/\s+/).length < 3) return false;
+
+      const specialCharCount = (s.match(/[×()[\]{}→]/g) || []).length;
+      if (specialCharCount > 2) return false;
+
+      if (s.includes('1x') || s.includes('→') || s.match(/\d+×/)) return false;
+
+      const wordFormPatterns = (s.match(/\([0-9×]+\)/g) || []).length;
+      if (wordFormPatterns > 3) return false;
+
+      if (/[\u4E00-\u9FFF]/.test(s) || /[\u3040-\u309F]/.test(s)) return false;
+
+      return true;
+    });
+
+    if (matching.length > 0) {
+      sentences = [matching[0].trim() + '.'];
+    } else {
+      sentences = [`${word} was found on this page.`];
+    }
+  }
+
+  // DEBUG: Log exactly what we're about to send
+  console.log(`[MixRead DEBUG] About to send word "${word}" with ${sentences.length} sentences:`, sentences);
+
+  // Send to backend
+  try {
+    const sendAddToLibrary = () => {
+      try {
+        chrome.runtime.sendMessage(
+          {
+            type: "ADD_TO_LIBRARY",
+            user_id: userId,
+            words: [word],
+            contexts: [
+              {
+                page_url: pageUrl,
+                page_title: pageTitle,
+                sentences: sentences,
+              }
+            ],
+          },
+          (response) => {
+            try {
+              if (chrome.runtime.lastError) {
+                console.warn(`[MixRead] Extension context invalidated, retrying...`);
+                // Retry after a short delay
+                setTimeout(sendAddToLibrary, 500);
+              } else if (response && response.success) {
+                console.log(`[MixRead] Successfully added "${word}" to library`);
+              } else {
+                console.error(`[MixRead] Failed to add word to library:`, response);
+              }
+            } catch (e) {
+              console.error(`[MixRead] Error in callback:`, e.message);
+            }
+          }
+        );
+      } catch (e) {
+        console.error(`[MixRead] Failed to send message:`, e.message);
+      }
+    };
+
+    sendAddToLibrary();
+  } catch (error) {
+    console.error(`[MixRead] Error setting up message:`, error.message);
+  }
 }
 
 /**
@@ -664,25 +874,44 @@ function markWordAsKnown(word) {
   logger.log(`Marking "${word}" as known`);
 
   // Call backend API to mark word as known
-  chrome.runtime.sendMessage(
-    {
-      type: "MARK_AS_KNOWN",
-      user_id: userId,
-      word: stemmedWord,
-    },
-    (response) => {
-      if (response?.success) {
-        console.log(`[MixRead] Successfully marked "${stemmedWord}" as known`);
-        logger.info(`"${word}" marked as known`);
+  try {
+    const sendMarkAsKnown = () => {
+      try {
+        chrome.runtime.sendMessage(
+          {
+            type: "MARK_AS_KNOWN",
+            user_id: userId,
+            word: stemmedWord,
+          },
+          (response) => {
+            try {
+              if (chrome.runtime.lastError) {
+                console.warn(`[MixRead] Extension context invalidated when marking as known, retrying...`);
+                setTimeout(sendMarkAsKnown, 500);
+              } else if (response?.success) {
+                console.log(`[MixRead] Successfully marked "${stemmedWord}" as known`);
+                logger.info(`"${word}" marked as known`);
 
-        // Trigger page re-highlight to update highlights
-        highlightPageWords();
-      } else {
-        console.error(`[MixRead] Failed to mark "${word}" as known:`, response?.error);
-        logger.error(`Failed to mark "${word}" as known`, response?.error);
+                // Trigger page re-highlight to update highlights
+                highlightPageWords();
+              } else {
+                console.error(`[MixRead] Failed to mark "${word}" as known:`, response?.error);
+                logger.error(`Failed to mark "${word}" as known`, response?.error);
+              }
+            } catch (e) {
+              console.error(`[MixRead] Error in mark-as-known callback:`, e.message);
+            }
+          }
+        );
+      } catch (e) {
+        console.error(`[MixRead] Failed to send mark-as-known message:`, e.message);
       }
-    }
-  );
+    };
+
+    sendMarkAsKnown();
+  } catch (error) {
+    console.error(`[MixRead] Error setting up mark-as-known message:`, error.message);
+  }
 }
 
 // ===== Event Listeners =====
@@ -725,6 +954,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Re-highlight the page to show/hide Chinese
     highlightPageWords();
     sendResponse({ success: true });
+  } else if (request.type === "UPDATE_CURRENT_USER") {
+    // Update current user ID in user store
+    console.log('[MixRead] Updating current user to:', request.userId);
+    if (userStore && userStore.user) {
+      userStore.user.id = request.userId;
+      console.log('[MixRead] User updated in userStore');
+      sendResponse({ success: true });
+    } else {
+      console.log('[MixRead] User store not initialized, storing for later');
+      // Store for later when userStore initializes
+      window.pendingUserId = request.userId;
+      sendResponse({ success: true });
+    }
   } else if (request.type === "CONTEXT_MARK_UNKNOWN") {
     // Handle Mark as Unknown from context menu
     const word = request.word;
@@ -804,15 +1046,61 @@ initializeModules().then(() => {
 //   subtree: true,
 // });
 
+// Clean up when page unloads to prevent context invalidated errors
+window.addEventListener('beforeunload', () => {
+  console.log('[MixRead] Page unloading, cleaning up...');
+
+  // Record final session if extension context is still valid
+  if (chrome && chrome.storage && !window.mixReadUnloaded) {
+    recordReadingSession();
+    window.mixReadUnloaded = true;
+  }
+
+  // Cancel any ongoing speech
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+
+  // Remove any tooltips
+  const tooltips = document.querySelectorAll('.mixread-tooltip');
+  tooltips.forEach(tooltip => tooltip.remove());
+
+  // Remove batch marking panel if it exists
+  const panel = document.getElementById('mixread-batch-panel');
+  if (panel) {
+    panel.remove();
+  }
+});
+
+// Also clean up on visibility change (when switching tabs)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && chrome && chrome.storage && !window.mixReadUnloaded) {
+    // Record session when tab becomes hidden
+    recordReadingSession();
+  }
+});
+
 /**
  * Track reading session time and update stats
  */
 function recordReadingSession() {
+  // Check if extension context is still valid
+  if (!chrome || !chrome.storage || !chrome.runtime) {
+    console.warn('[MixRead] Extension context invalidated, cannot record session');
+    return;
+  }
+
   const sessionDurationMs = Date.now() - sessionStartTime;
   const sessionDurationMinutes = Math.round(sessionDurationMs / 60000); // Convert to minutes
 
   if (sessionDurationMinutes > 0) {
     chrome.storage.local.get(["reading_sessions"], (result) => {
+      // Check again inside callback in case context was invalidated during async operation
+      if (chrome.runtime.lastError) {
+        console.warn('[MixRead] Extension context error during session recording:', chrome.runtime.lastError.message);
+        return;
+      }
+
       const sessions = result.reading_sessions || {};
       const today = new Date().toISOString().split("T")[0];
 
@@ -821,9 +1109,13 @@ function recordReadingSession() {
 
       chrome.storage.local.set({
         reading_sessions: sessions,
+      }, () => {
+        if (chrome.runtime.lastError) {
+          console.warn('[MixRead] Error saving reading session:', chrome.runtime.lastError.message);
+        } else {
+          console.log(`[MixRead] Recorded ${sessionDurationMinutes} minutes of reading for ${today}`);
+        }
       });
-
-      console.log(`[MixRead] Recorded ${sessionDurationMinutes} minutes of reading for ${today}`);
     });
   }
 }

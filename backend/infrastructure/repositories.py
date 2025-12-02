@@ -6,9 +6,18 @@ Provides data access layer using SQLAlchemy ORM
 
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from typing import List, Optional
+from datetime import datetime
 
-from domain.models import User, VocabularyEntry
-from infrastructure.models import UserModel, UnknownWordModel, VocabularyEntryModel
+from domain.models import User, VocabularyEntry, LibraryEntry
+from infrastructure.models import (
+    UserModel,
+    UnknownWordModel,
+    VocabularyEntryModel,
+    LibraryEntryModel,
+    DomainManagementPolicy,
+    DomainPolicyType,
+)
 
 
 class UserRepository:
@@ -112,6 +121,39 @@ class UserRepository:
                     added_at=entry.added_at
                 )
                 self.db.add(vocab_model)
+
+        # Update library entries
+        current_library = self.db.query(LibraryEntryModel).filter(
+            LibraryEntryModel.user_id == user.user_id
+        ).all()
+        current_library_set = {l.word.lower() for l in current_library}
+        desired_library_set = set(user.library.keys())
+
+        # Remove words no longer in library
+        for library_model in current_library:
+            if library_model.word.lower() not in desired_library_set:
+                self.db.delete(library_model)
+
+        # Update or add library entries
+        for word, entry in user.library.items():
+            library_model = next(
+                (l for l in current_library if l.word.lower() == word.lower()),
+                None
+            )
+            if library_model:
+                # Update existing
+                library_model.status = entry.status
+                library_model.set_contexts(entry.contexts)
+            else:
+                # Create new
+                library_model = LibraryEntryModel(
+                    user_id=user.user_id,
+                    word=word,
+                    status=entry.status,
+                    added_at=entry.added_at
+                )
+                library_model.set_contexts(entry.contexts)
+                self.db.add(library_model)
 
         self.db.commit()
 
@@ -238,4 +280,296 @@ class UserRepository:
             entry.last_reviewed = vocab_model.last_reviewed
             user.vocabulary[vocab_model.word.lower()] = entry
 
+        # Load library
+        library_models = self.db.query(LibraryEntryModel).filter(
+            LibraryEntryModel.user_id == user_model.user_id
+        ).all()
+
+        for library_model in library_models:
+            entry = LibraryEntry(library_model.word, added_at=library_model.added_at)
+            entry.status = library_model.status
+            entry.contexts = library_model.get_contexts()
+            user.library[library_model.word.lower()] = entry
+
         return user
+
+
+class DomainManagementPolicyRepository:
+    """
+    Domain Management Policy repository - handles domain policy data persistence
+    Provides methods for managing blacklist/whitelist policies
+    """
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    # ========== 获取策略 ==========
+
+    def get_by_user_and_type(
+        self,
+        user_id: str,
+        policy_type: DomainPolicyType,
+    ) -> List[str]:
+        """
+        获取用户指定类型的所有域名（活跃的）
+
+        Args:
+            user_id: User ID
+            policy_type: BLACKLIST or WHITELIST
+
+        Returns:
+            List of domain names
+        """
+        domains = self.db.query(DomainManagementPolicy.domain).filter(
+            DomainManagementPolicy.user_id == user_id,
+            DomainManagementPolicy.policy_type == policy_type,
+            DomainManagementPolicy.is_active == True,
+        ).all()
+        return [d[0] for d in domains]
+
+    def get_policies_by_user_and_type(
+        self,
+        user_id: str,
+        policy_type: DomainPolicyType,
+    ) -> List[DomainManagementPolicy]:
+        """
+        获取用户指定类型的所有策略对象（包含完整信息）
+
+        Args:
+            user_id: User ID
+            policy_type: BLACKLIST or WHITELIST
+
+        Returns:
+            List of DomainManagementPolicy objects
+        """
+        return self.db.query(DomainManagementPolicy).filter(
+            DomainManagementPolicy.user_id == user_id,
+            DomainManagementPolicy.policy_type == policy_type,
+            DomainManagementPolicy.is_active == True,
+        ).order_by(DomainManagementPolicy.added_at.desc()).all()
+
+    def get_all_policies_by_user(self, user_id: str) -> List[DomainManagementPolicy]:
+        """
+        获取用户所有活跃策略（黑名单 + 白名单）
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            List of all active DomainManagementPolicy objects
+        """
+        return self.db.query(DomainManagementPolicy).filter(
+            DomainManagementPolicy.user_id == user_id,
+            DomainManagementPolicy.is_active == True,
+        ).order_by(
+            DomainManagementPolicy.policy_type,
+            DomainManagementPolicy.added_at.desc(),
+        ).all()
+
+    # ========== 添加策略 ==========
+
+    def add_domain(
+        self,
+        user_id: str,
+        domain: str,
+        policy_type: DomainPolicyType = DomainPolicyType.BLACKLIST,
+        description: Optional[str] = None,
+    ) -> DomainManagementPolicy:
+        """
+        添加域名到指定策略
+
+        Args:
+            user_id: User ID
+            domain: Domain name to add
+            policy_type: BLACKLIST or WHITELIST
+            description: Optional description
+
+        Returns:
+            DomainManagementPolicy object (created or reactivated)
+        """
+        # 检查是否已存在
+        existing = self.db.query(DomainManagementPolicy).filter_by(
+            user_id=user_id,
+            policy_type=policy_type,
+            domain=domain,
+        ).first()
+
+        if existing:
+            # 如果已存在但被禁用，则启用它
+            if not existing.is_active:
+                existing.is_active = True
+                existing.updated_at = datetime.now()
+                self.db.commit()
+                self.db.refresh(existing)
+            return existing
+
+        # 创建新策略
+        policy = DomainManagementPolicy(
+            user_id=user_id,
+            domain=domain,
+            policy_type=policy_type,
+            description=description,
+        )
+        self.db.add(policy)
+        self.db.commit()
+        self.db.refresh(policy)
+        return policy
+
+    # ========== 删除策略 ==========
+
+    def remove_domain(
+        self,
+        user_id: str,
+        domain: str,
+        policy_type: DomainPolicyType = DomainPolicyType.BLACKLIST,
+    ) -> bool:
+        """
+        删除域名（软删除，设置为不活跃）
+
+        Args:
+            user_id: User ID
+            domain: Domain name to remove
+            policy_type: BLACKLIST or WHITELIST
+
+        Returns:
+            True if domain was removed, False if not found
+        """
+        policy = self.db.query(DomainManagementPolicy).filter_by(
+            user_id=user_id,
+            policy_type=policy_type,
+            domain=domain,
+        ).first()
+
+        if policy:
+            policy.is_active = False
+            policy.updated_at = datetime.now()
+            self.db.commit()
+            return True
+        return False
+
+    def hard_delete_domain(
+        self,
+        user_id: str,
+        domain: str,
+        policy_type: DomainPolicyType = DomainPolicyType.BLACKLIST,
+    ) -> bool:
+        """
+        永久删除域名（硬删除）
+
+        Args:
+            user_id: User ID
+            domain: Domain name to delete
+            policy_type: BLACKLIST or WHITELIST
+
+        Returns:
+            True if domain was deleted, False if not found
+        """
+        policy = self.db.query(DomainManagementPolicy).filter_by(
+            user_id=user_id,
+            policy_type=policy_type,
+            domain=domain,
+        ).first()
+
+        if policy:
+            self.db.delete(policy)
+            self.db.commit()
+            return True
+        return False
+
+    # ========== 检查和验证 ==========
+
+    def domain_exists(
+        self,
+        user_id: str,
+        domain: str,
+        policy_type: DomainPolicyType = DomainPolicyType.BLACKLIST,
+    ) -> bool:
+        """
+        检查域名是否在指定策略中
+
+        Args:
+            user_id: User ID
+            domain: Domain name to check
+            policy_type: BLACKLIST or WHITELIST
+
+        Returns:
+            True if domain exists in the policy type, False otherwise
+        """
+        exists = self.db.query(DomainManagementPolicy).filter_by(
+            user_id=user_id,
+            policy_type=policy_type,
+            domain=domain,
+            is_active=True,
+        ).first()
+        return exists is not None
+
+    # ========== 统计 ==========
+
+    def count_by_type(
+        self,
+        user_id: str,
+        policy_type: DomainPolicyType,
+    ) -> int:
+        """
+        统计用户指定类型的活跃策略数量
+
+        Args:
+            user_id: User ID
+            policy_type: BLACKLIST or WHITELIST
+
+        Returns:
+            Count of active policies
+        """
+        return self.db.query(DomainManagementPolicy).filter(
+            DomainManagementPolicy.user_id == user_id,
+            DomainManagementPolicy.policy_type == policy_type,
+            DomainManagementPolicy.is_active == True,
+        ).count()
+
+    # ========== 批量操作 ==========
+
+    def add_domains_batch(
+        self,
+        user_id: str,
+        domains: List[str],
+        policy_type: DomainPolicyType = DomainPolicyType.BLACKLIST,
+    ) -> List[DomainManagementPolicy]:
+        """
+        批量添加域名
+
+        Args:
+            user_id: User ID
+            domains: List of domain names to add
+            policy_type: BLACKLIST or WHITELIST
+
+        Returns:
+            List of created/reactivated DomainManagementPolicy objects
+        """
+        results = []
+        for domain in domains:
+            policy = self.add_domain(user_id, domain, policy_type)
+            results.append(policy)
+        return results
+
+    def remove_domains_batch(
+        self,
+        user_id: str,
+        domains: List[str],
+        policy_type: DomainPolicyType = DomainPolicyType.BLACKLIST,
+    ) -> int:
+        """
+        批量删除域名
+
+        Args:
+            user_id: User ID
+            domains: List of domain names to remove
+            policy_type: BLACKLIST or WHITELIST
+
+        Returns:
+            Count of removed domains
+        """
+        count = 0
+        for domain in domains:
+            if self.remove_domain(user_id, domain, policy_type):
+                count += 1
+        return count

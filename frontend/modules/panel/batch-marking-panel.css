@@ -373,17 +373,43 @@
   background: #3d8b40;
 }
 
-.action-btn:not(.primary) {
+.action-btn.info {
+  background: #2196F3;
+  color: white;
+}
+
+.action-btn.info:hover {
+  background: #1976D2;
+}
+
+.action-btn.info:active {
+  background: #0D47A1;
+}
+
+.action-btn.primary {
+  background: #4CAF50;
+  color: white;
+}
+
+.action-btn.primary:hover {
+  background: #45a049;
+}
+
+.action-btn.primary:active {
+  background: #3d8b40;
+}
+
+.action-btn:not(.info):not(.primary) {
   background: #f0f0f0;
   color: #333;
   border: 1px solid #ddd;
 }
 
-.action-btn:not(.primary):hover {
+.action-btn:not(.info):not(.primary):hover {
   background: #e0e0e0;
 }
 
-.action-btn:not(.primary):active {
+.action-btn:not(.info):not(.primary):active {
   background: #d0d0d0;
 }
 

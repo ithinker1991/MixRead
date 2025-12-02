@@ -67,6 +67,24 @@ class VocabularyEntry:
         self.mark_reviewed()
 
 
+class LibraryEntry:
+    """Library entry - represents a word user wants to learn with context"""
+
+    def __init__(self, word: str, added_at: datetime = None):
+        self.word = word.lower()
+        self.added_at = added_at or datetime.now()
+        self.contexts = []  # List of context objects with page info and sentences
+        self.status = VocabularyStatus.LEARNING
+
+    def add_context(self, context: dict):
+        """Add learning context (page URL, sentences, etc.)"""
+        self.contexts.append(context)
+
+    def get_contexts(self) -> list:
+        """Get all learning contexts"""
+        return self.contexts
+
+
 class User:
     """User entity - represents a MixRead user"""
 
@@ -78,6 +96,7 @@ class User:
         self.known_words: set = set()  # Words user confirmed they know
         self.unknown_words: set = set()  # Words user marked as not knowing
         self.vocabulary: dict = {}  # Words user wants to learn (VocabularyEntry)
+        self.library: dict = {}  # Words user wants to learn with context (LibraryEntry)
 
     def add_known_word(self, word: str):
         """Mark a word as known"""
@@ -121,3 +140,30 @@ class User:
         if word_lower in self.unknown_words:
             self.unknown_words.discard(word_lower)
             self.add_to_vocabulary(word_lower)
+
+    def add_to_library(self, words: list, contexts: list = None):
+        """Add words to library with learning context"""
+        for i, word in enumerate(words):
+            word_lower = word.lower()
+            if word_lower not in self.library:
+                self.library[word_lower] = LibraryEntry(word_lower)
+
+            # Add context if provided
+            if contexts and i < len(contexts):
+                self.library[word_lower].add_context(contexts[i])
+
+    def remove_from_library(self, word: str):
+        """Remove a word from library"""
+        self.library.pop(word.lower(), None)
+
+    def get_library_with_context(self) -> list:
+        """Get library words with their contexts"""
+        result = []
+        for word_lower, entry in self.library.items():
+            result.append({
+                "word": word_lower,
+                "added_at": entry.added_at.isoformat() if entry.added_at else None,
+                "status": entry.status.value,
+                "contexts": entry.get_contexts()
+            })
+        return result

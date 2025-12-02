@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Sentence Collection</title>
+    <style>
+        .highlighted {
+            background-color: yellow;
+            font-weight: bold;
+        }
+        p {
+            line-height: 1.8;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sentence Collection Test</h1>
+
+    <p>This is a <span data-word="example" class="highlighted">example</span> sentence. It contains multiple sentences! How are sentences collected? Let's see what happens with punctuation.</p>
+
+    <p>Another paragraph with different <span data-word="example" class="highlighted">example</span>. Does it work correctly? We should test various scenarios. What about questions?</p>
+
+    <p>Testing quotes: "This is an <span data-word="example" class="highlighted">example</span> with quotes." And parentheses (this is another example). How about semicolons; here's an example!</p>
+
+    <button onclick="testSentenceCollection()">Test Sentence Collection Logic</button>
+    <button onclick="simulateAddToLibrary()">Simulate Add to Library</button>
+
+    <div id="results" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9;"></div>
+
+    <script>
+        function testSentenceCollection() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h3>Sentence Collection Test Results:</h3>';
+
+            // Test the actual implementation
+            const word = 'example';
+            const elements = document.querySelectorAll(`[data-word="${word}"], [data-word="${word.toLowerCase()}"]`);
+
+            elements.forEach((element, index) => {
+                // Get the full text from the parent element
+                const parentElement = element.closest('p, div, li, td, th, h1, h2, h3, h4, h5, h6, span') || element.parentElement;
+                const text = parentElement ? parentElement.textContent : element.textContent;
+
+                // Split text into sentences using punctuation marks
+                const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+
+                // Find sentences that contain the target word
+                const targetSentences = sentences
+                  .map(sentence => sentence.trim())
+                  .filter(sentence => {
+                    const sentenceLower = sentence.toLowerCase();
+                    const wordLower = word.toLowerCase();
+                    return sentenceLower.includes(wordLower);
+                  });
+
+                results.innerHTML += `
+                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd;">
+                        <strong>Element ${index + 1}:</strong><br>
+                        <em>Parent text:</em> "${text.substring(0, 200)}...${text.length > 200 ? '' : ''}"<br>
+                        <em>All sentences found:</em> ${sentences.length}<br>
+                        <em>Target sentences with "${word}":</em> ${targetSentences.length}<br>
+                        <div style="background: white; padding: 5px; margin: 5px 0;">
+                            ${targetSentences.map(s => `• ${s}`).join('<br>')}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function simulateAddToLibrary() {
+            const results = document.getElementById('results');
+            results.innerHTML += '<h3>Simulating Add to Library:</h3>';
+
+            const word = 'example';
+            const elements = document.querySelectorAll(`[data-word="${word}"], [data-word="${word.toLowerCase()}"]`);
+            const pageUrl = window.location.href;
+            const pageTitle = document.title;
+
+            const contexts = Array.from(elements).map(element => {
+                // Get the full text from the parent element to capture complete sentences
+                const parentElement = element.closest('p, div, li, td, th, h1, h2, h3, h4, h5, h6, span') || element.parentElement;
+                const text = parentElement ? parentElement.textContent : element.textContent;
+
+                // Split text into sentences using punctuation marks
+                const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+
+                // Find sentences that contain the target word
+                const targetSentences = sentences
+                  .map(sentence => sentence.trim())
+                  .filter(sentence => {
+                    const sentenceLower = sentence.toLowerCase();
+                    const wordLower = word.toLowerCase();
+                    return sentenceLower.includes(wordLower);
+                  });
+
+                return {
+                    pageUrl: pageUrl,
+                    pageTitle: pageTitle,
+                    sentences: targetSentences.length > 0 ? targetSentences : [text.substring(Math.max(0, text.indexOf(word) - 100), text.indexOf(word) + word.length + 100).trim()],
+                    timestamp: Date.now()
+                };
+            });
+
+            // Collect all unique contexts from all occurrences
+            const allContexts = [];
+            contexts.forEach(context => {
+                // Add context if it's not empty
+                if (context.sentences && context.sentences.length > 0) {
+                    allContexts.push({
+                        page_url: context.pageUrl,
+                        page_title: context.pageTitle,
+                        sentences: context.sentences,
+                        timestamp: context.timestamp
+                    });
+                }
+            });
+
+            results.innerHTML += `
+                <div style="background: white; padding: 10px; margin: 10px 0; border: 1px solid #ddd;">
+                    <strong>Word:</strong> "${word}"<br>
+                    <strong>Total contexts:</strong> ${allContexts.length}<br>
+                    <strong>Data that would be sent to backend:</strong>
+                    <pre style="background: #f0f0f0; padding: 10px; overflow-x: auto;">
+${JSON.stringify({
+    type: "ADD_TO_LIBRARY",
+    user_id: "test_user",
+    word: word,
+    contexts: allContexts
+}, null, 2)}
+                    </pre>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

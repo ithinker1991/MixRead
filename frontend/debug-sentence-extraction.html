@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug Sentence Extraction</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .highlighted {
+            background-color: yellow;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px 5px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .debug-info {
+            background: #e3f2fd;
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #2196f3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Debug Sentence Extraction</h1>
+    <div class="debug-info">
+        This page simulates the MixRead extension environment to test sentence extraction.
+        Each highlighted word represents a word that could be added to the library.
+    </div>
+
+    <div class="test-section">
+        <h3>Paragraph 1 - Simple sentences</h3>
+        <p>This is a <span data-word="example" class="highlighted" data-definition="a thing characteristic of its kind" data-chinese="例子">example</span> paragraph with multiple sentences. The first sentence shows the word in context. The second sentence continues the thought. A third sentence completes the paragraph with more details.</p>
+    </div>
+
+    <div class="test-section">
+        <h3>Paragraph 2 - Mixed content</h3>
+        <p>Here is a <span data-word="understanding" class="highlighted" data-definition="the ability to understand something" data-chinese="理解">understanding</span> sentence that should be clean. Learning requires patience and dedication. Students should practice every day.</p>
+    </div>
+
+    <div class="test-section">
+        <h3>Paragraph 3 - Complex sentences</h3>
+        <p>Although it was difficult, she completed the <span data-word="comprehensive" class="highlighted" data-definition="complete or including all elements" data-chinese="全面的">comprehensive</span> assignment on time. The professor was impressed by her thorough research and detailed analysis. This achievement will definitely help her future career.</p>
+    </div>
+
+    <div class="test-section">
+        <h3>List Items</h3>
+        <ul>
+            <li>First item with <span data-word="difficult" class="highlighted" data-definition="needing much effort or skill" data-chinese="困难的">difficult</span> word</li>
+            <li>Second item for <span data-word="testing" class="highlighted" data-definition="taking measures to check the quality" data-chinese="测试">testing</span> purposes</li>
+            <li>Third item contains another <span data-word="example" class="highlighted">example</span> word</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h3>Nested Elements</h3>
+        <div>
+            <p>This sentence contains a <span data-word="navigation" class="highlighted" data-definition="the act of moving or sailing" data-chinese="导航">navigation</span> element.</p>
+            <nav>
+                <ul>
+                    <li><a href="#">Home</a></li>
+                    <li><a href="#">About</a></li>
+                </ul>
+            </nav>
+            <p>This sentence should not include navigation content in sentence extraction.</p>
+        </div>
+    </div>
+
+    <button onclick="testSentenceExtraction()">Test Sentence Extraction (Simulate Batch Mark)</button>
+    <button onclick="testSingleWord('comprehensive')">Test Single Word: comprehensive</button>
+    <button onclick="clearResults()">Clear Results</button>
+
+    <div id="result"></div>
+
+    <script>
+        // Simulate the sentence extraction logic from batch-marking-panel.js
+        function extractSentenceContext(element, word) {
+            console.log(`Extracting context for word: ${word}`);
+
+            // Get the paragraph containing this word (same logic as batch-marking-panel.js)
+            let paragraph = element.closest('p');
+            if (!paragraph) {
+                // If not in a paragraph, try to find the nearest text block
+                paragraph = element.closest('div, article, section, li') || element.parentElement;
+            }
+
+            console.log(`Found parent element:`, paragraph?.tagName.toLowerCase());
+
+            // Get clean text - remove scripts, styles, and navigation elements
+            let text = '';
+            if (paragraph) {
+                // Clone the paragraph to avoid modifying the DOM
+                const clone = paragraph.cloneNode(true);
+
+                console.log('Original element innerHTML:', paragraph.innerHTML.substring(0, 200));
+
+                // Remove unwanted elements (same as batch-marking-panel.js)
+                const unwantedTags = ['script', 'style', 'nav', 'header', 'footer', 'aside', '.navigation', '.menu', '.sidebar'];
+                unwantedTags.forEach(tag => {
+                    const elements = clone.querySelectorAll(tag);
+                    elements.forEach(el => el.remove());
+                });
+
+                // Get clean text content
+                text = clone.textContent || clone.innerText || '';
+                console.log(`Extracted text length: ${text.length}`);
+                console.log(`Extracted text: "${text.substring(0, 100)}..."`);
+            }
+
+            // Clean up the text (same as batch-marking-panel.js)
+            text = text
+                .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+                .replace(/\n\s*\n/g, '\n')  // Replace multiple newlines
+                .trim();
+
+            console.log(`Cleaned text: "${text.substring(0, 100)}..."`);
+
+            // Split text into sentences
+            const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+            console.log(`Found ${sentences.length} sentences using regex`);
+
+            // Find sentences that contain the target word
+            const targetSentences = sentences
+                .map(sentence => sentence.trim())
+                .filter(sentence => {
+                    const sentenceLower = sentence.toLowerCase();
+                    const wordLower = word.toLowerCase();
+                    return sentenceLower.includes(wordLower);
+                })
+                .filter(sentence => sentence.length > 10) // Filter out very short fragments
+                .slice(0, 3); // Limit to 3 sentences per context
+
+            console.log(`Target sentences containing "${word}":`, targetSentences);
+
+            // Fallback if no sentences found
+            if (targetSentences.length === 0 && text.includes(word)) {
+                const fallback = text.substring(
+                    Math.max(0, text.indexOf(word) - 50),
+                    text.indexOf(word) + word.length + 50
+                ).trim();
+                console.log(`Using fallback text: "${fallback}"`);
+                return [fallback];
+            }
+
+            return targetSentences;
+        }
+
+        function testSentenceExtraction() {
+            const result = document.getElementById('result');
+            let output = '=== Sentence Extraction Debug ===\n\n';
+
+            // Get all highlighted words
+            const highlightedWords = document.querySelectorAll('.highlighted');
+            output += `Found ${highlightedWords.length} highlighted words:\n\n`;
+
+            // Group words by their text content (simulate frequency counting)
+            const wordGroups = {};
+            highlightedWords.forEach(element => {
+                const word = element.dataset.word || element.textContent;
+                if (!wordGroups[word]) {
+                    wordGroups[word] = [];
+                }
+                wordGroups[word].push(element);
+            });
+
+            // Test extraction for each unique word
+            Object.entries(wordGroups).forEach(([word, elements]) => {
+                output += `\n=== Word: "${word}" (${elements.length} occurrences) ===\n`;
+
+                elements.forEach((element, index) => {
+                    output += `\n--- Occurrence ${index + 1} ---\n`;
+                    output += `Parent: ${element.parentElement.tagName.toLowerCase()}\n`;
+
+                    // Extract sentences using the same logic as batch-marking-panel.js
+                    const sentences = extractSentenceContext(element, word);
+
+                    output += `Sentences found: ${sentences.length}\n`;
+                    sentences.forEach((sentence, i) => {
+                        output += `  ${i + 1}. "${sentence}"\n`;
+
+                        // Check for issues
+                        if (sentence.includes('1x') || sentence.includes('×')) {
+                            output += `    ⚠️  Contains '1x' or special characters!\n`;
+                        }
+                        if (sentence.length < 20) {
+                            output += `    ⚠️  Very short sentence (${sentence.length} chars)\n`;
+                        }
+                    });
+                });
+
+                // Simulate what would be sent to the library
+                output += `\n--- Data for Library ---\n`;
+                const allSentences = [];
+                elements.forEach(element => {
+                    const sentences = extractSentenceContext(element, word);
+                    allSentences.push(...sentences);
+                });
+
+                // Remove duplicates and limit
+                const uniqueSentences = [...new Set(allSentences)].slice(0, 3);
+                output += `Unique sentences to save: ${uniqueSentences.length}\n`;
+                uniqueSentences.forEach((s, i) => {
+                    output += `  ${i + 1}. "${s}"\n`;
+                });
+            });
+
+            result.textContent = output;
+            console.log(output);
+        }
+
+        function testSingleWord(word) {
+            const result = document.getElementById('result');
+            let output = `=== Testing Single Word: "${word}" ===\n\n`;
+
+            const elements = document.querySelectorAll(`[data-word="${word}"], [data-word="${word.toLowerCase()}"]`);
+            output += `Found ${elements.length} elements:\n\n`;
+
+            elements.forEach((element, index) => {
+                output += `Element ${index + 1}:\n`;
+                output += `  Tag: ${element.tagName.toLowerCase()}\n`;
+                output += `  Text: "${element.textContent}"\n`;
+                output += `  Parent: ${element.parentElement?.tagName.toLowerCase()}\n`;
+
+                // Walk up the DOM tree
+                let parent = element.parentElement;
+                let level = 1;
+                while (parent && level <= 5) {
+                    output += `  ${'  '.repeat(level)}Parent ${level}: ${parent.tagName.toLowerCase()}`;
+                    if (parent.className) {
+                        output += `.${parent.className.split(' ').join('.')}`;
+                    }
+                    output += '\n';
+                    parent = parent.parentElement;
+                    level++;
+                }
+
+                output += '\n';
+
+                const sentences = extractSentenceContext(element, word);
+                output += `  Extracted sentences: ${sentences.length}\n`;
+                sentences.forEach((s, i) => {
+                    output += `    ${i + 1}. "${s}"\n`;
+                });
+                output += '\n';
+            });
+
+            result.textContent = output;
+        }
+
+        function clearResults() {
+            document.getElementById('result').textContent = '';
+        }
+
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                console.log('Auto-running sentence extraction test...');
+                testSentenceExtraction();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

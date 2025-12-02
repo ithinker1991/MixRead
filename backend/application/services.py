@@ -8,7 +8,8 @@ Implements specific business use cases
 from typing import List, Dict, Optional
 from domain.models import Word, User
 from domain.services import HighlightService, DifficultyService
-from infrastructure.repositories import UserRepository
+from infrastructure.repositories import UserRepository, DomainManagementPolicyRepository
+from infrastructure.models import DomainPolicyType
 
 
 class UserApplicationService:
@@ -104,6 +105,55 @@ class UserApplicationService:
             "success": True,
             "unknown_words": list(words)
         }
+
+    def get_library(self, user_id: str):
+        """
+        Use case: Get user's library words with learning context
+        """
+        user = self.user_repository.get_user(user_id)
+        return {
+            "success": True,
+            "library": user.get_library_with_context()
+        }
+
+    def add_to_library(self, user_id: str, words: List[str], contexts: List[Dict] = None):
+        """
+        Use case: Add words to library with learning context
+        """
+        user = self.user_repository.get_user(user_id)
+
+        # Handle contexts: if provided, associate them with the words
+        if contexts:
+            # If contexts provided, assume first word gets all contexts
+            # (for backward compatibility with current frontend)
+            if len(words) == 1:
+                user.add_to_library(words, contexts)
+            else:
+                # Multiple words: distribute contexts evenly or assign empty contexts
+                contexts_per_word = len(contexts) // len(words) if contexts else 0
+                for i, word in enumerate(words):
+                    start_idx = i * contexts_per_word
+                    end_idx = (i + 1) * contexts_per_word if i < len(words) - 1 else len(contexts)
+                    word_contexts = contexts[start_idx:end_idx] if contexts else []
+                    user.add_to_library([word], word_contexts)
+        else:
+            user.add_to_library(words, [])
+
+        self.user_repository.save_user(user)
+        return {
+            "success": True,
+            "message": f"{len(words)} word(s) added to library",
+            "added_count": len(words)
+        }
+
+    def remove_from_library(self, user_id: str, word: str):
+        """
+        Use case: Remove a word from library
+        """
+        user = self.user_repository.get_user(user_id)
+        user.remove_from_library(word)
+        self.user_repository.save_user(user)
+        return {"success": True, "message": "Word removed from library"}
 
 
 class HighlightApplicationService:
@@ -217,3 +267,314 @@ class HighlightApplicationService:
             "highlighted_words": highlighted,
             "word_details": word_details
         }
+
+
+class DomainManagementService:
+    """
+    Domain Management Service - handles domain policy use cases
+    Manages blacklist/whitelist domain policies for users
+    """
+
+    def __init__(self, domain_repo: DomainManagementPolicyRepository):
+        self.domain_repo = domain_repo
+
+    # ========== 黑名单操作 ==========
+
+    def add_blacklist_domain(
+        self,
+        user_id: str,
+        domain: str,
+        description: Optional[str] = None
+    ) -> Dict:
+        """
+        Use case: User adds a domain to blacklist
+        """
+        try:
+            policy = self.domain_repo.add_domain(
+                user_id=user_id,
+                domain=domain,
+                policy_type=DomainPolicyType.BLACKLIST,
+                description=description
+            )
+            return {
+                "success": True,
+                "message": f"Domain {domain} added to blacklist",
+                "domain": domain,
+                "policy_type": "blacklist"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to add domain: {str(e)}",
+                "error": str(e)
+            }
+
+    def remove_blacklist_domain(self, user_id: str, domain: str) -> Dict:
+        """
+        Use case: User removes a domain from blacklist
+        """
+        try:
+            removed = self.domain_repo.remove_domain(
+                user_id=user_id,
+                domain=domain,
+                policy_type=DomainPolicyType.BLACKLIST
+            )
+            if removed:
+                return {
+                    "success": True,
+                    "message": f"Domain {domain} removed from blacklist",
+                    "domain": domain
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Domain {domain} not found in blacklist"
+                }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to remove domain: {str(e)}",
+                "error": str(e)
+            }
+
+    def get_blacklist_domains(self, user_id: str) -> Dict:
+        """
+        Use case: Get all blacklist domains for user
+        """
+        try:
+            domains = self.domain_repo.get_by_user_and_type(
+                user_id=user_id,
+                policy_type=DomainPolicyType.BLACKLIST
+            )
+            return {
+                "success": True,
+                "blacklist_domains": domains,
+                "count": len(domains)
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to get blacklist: {str(e)}",
+                "error": str(e)
+            }
+
+    def get_blacklist_policies(self, user_id: str) -> Dict:
+        """
+        Use case: Get all blacklist policies with full details
+        """
+        try:
+            policies = self.domain_repo.get_policies_by_user_and_type(
+                user_id=user_id,
+                policy_type=DomainPolicyType.BLACKLIST
+            )
+            policies_data = [
+                {
+                    "id": p.id,
+                    "domain": p.domain,
+                    "description": p.description,
+                    "added_at": p.added_at.isoformat() if p.added_at else None,
+                    "is_active": p.is_active
+                }
+                for p in policies
+            ]
+            return {
+                "success": True,
+                "policies": policies_data,
+                "count": len(policies_data)
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to get blacklist policies: {str(e)}",
+                "error": str(e)
+            }
+
+    # ========== 白名单操作 ==========
+
+    def add_whitelist_domain(
+        self,
+        user_id: str,
+        domain: str,
+        description: Optional[str] = None
+    ) -> Dict:
+        """
+        Use case: User adds a domain to whitelist
+        """
+        try:
+            policy = self.domain_repo.add_domain(
+                user_id=user_id,
+                domain=domain,
+                policy_type=DomainPolicyType.WHITELIST,
+                description=description
+            )
+            return {
+                "success": True,
+                "message": f"Domain {domain} added to whitelist",
+                "domain": domain,
+                "policy_type": "whitelist"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to add domain: {str(e)}",
+                "error": str(e)
+            }
+
+    def remove_whitelist_domain(self, user_id: str, domain: str) -> Dict:
+        """
+        Use case: User removes a domain from whitelist
+        """
+        try:
+            removed = self.domain_repo.remove_domain(
+                user_id=user_id,
+                domain=domain,
+                policy_type=DomainPolicyType.WHITELIST
+            )
+            if removed:
+                return {
+                    "success": True,
+                    "message": f"Domain {domain} removed from whitelist",
+                    "domain": domain
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Domain {domain} not found in whitelist"
+                }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to remove domain: {str(e)}",
+                "error": str(e)
+            }
+
+    def get_whitelist_domains(self, user_id: str) -> Dict:
+        """
+        Use case: Get all whitelist domains for user
+        """
+        try:
+            domains = self.domain_repo.get_by_user_and_type(
+                user_id=user_id,
+                policy_type=DomainPolicyType.WHITELIST
+            )
+            return {
+                "success": True,
+                "whitelist_domains": domains,
+                "count": len(domains)
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to get whitelist: {str(e)}",
+                "error": str(e)
+            }
+
+    # ========== 通用检查 ==========
+
+    def should_exclude_domain(self, user_id: str, domain: str) -> Dict:
+        """
+        Use case: Check if a domain should be excluded
+        Current logic: only blacklist support
+        Returns True if domain is in blacklist
+        """
+        try:
+            in_blacklist = self.domain_repo.domain_exists(
+                user_id=user_id,
+                domain=domain,
+                policy_type=DomainPolicyType.BLACKLIST
+            )
+            return {
+                "success": True,
+                "should_exclude": in_blacklist,
+                "reason": "domain_in_blacklist" if in_blacklist else "not_in_blacklist"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to check domain: {str(e)}",
+                "error": str(e),
+                "should_exclude": False  # Default to NOT excluding on error
+            }
+
+    # ========== 统计 ==========
+
+    def get_statistics(self, user_id: str) -> Dict:
+        """
+        Use case: Get domain management statistics
+        """
+        try:
+            blacklist_count = self.domain_repo.count_by_type(
+                user_id=user_id,
+                policy_type=DomainPolicyType.BLACKLIST
+            )
+            whitelist_count = self.domain_repo.count_by_type(
+                user_id=user_id,
+                policy_type=DomainPolicyType.WHITELIST
+            )
+            return {
+                "success": True,
+                "blacklist_count": blacklist_count,
+                "whitelist_count": whitelist_count,
+                "total_policies": blacklist_count + whitelist_count
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to get statistics: {str(e)}",
+                "error": str(e)
+            }
+
+    # ========== 批量操作 ==========
+
+    def add_blacklist_domains_batch(
+        self,
+        user_id: str,
+        domains: List[str]
+    ) -> Dict:
+        """
+        Use case: Add multiple domains to blacklist
+        """
+        try:
+            policies = self.domain_repo.add_domains_batch(
+                user_id=user_id,
+                domains=domains,
+                policy_type=DomainPolicyType.BLACKLIST
+            )
+            return {
+                "success": True,
+                "message": f"Added {len(policies)} domains to blacklist",
+                "domains_added": domains,
+                "count": len(policies)
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to add domains: {str(e)}",
+                "error": str(e)
+            }
+
+    def remove_blacklist_domains_batch(
+        self,
+        user_id: str,
+        domains: List[str]
+    ) -> Dict:
+        """
+        Use case: Remove multiple domains from blacklist
+        """
+        try:
+            count = self.domain_repo.remove_domains_batch(
+                user_id=user_id,
+                domains=domains,
+                policy_type=DomainPolicyType.BLACKLIST
+            )
+            return {
+                "success": True,
+                "message": f"Removed {count} domains from blacklist",
+                "count": count
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to remove domains: {str(e)}",
+                "error": str(e)
+            }

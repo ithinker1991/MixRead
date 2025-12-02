@@ -11,8 +11,26 @@
     <div class="popup-header">
       <h1>MixRead</h1>
       <p class="subtitle">Learn English through reading</p>
+      <div class="user-info">
+        <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 5px;">
+          <small style="color: #666; font-size: 10px;">User:</small>
+          <select id="user-selector" style="font-size: 10px; padding: 2px 4px; border: 1px solid #ddd; border-radius: 3px;">
+            <option value="">-- Select User --</option>
+          </select>
+          <button id="add-new-user" style="font-size: 10px; padding: 2px 6px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer;">+ New</button>
+        </div>
+        <small style="color: #666; font-size: 10px;">Current: <code id="user-id-display" style="background: #f0f0f0; padding: 2px 4px; border-radius: 3px;">Loading...</code></small>
+      </div>
     </div>
 
+    <!-- Tab Navigation -->
+    <div class="popup-tabs">
+      <button class="tab-btn active" data-tab="main-tab">Settings</button>
+      <button class="tab-btn" data-tab="domain-tab">Domains</button>
+    </div>
+
+    <!-- Main Tab Content -->
+    <div id="main-tab" class="tab-content active">
     <div class="popup-section">
       <label for="difficulty-slider" class="slider-label">Your English Level</label>
       <div class="difficulty-labels">
@@ -43,6 +61,9 @@
     <div class="popup-section">
       <button id="btn-batch-mark" class="btn btn-primary">
         📋 Batch Mark Words
+      </button>
+      <button id="btn-view-library" class="btn btn-primary">
+        📚 My Library (<span id="library-count">0</span>)
       </button>
       <button id="btn-view-vocabulary" class="btn btn-secondary">
         View Vocabulary (<span id="vocab-count">0</span>)
@@ -85,8 +106,57 @@
         🎚️ Adjust difficulty to show more or fewer words.
       </p>
     </div>
+    </div><!-- End main-tab -->
+
+    <!-- Domain Management Tab Content -->
+    <div id="domain-tab" class="tab-content">
+      <div class="popup-section">
+        <h3 style="margin: 0 0 10px 0; font-size: 14px;">Domain Blacklist</h3>
+        <p style="margin: 0 0 10px 0; font-size: 12px; color: #666;">
+          Disable highlighting on specific websites to reduce distractions.
+        </p>
+      </div>
+
+      <div class="popup-section">
+        <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+          <input
+            type="text"
+            id="domain-input"
+            placeholder="example.com"
+            style="flex: 1; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;"
+          >
+          <button
+            id="btn-add-domain"
+            style="padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+
+      <div class="popup-section">
+        <h4 style="margin: 0 0 8px 0; font-size: 12px; color: #333;">
+          Blacklist (<span id="blacklist-count">0</span>)
+        </h4>
+        <div id="blacklist-container" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 8px;">
+          <p id="empty-blacklist-msg" style="margin: 0; color: #999; font-size: 12px;">No domains in blacklist</p>
+          <ul id="blacklist-items" style="margin: 0; padding: 0; list-style: none;"></ul>
+        </div>
+      </div>
+
+      <div class="popup-section">
+        <button
+          id="btn-preset-domains"
+          style="width: 100%; padding: 8px; background: #f8f9fa; color: #333; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; font-size: 12px;"
+        >
+          Add Preset Domains
+        </button>
+      </div>
+    </div><!-- End domain-tab -->
   </div>
 
+  <script src="modules/domain-policy/domain-policy-store.js"></script>
+  <script src="modules/domain-policy/domain-policy-filter.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

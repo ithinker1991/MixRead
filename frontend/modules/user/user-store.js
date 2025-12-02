@@ -19,13 +19,13 @@ class UserStore {
    */
   async initialize() {
     try {
-      let userId = await StorageManager.getItem('user_id');
+      // Get current user ID from popup's user management
+      const result = await StorageManager.getItems(['mixread_current_user', 'mixread_user_id']);
+      let userId = result.mixread_current_user || result.mixread_user_id;
 
-      // Generate new user_id if doesn't exist
       if (!userId) {
-        userId = this.generateUserId();
-        await StorageManager.setItem('user_id', userId);
-        logger.info(`Generated new user_id: ${userId}`);
+        // Fallback to generate new user
+        userId = await StorageManager.getUserId();
       }
 
       this.user.id = userId;

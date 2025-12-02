@@ -61,6 +61,7 @@ class BatchMarkingPanel {
         </div>
 
         <div class="panel-actions">
+          <button id="add-to-library-btn" class="action-btn info">⭐ Add to Library</button>
           <button id="mark-known-btn" class="action-btn primary">✓ Mark as Known</button>
           <button id="mark-unknown-btn" class="action-btn">× Mark as Unknown</button>
         </div>
@@ -119,6 +120,9 @@ class BatchMarkingPanel {
       .addEventListener('click', () => this.clearSelection());
 
     // Action buttons
+    document.querySelector('#add-to-library-btn')
+      .addEventListener('click', () => this.handleAddToLibrary());
+
     document.querySelector('#mark-known-btn')
       .addEventListener('click', () => this.handleMarkKnown());
 
@@ -465,7 +469,10 @@ class BatchMarkingPanel {
     const totalWords = Object.values(this.groups)
       .flat()
       .length;
-    document.querySelector('#panel-total-words').textContent = totalWords;
+    const totalWordsElement = this.panelElement.querySelector('#panel-total-words');
+    if (totalWordsElement) {
+      totalWordsElement.textContent = totalWords;
+    }
   }
 
   /**
@@ -549,6 +556,21 @@ class BatchMarkingPanel {
   }
 
   /**
+   * Handle Add to Library button click
+   */
+  handleAddToLibrary() {
+    const selectedWords = this.getSelectedWords();
+
+    if (selectedWords.length === 0) {
+      alert('请先选择要添加到单词本的词');
+      return;
+    }
+
+    const message = `即将添加 ${selectedWords.length} 个单词到你的单词本，确定吗？`;
+    this.showConfirmDialog(message, 'add-to-library');
+  }
+
+  /**
    * Show confirmation dialog
    */
   showConfirmDialog(message, action) {
@@ -592,6 +614,8 @@ class BatchMarkingPanel {
         await this.batchMarkAsKnown(selectedWords);
       } else if (this.pendingAction === 'mark-unknown') {
         await this.batchMarkAsUnknown(selectedWords);
+      } else if (this.pendingAction === 'add-to-library') {
+        await this.batchAddToLibrary(selectedWords);
       }
 
       // Update UI
@@ -648,21 +672,44 @@ class BatchMarkingPanel {
     const promises = words.map(word => {
       const stemmedWord = Stemmer.stem(word);
       return new Promise((resolve) => {
-        chrome.runtime.sendMessage(
-          {
-            type: "MARK_AS_KNOWN",
-            user_id: this.userStore.getUserId(),
-            word: stemmedWord,
-          },
-          (response) => {
-            if (response?.success) {
-              console.log(`[BatchMarkingPanel] Marked "${word}" as known`);
-            } else {
-              console.warn(`[BatchMarkingPanel] Failed to mark "${word}" as known`, response?.error);
+        try {
+          const sendMarkAsKnown = () => {
+            try {
+              chrome.runtime.sendMessage(
+                {
+                  type: "MARK_AS_KNOWN",
+                  user_id: this.userStore.getUserId(),
+                  word: stemmedWord,
+                },
+                (response) => {
+                  try {
+                    if (chrome.runtime.lastError) {
+                      console.warn(`[BatchMarkingPanel] Extension context error for "${word}":`, chrome.runtime.lastError.message);
+                      // Retry
+                      setTimeout(sendMarkAsKnown, 500);
+                    } else if (response?.success) {
+                      console.log(`[BatchMarkingPanel] Marked "${word}" as known`);
+                    } else {
+                      console.warn(`[BatchMarkingPanel] Failed to mark "${word}" as known`, response?.error);
+                    }
+                    resolve();
+                  } catch (e) {
+                    console.error(`[BatchMarkingPanel] Error in callback:`, e.message);
+                    resolve();
+                  }
+                }
+              );
+            } catch (e) {
+              console.error(`[BatchMarkingPanel] Failed to send message:`, e.message);
+              resolve();
             }
-            resolve();
-          }
-        );
+          };
+
+          sendMarkAsKnown();
+        } catch (error) {
+          console.error(`[BatchMarkingPanel] Error setting up mark as known:`, error.message);
+          resolve();
+        }
       });
     });
 
@@ -683,5 +730,226 @@ class BatchMarkingPanel {
 
     await Promise.all(promises);
     console.log('[BatchMarkingPanel] Batch mark as unknown completed');
+  }
+
+  /**
+   * Batch add words to library (user wants to learn)
+   */
+  async batchAddToLibrary(words) {
+    console.log('[BatchMarkingPanel] Batch adding to library:', words);
+
+    const userId = this.userStore.getUserId();
+    if (!userId) {
+      throw new Error('No user ID available');
+    }
+
+    // Get current page context
+    const pageUrl = window.location.href;
+    const pageTitle = document.title;
+
+    const promises = words.map(word => {
+      // Get all occurrences of this word to collect different sentences
+      const elements = document.querySelectorAll(`[data-word="${word}"], [data-word="${word.toLowerCase()}"]`);
+
+      const contexts = Array.from(elements).map(element => {
+        // Get the paragraph containing this word
+        let paragraph = element.closest('p');
+        if (!paragraph) {
+          // If not in a paragraph, try to find the nearest text block
+          paragraph = element.closest('div, article, section, li') || element.parentElement;
+        }
+
+        // Get the original text content of the paragraph
+        let text = '';
+        if (paragraph) {
+          text = paragraph.textContent || paragraph.innerText || '';
+
+          // CRITICAL: Clean up frequency markers like (1×), (2×), etc. that some websites embed
+          // These appear as "word(1×)" in textContent from certain websites' DOM
+          // This is a common pattern in dictionary/reference websites
+          text = text.replace(/\(\d+×\)/g, '');  // Remove (1×), (2×), (3×), etc.
+          text = text.replace(/→\s*/g, ' ');     // Replace arrows with spaces
+
+          // Clean up whitespace but keep original structure
+          text = text.replace(/\s+/g, ' ').trim();
+        }
+
+        // Simple and direct sentence extraction
+        let sentences = [];
+
+        // Find all occurrences of the word in the text
+        const wordLower = word.toLowerCase();
+        const textLower = text.toLowerCase();
+        const wordPositions = [];
+
+        let pos = textLower.indexOf(wordLower);
+        while (pos !== -1) {
+          wordPositions.push(pos);
+          pos = textLower.indexOf(wordLower, pos + 1);
+        }
+
+        // For each occurrence, extract the sentence around it
+        wordPositions.forEach(wordPos => {
+          // Find start of sentence (first punctuation before the word)
+          let start = wordPos;
+          while (start > 0 && !text[start - 1].match(/[.!?]/)) {
+            start--;
+          }
+          if (start > 0) start++; // Skip the punctuation
+
+          // Find end of sentence (first punctuation after the word)
+          let end = wordPos + word.length;
+          while (end < text.length && !text[end].match(/[.!?]/)) {
+            end++;
+          }
+          if (end < text.length) end++; // Include the punctuation
+
+          // Extract the sentence
+          let sentence = text.substring(start, end).trim();
+
+          // Clean up extra spaces and capitalize
+          sentence = sentence.replace(/\s+/g, ' ');
+          if (sentence.length > 0) {
+            sentence = sentence.charAt(0).toUpperCase() + sentence.slice(1);
+            sentences.push(sentence);
+          }
+        });
+
+        // Remove duplicate sentences
+        sentences = [...new Set(sentences)];
+
+        // Filter and limit sentences
+        let targetSentences = sentences
+          .filter(sentence => {
+            // Basic checks
+            if (sentence.length < 10) return false; // Minimum length
+            if (sentence.split(/\s+/).length < 3) return false; // At least 3 words
+
+            // Skip sentences with excessive special characters (likely code or markup)
+            const specialCharCount = (sentence.match(/[×()[\]{}→]/g) || []).length;
+            if (specialCharCount > 2) return false; // Too many special chars
+
+            // Skip if looks like it's mixing different languages/formats
+            if (sentence.includes('1x') || sentence.includes('→') || sentence.match(/\d+×/)) {
+              return false;
+            }
+
+            // CRITICAL: Skip sentences that contain multiple word-form patterns like "word(1×)"
+            // This indicates the paragraph contains stemming/dictionary information
+            const wordFormPatterns = (sentence.match(/\([0-9×]+\)/g) || []).length;
+            if (wordFormPatterns > 3) {
+              return false;
+            }
+
+            // Skip sentences with non-ASCII characters mixed in (multilingual content)
+            if (/[\u4E00-\u9FFF]/.test(sentence) || /[\u3040-\u309F]/.test(sentence)) {
+              return false;
+            }
+
+            return true;
+          })
+          .slice(0, 3); // Limit to 3 sentences per context
+
+        // Simple fallback if no sentences found
+        if (targetSentences.length === 0) {
+          // Try splitting by punctuation and include the word
+          const allSentences = text.split(/[.!?]/).filter(s => s.trim().length > 0);
+          targetSentences = allSentences.filter(sentence => {
+            const sLower = sentence.toLowerCase();
+            // Check if contains word
+            if (!sLower.includes(word.toLowerCase())) return false;
+            // Check if long enough
+            if (sentence.trim().length < 5) return false;
+
+            // Apply same 6-layer filtering to fallback sentences
+            if (sentence.length < 10) return false;
+            if (sentence.split(/\s+/).length < 3) return false;
+
+            const specialCharCount = (sentence.match(/[×()[\]{}→]/g) || []).length;
+            if (specialCharCount > 2) return false;
+
+            if (sentence.includes('1x') || sentence.includes('→') || sentence.match(/\d+×/)) return false;
+
+            const wordFormPatterns = (sentence.match(/\([0-9×]+\)/g) || []).length;
+            if (wordFormPatterns > 3) return false;
+
+            if (/[\u4E00-\u9FFF]/.test(sentence) || /[\u3040-\u309F]/.test(sentence)) return false;
+
+            return true;
+          }).slice(0, 1).map(s => s.trim() + '.');
+        }
+
+        // Final fallback
+        if (targetSentences.length === 0) {
+          targetSentences = [`${word} was found on this page.`];
+        }
+
+        return {
+          pageUrl: pageUrl,
+          pageTitle: pageTitle,
+          sentences: targetSentences,
+          timestamp: Date.now()
+        };
+      });
+
+      // Get word details from highlighted elements (take first for main info)
+      const element = elements[0];
+      const definition = element?.dataset.definition || '';
+      const chinese = element?.dataset.chinese || '';
+      const cefrLevel = element?.dataset.cefr || '';
+
+      // Collect all unique contexts from all occurrences
+      const allContexts = [];
+      contexts.forEach(context => {
+        // Add context if it's not empty
+        if (context.sentences && context.sentences.length > 0) {
+          allContexts.push({
+            page_url: context.pageUrl,
+            page_title: context.pageTitle,
+            sentences: context.sentences,
+            timestamp: context.timestamp
+          });
+        }
+      });
+
+      try {
+        const sendAddToLibrary = () => {
+          try {
+            return chrome.runtime.sendMessage(
+              {
+                type: "ADD_TO_LIBRARY",
+                user_id: userId,
+                word: word, // Send simple word string, not object
+                contexts: allContexts // Send contexts array separately
+              },
+              (response) => {
+                try {
+                  if (chrome.runtime.lastError) {
+                    console.warn(`[BatchMarkingPanel] Extension context error when adding "${word}":`, chrome.runtime.lastError.message);
+                    // Retry after delay
+                    setTimeout(sendAddToLibrary, 500);
+                  } else if (response?.success) {
+                    console.log(`[BatchMarkingPanel] Added "${word}" to library with ${contexts.length} contexts`);
+                  } else {
+                    console.warn(`[BatchMarkingPanel] Failed to add "${word}" to library:`, response?.error);
+                  }
+                } catch (e) {
+                  console.error(`[BatchMarkingPanel] Error in callback:`, e.message);
+                }
+              }
+            );
+          } catch (e) {
+            console.error(`[BatchMarkingPanel] Failed to send message:`, e.message);
+          }
+        };
+
+        sendAddToLibrary();
+      } catch (error) {
+        console.error(`[BatchMarkingPanel] Error setting up add to library:`, error.message);
+      }
+    });
+
+    await Promise.all(promises);
+    console.log('[BatchMarkingPanel] Batch add to library completed');
   }
 }

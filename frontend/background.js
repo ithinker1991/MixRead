@@ -93,6 +93,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleGetUserData(request, sendResponse);
   } else if (request.type === "MARK_AS_KNOWN") {
     handleMarkAsKnown(request, sendResponse);
+  } else if (request.type === "ADD_TO_LIBRARY") {
+    handleAddToLibrary(request, sendResponse);
   }
   return true; // Keep the message channel open for async response
 });
@@ -252,6 +254,52 @@ async function handleMarkAsKnown(request, sendResponse) {
     });
   } catch (error) {
     console.error("Error in handleMarkAsKnown:", error);
+    sendResponse({
+      success: false,
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Add word to library with context for learning
+ */
+async function handleAddToLibrary(request, sendResponse) {
+  try {
+    const { user_id, word, contexts } = request;
+
+    if (!user_id || !word) {
+      throw new Error("user_id and word are required");
+    }
+
+    console.log('[Background] Adding word to library:', word, 'for user:', user_id);
+    console.log('[Background] Contexts count:', contexts?.length || 0);
+
+    const response = await fetch(`${API_BASE}/users/${encodeURIComponent(user_id)}/library`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        words: [word.toLowerCase()], // Single word in array
+        contexts: contexts || [], // Contexts for this word
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('[Background] Word added to library:', data);
+
+    sendResponse({
+      success: true,
+      message: `"${word}" added to library`,
+      data: data,
+    });
+  } catch (error) {
+    console.error("Error in handleAddToLibrary:", error);
     sendResponse({
       success: false,
       error: error.message,

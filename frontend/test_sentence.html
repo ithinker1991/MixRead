@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Sentence Collection</title>
+</head>
+<body>
+    <h1>Sentence Collection Test</h1>
+    <p>This is a test paragraph. It contains multiple sentences! How are sentences collected? Let's see what happens with punctuation.</p>
+    <p>Another paragraph with different sentences. Does it work correctly? We should test various scenarios.</p>
+
+    <button onclick="testCollection()">Test Sentence Collection</button>
+
+    <script>
+        function testCollection() {
+            // Simulate the word highlighting
+            const text = document.body.textContent;
+            const word = 'sentences';
+            const wordIndex = text.indexOf(word);
+
+            if (wordIndex !== -1) {
+                // Current implementation: simple character window
+                const start = Math.max(0, wordIndex - 50);
+                const end = Math.min(text.length, wordIndex + word.length + 50);
+                const context = text.substring(start, end).trim();
+
+                console.log('Current implementation result:');
+                console.log('Context:', context);
+                console.log('Length:', context.length);
+            }
+
+            // Better implementation: sentence-based collection
+            const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+            console.log('\\nBetter implementation (sentence-based):');
+            sentences.forEach((sentence, index) => {
+                if (sentence.includes('sentences')) {
+                    console.log(`Sentence ${index + 1}:`, sentence.trim());
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -83,4 +83,41 @@ class StorageManager {
       });
     });
   }
+
+  /**
+   * Generate or get user ID
+   * @returns {Promise<string>} User ID
+   */
+  static async getUserId() {
+    let userId = await this.getItem('mixread_user_id');
+
+    if (!userId) {
+      // Generate a unique user ID
+      userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      await this.setItem('mixread_user_id', userId);
+      console.log('[Storage] Generated new user ID:', userId);
+    }
+
+    return userId;
+  }
+
+  /**
+   * Get user display info (name, stats, etc.)
+   * @returns {Promise<object>} User info object
+   */
+  static async getUserInfo() {
+    const userId = await this.getUserId();
+    const userStats = await this.getItem('mixread_user_stats') || {
+      wordsHighlighted: 0,
+      wordsMarkedKnown: 0,
+      wordsMarkedUnknown: 0,
+      wordsAddedToLibrary: 0,
+      createdAt: new Date().toISOString()
+    };
+
+    return {
+      id: userId,
+      stats: userStats
+    };
+  }
 }
