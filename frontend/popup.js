@@ -22,7 +22,7 @@ const ChromeAPI = {
         return;
       }
       try {
-        ChromeAPI.storage.get(keys, (result) => {
+        chrome.storage.local.get(keys, (result) => {
           if (chrome.runtime.lastError) {
             console.warn('[MixRead] Storage error:', chrome.runtime.lastError.message);
             if (callback) callback({});
@@ -43,7 +43,7 @@ const ChromeAPI = {
         return;
       }
       try {
-        ChromeAPI.storage.set(data, () => {
+        chrome.storage.local.set(data, () => {
           if (chrome.runtime.lastError) {
             console.warn('[MixRead] Storage set error:', chrome.runtime.lastError.message);
           }
