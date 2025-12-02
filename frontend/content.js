@@ -4,6 +4,81 @@
  * Integrates modular architecture for unknown words management
  */
 
+// ===== Extension Context Management =====
+// Wrapper to safely handle chrome API calls even after context invalidation
+const ChromeAPI = {
+  isContextValid() {
+    try {
+      return chrome && chrome.storage && chrome.runtime;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  storage: {
+    get(keys, callback) {
+      if (!ChromeAPI.isContextValid()) {
+        console.warn('[MixRead] Extension context invalid, skipping storage.get');
+        if (callback) callback({});
+        return;
+      }
+      try {
+        chrome.storage.local.get(keys, (result) => {
+          if (chrome.runtime.lastError) {
+            console.warn('[MixRead] Storage error:', chrome.runtime.lastError.message);
+            if (callback) callback({});
+          } else {
+            if (callback) callback(result);
+          }
+        });
+      } catch (e) {
+        console.warn('[MixRead] Chrome storage error:', e.message);
+        if (callback) callback({});
+      }
+    },
+
+    set(data, callback) {
+      if (!ChromeAPI.isContextValid()) {
+        console.warn('[MixRead] Extension context invalid, skipping storage.set');
+        if (callback) callback();
+        return;
+      }
+      try {
+        chrome.storage.local.set(data, () => {
+          if (chrome.runtime.lastError) {
+            console.warn('[MixRead] Storage set error:', chrome.runtime.lastError.message);
+          }
+          if (callback) callback();
+        });
+      } catch (e) {
+        console.warn('[MixRead] Chrome storage set error:', e.message);
+        if (callback) callback();
+      }
+    }
+  },
+
+  runtime: {
+    sendMessage(message, callback) {
+      if (!ChromeAPI.isContextValid()) {
+        console.warn('[MixRead] Extension context invalid, skipping sendMessage');
+        if (callback) callback();
+        return;
+      }
+      try {
+        chrome.runtime.sendMessage(message, (response) => {
+          if (chrome.runtime.lastError) {
+            console.warn('[MixRead] Message error:', chrome.runtime.lastError.message);
+          }
+          if (callback) callback(response);
+        });
+      } catch (e) {
+        console.warn('[MixRead] Chrome sendMessage error:', e.message);
+        if (callback) callback();
+      }
+    }
+  }
+};
+
 // ===== Global State =====
 let currentDifficultyLevel = "B1";
 let highlightedWordsMap = {};
@@ -114,7 +189,7 @@ async function initializeModules() {
 
 // ===== Legacy Settings Initialization =====
 // Load settings on startup for backward compatibility
-chrome.storage.local.get(
+ChromeAPI.storage.get(
   ["difficultyLevel", "vocabulary", "showChinese"],
   (result) => {
     if (result.difficultyLevel) {
@@ -151,7 +226,7 @@ function tokenizeText(text) {
  */
 function sendMessageWithRetry(message, callback, maxRetries = 3) {
   // Check if chrome runtime is available
-  if (!chrome || !chrome.runtime) {
+  if (!ChromeAPI.isContextValid()) {
     console.warn('[MixRead] Chrome runtime not available, cannot send message');
     callback({ success: false, error: 'Extension context not available' });
     return;
@@ -162,29 +237,11 @@ function sendMessageWithRetry(message, callback, maxRetries = 3) {
   function attempt() {
     retries++;
     try {
-      chrome.runtime.sendMessage(message, (response) => {
-        if (chrome.runtime.lastError) {
-          const errorMsg = chrome.runtime.lastError.message;
-
-          // Check if it's a context invalidated error
-          if (errorMsg.includes('Extension context invalidated')) {
-            console.warn('[MixRead] Extension context invalidated, stopping retries');
-            callback({ success: false, error: 'Extension context invalidated' });
-            return;
-          }
-
-          console.warn(`[MixRead] sendMessage error: ${errorMsg}`);
-          if (retries < maxRetries) {
-            console.log(`[MixRead] Retrying message send (attempt ${retries + 1}/${maxRetries})...`);
-            setTimeout(attempt, 100 * retries); // Exponential backoff
-          } else {
-            console.error('[MixRead] Failed to send message after', maxRetries, 'retries');
-            callback({ success: false, error: errorMsg });
-          }
-        } else if (response) {
+      ChromeAPI.runtime.sendMessage(message, (response) => {
+        if (response) {
           callback(response);
         } else {
-          console.error('[MixRead] No response from background script');
+          console.warn('[MixRead] No response from background script');
           if (retries < maxRetries) {
             console.log(`[MixRead] Retrying message send (attempt ${retries + 1}/${maxRetries})...`);
             setTimeout(attempt, 100 * retries);
@@ -688,13 +745,13 @@ function addWordToVocabulary(word) {
   userVocabulary.add(wordLower);
 
   // Get current vocabulary dates
-  chrome.storage.local.get(["vocabulary_dates"], (result) => {
+  ChromeAPI.storage.get(["vocabulary_dates"], (result) => {
     const dates = result.vocabulary_dates || {};
     const today = new Date().toISOString().split("T")[0];
     dates[wordLower] = today;
 
     // Save to local storage
-    chrome.storage.local.set({
+    ChromeAPI.storage.set({
       vocabulary: Array.from(userVocabulary),
       vocabulary_dates: dates,
     });
@@ -830,7 +887,7 @@ function addWordToVocabulary(word) {
   try {
     const sendAddToLibrary = () => {
       try {
-        chrome.runtime.sendMessage(
+        ChromeAPI.runtime.sendMessage(
           {
             type: "ADD_TO_LIBRARY",
             user_id: userId,
@@ -845,14 +902,14 @@ function addWordToVocabulary(word) {
           },
           (response) => {
             try {
-              if (chrome.runtime.lastError) {
+              if (response && response.success) {
+                console.log(`[MixRead] Successfully added "${word}" to library`);
+              } else if (response) {
+                console.error(`[MixRead] Failed to add word to library:`, response);
+              } else {
                 console.warn(`[MixRead] Extension context invalidated, retrying...`);
                 // Retry after a short delay
                 setTimeout(sendAddToLibrary, 500);
-              } else if (response && response.success) {
-                console.log(`[MixRead] Successfully added "${word}" to library`);
-              } else {
-                console.error(`[MixRead] Failed to add word to library:`, response);
               }
             } catch (e) {
               console.error(`[MixRead] Error in callback:`, e.message);
@@ -905,7 +962,7 @@ function markWordAsKnown(word) {
   try {
     const sendMarkAsKnown = () => {
       try {
-        chrome.runtime.sendMessage(
+        ChromeAPI.runtime.sendMessage(
           {
             type: "MARK_AS_KNOWN",
             user_id: userId,
@@ -913,10 +970,7 @@ function markWordAsKnown(word) {
           },
           (response) => {
             try {
-              if (chrome.runtime.lastError) {
-                console.warn(`[MixRead] Extension context invalidated when marking as known, retrying...`);
-                setTimeout(sendMarkAsKnown, 500);
-              } else if (response?.success) {
+              if (response?.success) {
                 console.log(`[MixRead] Successfully marked "${stemmedWord}" as known`);
                 logger.info(`"${word}" marked as known`);
 
@@ -962,31 +1016,32 @@ window.addEventListener('unknown-words-updated', () => {
 // See background.js for chrome.contextMenus implementation
 
 // Listen for difficulty level changes from popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === "DIFFICULTY_CHANGED") {
-    currentDifficultyLevel = request.difficulty_level;
-    chrome.storage.local.set({ difficultyLevel: currentDifficultyLevel });
+if (ChromeAPI.isContextValid()) {
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === "DIFFICULTY_CHANGED") {
+      currentDifficultyLevel = request.difficulty_level;
+      ChromeAPI.storage.set({ difficultyLevel: currentDifficultyLevel });
 
-    // Update user store if initialized
-    if (userStore) {
-      userStore.setDifficultyLevel(request.difficulty_level);
-    }
+      // Update user store if initialized
+      if (userStore) {
+        userStore.setDifficultyLevel(request.difficulty_level);
+      }
 
-    // Re-highlight the page
-    highlightPageWords();
-    sendResponse({ success: true });
-  } else if (request.type === "CHINESE_DISPLAY_CHANGED") {
-    showChinese = request.showChinese;
-    chrome.storage.local.set({ showChinese });
+      // Re-highlight the page
+      highlightPageWords();
+      sendResponse({ success: true });
+    } else if (request.type === "CHINESE_DISPLAY_CHANGED") {
+      showChinese = request.showChinese;
+      ChromeAPI.storage.set({ showChinese });
 
-    // Re-highlight the page to show/hide Chinese
-    highlightPageWords();
-    sendResponse({ success: true });
-  } else if (request.type === "UPDATE_CURRENT_USER") {
-    // Update current user ID in user store
-    console.log('[MixRead] Updating current user to:', request.userId);
-    if (userStore && userStore.user) {
-      userStore.user.id = request.userId;
+      // Re-highlight the page to show/hide Chinese
+      highlightPageWords();
+      sendResponse({ success: true });
+    } else if (request.type === "UPDATE_CURRENT_USER") {
+      // Update current user ID in user store
+      console.log('[MixRead] Updating current user to:', request.userId);
+      if (userStore && userStore.user) {
+        userStore.user.id = request.userId;
       console.log('[MixRead] User updated in userStore');
       sendResponse({ success: true });
     } else {
@@ -1039,7 +1094,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     return true; // Keep message channel open
   }
-});
+  });
+}
 
 // Start highlighting when page loads (after modules are initialized)
 function startHighlighting() {
@@ -1122,27 +1178,17 @@ function recordReadingSession() {
   const sessionDurationMinutes = Math.round(sessionDurationMs / 60000); // Convert to minutes
 
   if (sessionDurationMinutes > 0) {
-    chrome.storage.local.get(["reading_sessions"], (result) => {
-      // Check again inside callback in case context was invalidated during async operation
-      if (chrome.runtime.lastError) {
-        console.warn('[MixRead] Extension context error during session recording:', chrome.runtime.lastError.message);
-        return;
-      }
-
+    ChromeAPI.storage.get(["reading_sessions"], (result) => {
       const sessions = result.reading_sessions || {};
       const today = new Date().toISOString().split("T")[0];
 
       // Add session duration to today's total
       sessions[today] = (sessions[today] || 0) + sessionDurationMinutes;
 
-      chrome.storage.local.set({
+      ChromeAPI.storage.set({
         reading_sessions: sessions,
       }, () => {
-        if (chrome.runtime.lastError) {
-          console.warn('[MixRead] Error saving reading session:', chrome.runtime.lastError.message);
-        } else {
-          console.log(`[MixRead] Recorded ${sessionDurationMinutes} minutes of reading for ${today}`);
-        }
+        console.log(`[MixRead] Recorded ${sessionDurationMinutes} minutes of reading for ${today}`);
       });
     });
   }
@@ -1152,7 +1198,7 @@ function recordReadingSession() {
 function safeRecordReadingSession() {
   try {
     // Check if extension context is valid before calling
-    if (chrome && chrome.storage && chrome.runtime) {
+    if (ChromeAPI.isContextValid()) {
       recordReadingSession();
     }
   } catch (error) {
