@@ -56,4 +56,4 @@ class Logger {
   }
 }
 
-const logger = Logger;
+window.logger = Logger;

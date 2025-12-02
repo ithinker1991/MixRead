@@ -27,14 +27,14 @@ class DomainPolicyFilter {
    * @returns {string} Domain name or empty string if invalid
    */
   static extractDomain(url) {
-    if (!url) return '';
+    if (!url) return "";
 
     try {
       const urlObj = new URL(url);
       return urlObj.hostname;
     } catch (error) {
-      logger.warn('[DomainFilter] Invalid URL:', url);
-      return '';
+      logger.warn("[DomainFilter] Invalid URL:", url);
+      return "";
     }
   }
 
@@ -50,7 +50,14 @@ class DomainPolicyFilter {
     }
 
     const normalizedDomain = domain.toLowerCase();
-    return domainList.some(d => d.toLowerCase() === normalizedDomain);
+    return domainList.some((d) => {
+      const listedDomain = d.toLowerCase();
+      // Match exact domain or subdomain (e.g., "www.example.com" matches "example.com")
+      return (
+        normalizedDomain === listedDomain ||
+        normalizedDomain.endsWith("." + listedDomain)
+      );
+    });
   }
 
   /**
@@ -61,16 +68,16 @@ class DomainPolicyFilter {
    */
   static getExclusionReason(domain, policyStore) {
     if (!policyStore || !domain) {
-      return 'none';
+      return "none";
     }
 
     // Check blacklist
     const blacklistDomains = policyStore.getBlacklistDomains();
     if (this.isDomainInList(domain, blacklistDomains)) {
-      return 'in_blacklist';
+      return "in_blacklist";
     }
 
-    return 'none';
+    return "none";
   }
 
   /**
@@ -88,7 +95,7 @@ class DomainPolicyFilter {
       domain: domain,
       isExcluded: isExcluded,
       reason: reason,
-      url: url
+      url: url,
     };
   }
 
@@ -114,7 +121,7 @@ class DomainPolicyFilter {
       //   timestamp: new Date().toISOString()
       // });
     } catch (error) {
-      logger.error('[DomainFilter] Failed to report domain status', error);
+      logger.error("[DomainFilter] Failed to report domain status", error);
     }
   }
 
@@ -128,12 +135,12 @@ class DomainPolicyFilter {
       // Get current tab
       const [tab] = await chrome.tabs.query({
         active: true,
-        currentWindow: true
+        currentWindow: true,
       });
 
       if (tab && tab.url) {
         const status = this.getExclusionStatus(tab.url, domainPolicyStore);
-        logger.log('[DomainFilter] Current tab status:', status);
+        logger.log("[DomainFilter] Current tab status:", status);
 
         if (callback) {
           callback(status);
@@ -142,7 +149,10 @@ class DomainPolicyFilter {
         return status;
       }
     } catch (error) {
-      logger.error('[DomainFilter] Failed to initialize for current tab', error);
+      logger.error(
+        "[DomainFilter] Failed to initialize for current tab",
+        error
+      );
     }
 
     return null;

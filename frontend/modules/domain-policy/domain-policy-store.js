@@ -28,22 +28,22 @@ class DomainPolicyStore {
    * @param {Function} callback - Function to remove
    */
   removeListener(callback) {
-    this.listeners = this.listeners.filter(l => l !== callback);
+    this.listeners = this.listeners.filter((l) => l !== callback);
   }
 
   /**
    * Notify all listeners of state change
    */
   notify() {
-    this.listeners.forEach(callback => {
+    this.listeners.forEach((callback) => {
       try {
         callback({
           blacklist: this.blacklist,
           whitelist: this.whitelist,
-          isInitialized: this.isInitialized
+          isInitialized: this.isInitialized,
         });
       } catch (error) {
-        logger.error('Error in domain policy listener', error);
+        logger.error("Error in domain policy listener", error);
       }
     });
   }
@@ -55,12 +55,12 @@ class DomainPolicyStore {
    */
   async initialize(userId) {
     if (this.isInitialized) {
-      logger.log('[DomainPolicy] Already initialized, skipping');
+      logger.log("[DomainPolicy] Already initialized, skipping");
       return true;
     }
 
     try {
-      logger.log('[DomainPolicy] Initializing domain policies...');
+      logger.log("[DomainPolicy] Initializing domain policies...");
 
       // Load blacklist from backend
       const blacklistResult = await apiClient.get(
@@ -69,7 +69,9 @@ class DomainPolicyStore {
 
       if (blacklistResult.success) {
         this.blacklist = blacklistResult.blacklist_domains || [];
-        logger.log(`[DomainPolicy] Loaded ${this.blacklist.length} blacklist domains`);
+        logger.log(
+          `[DomainPolicy] Loaded ${this.blacklist.length} blacklist domains`
+        );
       }
 
       // Load whitelist from backend
@@ -79,19 +81,31 @@ class DomainPolicyStore {
 
       if (whitelistResult.success) {
         this.whitelist = whitelistResult.whitelist_domains || [];
-        logger.log(`[DomainPolicy] Loaded ${this.whitelist.length} whitelist domains`);
+        logger.log(
+          `[DomainPolicy] Loaded ${this.whitelist.length} whitelist domains`
+        );
       }
 
       this.isInitialized = true;
       this.notify();
       return true;
     } catch (error) {
-      logger.error('[DomainPolicy] Initialization failed', error);
+      logger.error("[DomainPolicy] Initialization failed", error);
       // Continue anyway with empty lists
       this.isInitialized = true;
       this.notify();
       return false;
     }
+  }
+
+  /**
+   * Reload domain policies from backend
+   * @param {string} userId - User ID
+   * @returns {Promise<boolean>} Success status
+   */
+  async reload(userId) {
+    this.isInitialized = false;
+    return this.initialize(userId);
   }
 
   /**
@@ -116,18 +130,18 @@ class DomainPolicyStore {
    * @returns {string} Domain name
    */
   extractDomain(urlOrDomain) {
-    if (!urlOrDomain) return '';
+    if (!urlOrDomain) return "";
 
     try {
       // If it's a full URL, extract domain
-      if (urlOrDomain.includes('://')) {
+      if (urlOrDomain.includes("://")) {
         const url = new URL(urlOrDomain);
         return url.hostname;
       }
       // Otherwise assume it's already a domain
       return urlOrDomain.toLowerCase();
     } catch (error) {
-      logger.warn('[DomainPolicy] Failed to extract domain from:', urlOrDomain);
+      logger.warn("[DomainPolicy] Failed to extract domain from:", urlOrDomain);
       return urlOrDomain.toLowerCase();
     }
   }
@@ -145,7 +159,7 @@ class DomainPolicyStore {
         `/users/${userId}/domain-policies/blacklist`,
         {
           domain: domain,
-          description: description
+          description: description,
         }
       );
 
@@ -159,7 +173,7 @@ class DomainPolicyStore {
       }
       return false;
     } catch (error) {
-      logger.error('[DomainPolicy] Failed to add blacklist domain', error);
+      logger.error("[DomainPolicy] Failed to add blacklist domain", error);
       return false;
     }
   }
@@ -173,18 +187,20 @@ class DomainPolicyStore {
   async removeBlacklistDomain(userId, domain) {
     try {
       const response = await apiClient.delete(
-        `/users/${userId}/domain-policies/blacklist/${encodeURIComponent(domain)}`
+        `/users/${userId}/domain-policies/blacklist/${encodeURIComponent(
+          domain
+        )}`
       );
 
       if (response.success) {
-        this.blacklist = this.blacklist.filter(d => d !== domain);
+        this.blacklist = this.blacklist.filter((d) => d !== domain);
         this.notify();
         logger.log(`[DomainPolicy] Removed from blacklist: ${domain}`);
         return true;
       }
       return false;
     } catch (error) {
-      logger.error('[DomainPolicy] Failed to remove blacklist domain', error);
+      logger.error("[DomainPolicy] Failed to remove blacklist domain", error);
       return false;
     }
   }
@@ -204,18 +220,23 @@ class DomainPolicyStore {
 
       if (response.success) {
         // Add new domains to local list (avoid duplicates)
-        domains.forEach(domain => {
+        domains.forEach((domain) => {
           if (!this.blacklist.includes(domain)) {
             this.blacklist.push(domain);
           }
         });
         this.notify();
-        logger.log(`[DomainPolicy] Added ${domains.length} domains to blacklist`);
+        logger.log(
+          `[DomainPolicy] Added ${domains.length} domains to blacklist`
+        );
         return true;
       }
       return false;
     } catch (error) {
-      logger.error('[DomainPolicy] Failed to add blacklist domains batch', error);
+      logger.error(
+        "[DomainPolicy] Failed to add blacklist domains batch",
+        error
+      );
       return false;
     }
   }
@@ -234,14 +255,19 @@ class DomainPolicyStore {
       );
 
       if (response.success) {
-        this.blacklist = this.blacklist.filter(d => !domains.includes(d));
+        this.blacklist = this.blacklist.filter((d) => !domains.includes(d));
         this.notify();
-        logger.log(`[DomainPolicy] Removed ${domains.length} domains from blacklist`);
+        logger.log(
+          `[DomainPolicy] Removed ${domains.length} domains from blacklist`
+        );
         return true;
       }
       return false;
     } catch (error) {
-      logger.error('[DomainPolicy] Failed to remove blacklist domains batch', error);
+      logger.error(
+        "[DomainPolicy] Failed to remove blacklist domains batch",
+        error
+      );
       return false;
     }
   }
@@ -295,7 +321,7 @@ class DomainPolicyStore {
     this.presetDomains = [];
     this.isInitialized = false;
     this.notify();
-    logger.log('[DomainPolicy] Cleared all policies');
+    logger.log("[DomainPolicy] Cleared all policies");
   }
 
   /**

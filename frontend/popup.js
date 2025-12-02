@@ -17,7 +17,9 @@ const ChromeAPI = {
   storage: {
     get(keys, callback) {
       if (!ChromeAPI.isContextValid()) {
-        console.warn('[MixRead] Extension context invalid, skipping storage.get');
+        console.warn(
+          "[MixRead] Extension context invalid, skipping storage.get"
+        );
         if (callback) callback({});
         return;
       }
@@ -25,25 +27,33 @@ const ChromeAPI = {
         chrome.storage.local.get(keys, (result) => {
           try {
             if (chrome.runtime.lastError) {
-              console.warn('[MixRead] Storage error:', chrome.runtime.lastError.message);
+              console.warn(
+                "[MixRead] Storage error:",
+                chrome.runtime.lastError.message
+              );
               if (callback) callback({});
             } else {
               if (callback) callback(result);
             }
           } catch (callbackError) {
-            console.warn('[MixRead] Storage callback error:', callbackError.message);
+            console.warn(
+              "[MixRead] Storage callback error:",
+              callbackError.message
+            );
             if (callback) callback({});
           }
         });
       } catch (e) {
-        console.warn('[MixRead] Chrome storage error:', e.message);
+        console.warn("[MixRead] Chrome storage error:", e.message);
         if (callback) callback({});
       }
     },
 
     set(data, callback) {
       if (!ChromeAPI.isContextValid()) {
-        console.warn('[MixRead] Extension context invalid, skipping storage.set');
+        console.warn(
+          "[MixRead] Extension context invalid, skipping storage.set"
+        );
         if (callback) callback();
         return;
       }
@@ -51,25 +61,33 @@ const ChromeAPI = {
         chrome.storage.local.set(data, () => {
           try {
             if (chrome.runtime.lastError) {
-              console.warn('[MixRead] Storage set error:', chrome.runtime.lastError.message);
+              console.warn(
+                "[MixRead] Storage set error:",
+                chrome.runtime.lastError.message
+              );
             }
             if (callback) callback();
           } catch (callbackError) {
-            console.warn('[MixRead] Storage set callback error:', callbackError.message);
+            console.warn(
+              "[MixRead] Storage set callback error:",
+              callbackError.message
+            );
             if (callback) callback();
           }
         });
       } catch (e) {
-        console.warn('[MixRead] Chrome storage set error:', e.message);
+        console.warn("[MixRead] Chrome storage set error:", e.message);
         if (callback) callback();
       }
-    }
+    },
   },
 
   runtime: {
     sendMessage(message, callback) {
       if (!ChromeAPI.isContextValid()) {
-        console.warn('[MixRead] Extension context invalid, skipping sendMessage');
+        console.warn(
+          "[MixRead] Extension context invalid, skipping sendMessage"
+        );
         if (callback) callback();
         return;
       }
@@ -77,20 +95,26 @@ const ChromeAPI = {
         chrome.runtime.sendMessage(message, (response) => {
           try {
             if (chrome.runtime.lastError) {
-              console.warn('[MixRead] Message error:', chrome.runtime.lastError.message);
+              console.warn(
+                "[MixRead] Message error:",
+                chrome.runtime.lastError.message
+              );
             }
             if (callback) callback(response);
           } catch (callbackError) {
-            console.warn('[MixRead] Message callback error:', callbackError.message);
+            console.warn(
+              "[MixRead] Message callback error:",
+              callbackError.message
+            );
             if (callback) callback();
           }
         });
       } catch (e) {
-        console.warn('[MixRead] Chrome sendMessage error:', e.message);
+        console.warn("[MixRead] Chrome sendMessage error:", e.message);
         if (callback) callback();
       }
-    }
-  }
+    },
+  },
 };
 
 const DIFFICULTY_LEVELS = {
@@ -104,30 +128,36 @@ const DIFFICULTY_LEVELS = {
 
 // Level descriptions - explains what each level means
 const LEVEL_DESCRIPTIONS = {
-  "A1": {
+  A1: {
     range: "A1 only",
-    description: "Beginner - highlights only the most basic words for complete beginners"
+    description:
+      "Beginner - highlights only the most basic words for complete beginners",
   },
-  "A2": {
+  A2: {
     range: "A2-C2",
-    description: "Elementary - highlights words from basic to advanced, helping you build vocabulary"
+    description:
+      "Elementary - highlights words from basic to advanced, helping you build vocabulary",
   },
-  "B1": {
+  B1: {
     range: "B1-C2",
-    description: "Intermediate - highlights intermediate and advanced words to improve reading"
+    description:
+      "Intermediate - highlights intermediate and advanced words to improve reading",
   },
-  "B2": {
+  B2: {
     range: "B2-C2",
-    description: "Upper-Intermediate - highlights advanced words for skilled readers"
+    description:
+      "Upper-Intermediate - highlights advanced words for skilled readers",
   },
-  "C1": {
+  C1: {
     range: "C1-C2",
-    description: "Advanced - highlights only difficult words, minimal annotations"
+    description:
+      "Advanced - highlights only difficult words, minimal annotations",
   },
-  "C2": {
+  C2: {
     range: "C2 only",
-    description: "Mastery - highlights only the most challenging words for near-native readers"
-  }
+    description:
+      "Mastery - highlights only the most challenging words for near-native readers",
+  },
 };
 
 const difficultySlider = document.getElementById("difficulty-slider");
@@ -161,7 +191,7 @@ function getDateXDaysAgo(days) {
 }
 
 // Load user management first
-ChromeAPI.storage.get(['mixread_users', 'mixread_current_user'], (result) => {
+ChromeAPI.storage.get(["mixread_users", "mixread_current_user"], (result) => {
   allUsers = result.mixread_users || [];
   currentUser = result.mixread_current_user || "";
 
@@ -188,71 +218,81 @@ ChromeAPI.storage.get(['mixread_users', 'mixread_current_user'], (result) => {
 
   // Load and display current settings
   ChromeAPI.storage.get(
-    ["difficultyLevel", "vocabulary", "vocabulary_dates", "showChinese", "reading_sessions"],
+    [
+      "difficultyLevel",
+      "vocabulary",
+      "vocabulary_dates",
+      "showChinese",
+      "reading_sessions",
+    ],
     (result) => {
-    // Load difficulty level
-    const difficultyLevel = result.difficultyLevel || "B1";
-    const difficultyValue = Object.entries(DIFFICULTY_LEVELS).find(
-      ([_, level]) => level === difficultyLevel
-    )?.[0] || "3";
-    difficultySlider.value = difficultyValue;
-    updateDifficultyDisplay(difficultyValue);
+      // Load difficulty level
+      const difficultyLevel = result.difficultyLevel || "B1";
+      const difficultyValue =
+        Object.entries(DIFFICULTY_LEVELS).find(
+          ([_, level]) => level === difficultyLevel
+        )?.[0] || "3";
+      difficultySlider.value = difficultyValue;
+      updateDifficultyDisplay(difficultyValue);
 
-    // Load Chinese display setting
-    const showChinese = result.showChinese !== undefined ? result.showChinese : true;
-    toggleChinese.checked = showChinese;
+      // Load Chinese display setting
+      const showChinese =
+        result.showChinese !== undefined ? result.showChinese : true;
+      toggleChinese.checked = showChinese;
 
-    // Load vocabulary stats
-    const vocabulary = result.vocabulary || [];
-    vocabCountDisplay.textContent = vocabulary.length;
-    totalCountDisplay.textContent = vocabulary.length;
+      // Load vocabulary stats
+      const vocabulary = result.vocabulary || [];
+      vocabCountDisplay.textContent = vocabulary.length;
+      totalCountDisplay.textContent = vocabulary.length;
 
-    // Calculate today's additions
-    const dates = result.vocabulary_dates || {};
-    const today = new Date().toISOString().split("T")[0];
-    let todayCount = 0;
-    let weekCount = 0;
+      // Calculate today's additions
+      const dates = result.vocabulary_dates || {};
+      const today = new Date().toISOString().split("T")[0];
+      let todayCount = 0;
+      let weekCount = 0;
 
-    // Count words added today and this week
-    for (const word in dates) {
-      const wordDate = dates[word];
-      if (wordDate === today) {
-        todayCount++;
+      // Count words added today and this week
+      for (const word in dates) {
+        const wordDate = dates[word];
+        if (wordDate === today) {
+          todayCount++;
+        }
+        // Check if word was added in the last 7 days
+        const wordTime = new Date(wordDate).getTime();
+        const sevenDaysAgo = new Date().getTime() - 7 * 24 * 60 * 60 * 1000;
+        if (wordTime >= sevenDaysAgo) {
+          weekCount++;
+        }
       }
-      // Check if word was added in the last 7 days
-      const wordTime = new Date(wordDate).getTime();
-      const sevenDaysAgo = new Date().getTime() - (7 * 24 * 60 * 60 * 1000);
-      if (wordTime >= sevenDaysAgo) {
-        weekCount++;
+      todayCountDisplay.textContent = todayCount;
+
+      // Display week count if element exists
+      if (weekCountDisplay) {
+        weekCountDisplay.textContent = weekCount;
+      }
+
+      // Calculate reading time
+      const sessions = result.reading_sessions || {};
+      let todayReading = sessions[today] || 0;
+      let weekReading = 0;
+
+      // Sum up reading time for the week
+      for (let i = 0; i < 7; i++) {
+        const date = getDateXDaysAgo(i);
+        weekReading += sessions[date] || 0;
+      }
+
+      // Display reading time if element exists
+      if (readingTimeDisplay) {
+        if (weekReading > 60) {
+          readingTimeDisplay.textContent =
+            Math.round(weekReading / 60) + "h " + (weekReading % 60) + "m";
+        } else {
+          readingTimeDisplay.textContent = weekReading + "m";
+        }
       }
     }
-    todayCountDisplay.textContent = todayCount;
-
-    // Display week count if element exists
-    if (weekCountDisplay) {
-      weekCountDisplay.textContent = weekCount;
-    }
-
-    // Calculate reading time
-    const sessions = result.reading_sessions || {};
-    let todayReading = sessions[today] || 0;
-    let weekReading = 0;
-
-    // Sum up reading time for the week
-    for (let i = 0; i < 7; i++) {
-      const date = getDateXDaysAgo(i);
-      weekReading += sessions[date] || 0;
-    }
-
-    // Display reading time if element exists
-    if (readingTimeDisplay) {
-      if (weekReading > 60) {
-        readingTimeDisplay.textContent = Math.round(weekReading / 60) + "h " + (weekReading % 60) + "m";
-      } else {
-        readingTimeDisplay.textContent = weekReading + "m";
-      }
-    }
-  });
+  );
 });
 
 /**
@@ -344,15 +384,15 @@ btnViewVocab.addEventListener("click", () => {
     const vocabulary = result.vocabulary || [];
 
     if (vocabulary.length === 0) {
-      alert("No words in your vocabulary yet. Hover over highlighted words and click 'Add to Library' to start learning!");
+      alert(
+        "No words in your vocabulary yet. Hover over highlighted words and click 'Add to Library' to start learning!"
+      );
       return;
     }
 
     // Create a simple modal to display vocabulary
     const wordList = vocabulary.join(", ");
-    alert(
-      `Your Vocabulary (${vocabulary.length} words):\n\n${wordList}`
-    );
+    alert(`Your Vocabulary (${vocabulary.length} words):\n\n${wordList}`);
   });
 });
 
@@ -380,64 +420,85 @@ btnResetVocab.addEventListener("click", () => {
  */
 if (btnBatchMark) {
   btnBatchMark.addEventListener("click", () => {
-    console.log('[Popup] Batch mark button clicked');
-    console.log('[Popup] Current user:', currentUser);
+    console.log("[Popup] Batch mark button clicked");
+    console.log("[Popup] Current user:", currentUser);
 
     // Send message to content script to open batch marking panel
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      console.log('[Popup] Current tabs:', tabs);
+      console.log("[Popup] Current tabs:", tabs);
 
       if (tabs[0]?.id) {
         const tabId = tabs[0].id;
-        console.log('[Popup] Sending message to tab:', tabId);
+        console.log("[Popup] Sending message to tab:", tabId);
 
         // First, send current user ID to content script
-        chrome.tabs.sendMessage(tabId, {
-          type: "UPDATE_CURRENT_USER",
-          userId: currentUser
-        }, (response) => {
-          console.log('[Popup] User update response:', response);
+        chrome.tabs.sendMessage(
+          tabId,
+          {
+            type: "UPDATE_CURRENT_USER",
+            userId: currentUser,
+          },
+          (response) => {
+            console.log("[Popup] User update response:", response);
 
-          // Then send OPEN_BATCH_PANEL message
-          chrome.tabs.sendMessage(tabId, {
-            type: "OPEN_BATCH_PANEL",
-          }, (response) => {
-            console.log('[Popup] Batch panel response:', response);
-            if (chrome.runtime.lastError) {
-              console.error('[Popup] Error sending batch panel message:', chrome.runtime.lastError);
-
-              // Try to inject content script as fallback
-              console.log('[Popup] Attempting to inject content script...');
-              chrome.scripting.executeScript({
-                target: { tabId: tabId },
-                files: ['content.js']
-              }, () => {
+            // Then send OPEN_BATCH_PANEL message
+            chrome.tabs.sendMessage(
+              tabId,
+              {
+                type: "OPEN_BATCH_PANEL",
+              },
+              (response) => {
+                console.log("[Popup] Batch panel response:", response);
                 if (chrome.runtime.lastError) {
-                  console.error('[Popup] Failed to inject content script:', chrome.runtime.lastError);
-                  alert('Please refresh the page and try again.');
-                } else {
-                  // Wait a bit and try again
-                  setTimeout(() => {
-                    // Send user ID first
-                    chrome.tabs.sendMessage(tabId, {
-                      type: "UPDATE_CURRENT_USER",
-                      userId: currentUser
-                    }, () => {
-                      // Then send OPEN_BATCH_PANEL
-                      setTimeout(() => {
-                        chrome.tabs.sendMessage(tabId, {
-                          type: "OPEN_BATCH_PANEL",
-                        });
-                      }, 500);
-                    });
-                  }, 1000);
+                  console.error(
+                    "[Popup] Error sending batch panel message:",
+                    chrome.runtime.lastError
+                  );
+
+                  // Try to inject content script as fallback
+                  console.log("[Popup] Attempting to inject content script...");
+                  chrome.scripting.executeScript(
+                    {
+                      target: { tabId: tabId },
+                      files: ["content.js"],
+                    },
+                    () => {
+                      if (chrome.runtime.lastError) {
+                        console.error(
+                          "[Popup] Failed to inject content script:",
+                          chrome.runtime.lastError
+                        );
+                        alert("Please refresh the page and try again.");
+                      } else {
+                        // Wait a bit and try again
+                        setTimeout(() => {
+                          // Send user ID first
+                          chrome.tabs.sendMessage(
+                            tabId,
+                            {
+                              type: "UPDATE_CURRENT_USER",
+                              userId: currentUser,
+                            },
+                            () => {
+                              // Then send OPEN_BATCH_PANEL
+                              setTimeout(() => {
+                                chrome.tabs.sendMessage(tabId, {
+                                  type: "OPEN_BATCH_PANEL",
+                                });
+                              }, 500);
+                            }
+                          );
+                        }, 1000);
+                      }
+                    }
+                  );
                 }
-              });
-            }
-          });
-        });
+              }
+            );
+          }
+        );
       } else {
-        console.error('[Popup] No active tab found');
+        console.error("[Popup] No active tab found");
       }
     });
   });
@@ -448,7 +509,9 @@ if (btnBatchMark) {
  */
 async function loadLibraryCount(userId) {
   try {
-    const response = await fetch(`http://localhost:8000/users/${encodeURIComponent(userId)}/library`);
+    const response = await fetch(
+      `http://localhost:8000/users/${encodeURIComponent(userId)}/library`
+    );
 
     if (response.ok) {
       const data = await response.json();
@@ -458,8 +521,8 @@ async function loadLibraryCount(userId) {
       }
     }
   } catch (error) {
-    console.log('[Popup] Could not load library count:', error);
-    libraryCountDisplay.textContent = '?';
+    console.log("[Popup] Could not load library count:", error);
+    libraryCountDisplay.textContent = "?";
   }
 }
 
@@ -471,7 +534,7 @@ function openLibraryPage() {
   if (currentUser) {
     openLibraryUrl(currentUser);
   } else {
-    console.error('[Popup] No current user selected');
+    console.error("[Popup] No current user selected");
   }
 }
 
@@ -481,19 +544,20 @@ function openLibraryPage() {
 function openLibraryUrl(userId) {
   try {
     // Open library viewer with user ID
-    const libraryUrl = `http://localhost:8002/library-viewer.html?user=${encodeURIComponent(userId)}`;
+    const libraryUrl = `http://localhost:8002/library-viewer.html?user=${encodeURIComponent(
+      userId
+    )}`;
 
-    console.log('[Popup] Opening library page:', libraryUrl);
+    console.log("[Popup] Opening library page:", libraryUrl);
     chrome.tabs.create({ url: libraryUrl }, (tab) => {
-      console.log('[Popup] Opened library tab:', tab.id);
+      console.log("[Popup] Opened library tab:", tab.id);
     });
-
   } catch (error) {
-    console.error('[Popup] Error opening library page:', error);
+    console.error("[Popup] Error opening library page:", error);
 
     // Fallback: open basic library page
     chrome.tabs.create({
-      url: 'http://localhost:8002/library-viewer.html'
+      url: "http://localhost:8002/library-viewer.html",
     });
   }
 }
@@ -521,8 +585,8 @@ chrome.storage.onChanged.addListener((changes) => {
 function loadUsersIntoSelector() {
   userSelector.innerHTML = '<option value="">-- Select User --</option>';
 
-  allUsers.forEach(userId => {
-    const option = document.createElement('option');
+  allUsers.forEach((userId) => {
+    const option = document.createElement("option");
     option.value = userId;
     option.textContent = getUserDisplayName(userId);
     if (userId === currentUser) {
@@ -534,30 +598,34 @@ function loadUsersIntoSelector() {
 
 function getUserDisplayName(userId) {
   // Extract readable part from user ID
-  if (userId.startsWith('user_')) {
-    return userId.substring(5, 20) + '...';
+  if (userId.startsWith("user_")) {
+    return userId.substring(5, 20) + "...";
   }
   return userId;
 }
 
 function createNewUser() {
-  const newUserId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  const newUserId =
+    "user_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
 
   allUsers.push(newUserId);
   currentUser = newUserId;
 
-  ChromeAPI.storage.set({
-    mixread_users: allUsers,
-    mixread_current_user: currentUser
-  }, () => {
-    console.log('[Popup] Created new user:', newUserId);
-    loadUsersIntoSelector();
-    updateUserDisplay();
-    loadLibraryCount(currentUser);
+  ChromeAPI.storage.set(
+    {
+      mixread_users: allUsers,
+      mixread_current_user: currentUser,
+    },
+    () => {
+      console.log("[Popup] Created new user:", newUserId);
+      loadUsersIntoSelector();
+      updateUserDisplay();
+      loadLibraryCount(currentUser);
 
-    // Reset vocabulary for new user
-    resetUserVocabulary();
-  });
+      // Reset vocabulary for new user
+      resetUserVocabulary();
+    }
+  );
 }
 
 function switchToUser(userId) {
@@ -567,7 +635,7 @@ function switchToUser(userId) {
   saveCurrentUserVocabulary(() => {
     currentUser = userId;
     ChromeAPI.storage.set({ mixread_current_user: userId }, () => {
-      console.log('[Popup] Switched to user:', userId);
+      console.log("[Popup] Switched to user:", userId);
       updateUserDisplay();
       loadUserVocabulary();
       loadLibraryCount(userId);
@@ -576,20 +644,24 @@ function switchToUser(userId) {
 }
 
 function saveCurrentUserVocabulary(callback) {
-  ChromeAPI.storage.get(['vocabulary', 'vocabulary_dates', 'difficultyLevel', 'showChinese'], (result) => {
-    const userKey = `user_data_${currentUser}`;
-    const userData = {
-      vocabulary: result.vocabulary || [],
-      vocabulary_dates: result.vocabulary_dates || {},
-      difficultyLevel: result.difficultyLevel || 'B1',
-      showChinese: result.showChinese !== undefined ? result.showChinese : true
-    };
+  ChromeAPI.storage.get(
+    ["vocabulary", "vocabulary_dates", "difficultyLevel", "showChinese"],
+    (result) => {
+      const userKey = `user_data_${currentUser}`;
+      const userData = {
+        vocabulary: result.vocabulary || [],
+        vocabulary_dates: result.vocabulary_dates || {},
+        difficultyLevel: result.difficultyLevel || "B1",
+        showChinese:
+          result.showChinese !== undefined ? result.showChinese : true,
+      };
 
-    const update = {};
-    update[userKey] = userData;
+      const update = {};
+      update[userKey] = userData;
 
-    ChromeAPI.storage.set(update, callback);
-  });
+      ChromeAPI.storage.set(update, callback);
+    }
+  );
 }
 
 function loadUserVocabulary() {
@@ -610,9 +682,10 @@ function loadUserVocabulary() {
 
     if (userData.difficultyLevel) {
       ChromeAPI.storage.set({ difficultyLevel: userData.difficultyLevel });
-      const difficultyValue = Object.entries(DIFFICULTY_LEVELS).find(
-        ([_, level]) => level === userData.difficultyLevel
-      )?.[0] || "3";
+      const difficultyValue =
+        Object.entries(DIFFICULTY_LEVELS).find(
+          ([_, level]) => level === userData.difficultyLevel
+        )?.[0] || "3";
       difficultySlider.value = difficultyValue;
       updateDifficultyDisplay(difficultyValue);
     }
@@ -627,7 +700,7 @@ function loadUserVocabulary() {
 function resetUserVocabulary() {
   ChromeAPI.storage.set({
     vocabulary: [],
-    vocabulary_dates: {}
+    vocabulary_dates: {},
   });
   vocabCountDisplay.textContent = "0";
   totalCountDisplay.textContent = "0";
@@ -664,17 +737,24 @@ addNewUserBtn.addEventListener("click", () => {
 // Function to sync current user with content scripts
 function syncCurrentUserToContentScripts() {
   chrome.tabs.query({}, (tabs) => {
-    tabs.forEach(tab => {
-      if (tab.url && tab.url.startsWith('http')) {
-        chrome.tabs.sendMessage(tab.id, {
-          type: "UPDATE_CURRENT_USER",
-          userId: currentUser
-        }, (response) => {
-          if (chrome.runtime.lastError) {
-            // Tab might not have content script loaded, that's ok
-            console.log(`[Popup] Could not sync user to tab ${tab.id}:`, chrome.runtime.lastError.message);
+    tabs.forEach((tab) => {
+      if (tab.url && tab.url.startsWith("http")) {
+        chrome.tabs.sendMessage(
+          tab.id,
+          {
+            type: "UPDATE_CURRENT_USER",
+            userId: currentUser,
+          },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              // Tab might not have content script loaded, that's ok
+              console.log(
+                `[Popup] Could not sync user to tab ${tab.id}:`,
+                chrome.runtime.lastError.message
+              );
+            }
           }
-        });
+        );
       }
     });
   });
@@ -692,17 +772,20 @@ async function initializeDomainManagement() {
   try {
     // Create store instance
     domainPolicyStore = new DomainPolicyStore();
-    logger.log('[DomainPolicy] Store created, currentUser:', currentUser);
+    logger.log("[DomainPolicy] Store created, currentUser:", currentUser);
 
     // presetDialog is already created in preset-dialog.js, no need to recreate
 
     // Initialize from backend
     if (currentUser) {
-      logger.log('[DomainPolicy] Starting initialization with userId:', currentUser);
+      logger.log(
+        "[DomainPolicy] Starting initialization with userId:",
+        currentUser
+      );
       const initResult = await domainPolicyStore.initialize(currentUser);
-      logger.log('[DomainPolicy] Initialization result:', initResult);
+      logger.log("[DomainPolicy] Initialization result:", initResult);
     } else {
-      logger.warn('[DomainPolicy] No current user, skipping initialization');
+      logger.warn("[DomainPolicy] No current user, skipping initialization");
     }
 
     // Setup event listeners
@@ -711,7 +794,7 @@ async function initializeDomainManagement() {
     // Render blacklist
     renderBlacklist();
   } catch (error) {
-    logger.error('[DomainPolicy] Initialization error:', error);
+    logger.error("[DomainPolicy] Initialization error:", error);
   }
 }
 
@@ -720,29 +803,31 @@ async function initializeDomainManagement() {
  */
 function setupDomainEventListeners() {
   // Tab switching
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const tabName = e.target.getAttribute('data-tab');
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const tabName = e.target.getAttribute("data-tab");
       switchTab(tabName);
     });
   });
 
   // Add domain button
-  document.getElementById('btn-add-domain').addEventListener('click', () => {
+  document.getElementById("btn-add-domain").addEventListener("click", () => {
     addDomainFromInput();
   });
 
   // Domain input - Enter key
-  document.getElementById('domain-input').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
+  document.getElementById("domain-input").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
       addDomainFromInput();
     }
   });
 
   // Preset domains button
-  document.getElementById('btn-preset-domains').addEventListener('click', () => {
-    showPresetDialog();
-  });
+  document
+    .getElementById("btn-preset-domains")
+    .addEventListener("click", () => {
+      showPresetDialog();
+    });
 }
 
 /**
@@ -750,49 +835,55 @@ function setupDomainEventListeners() {
  */
 function switchTab(tabName) {
   // Hide all tabs
-  document.querySelectorAll('.tab-content').forEach(content => {
-    content.classList.remove('active');
+  document.querySelectorAll(".tab-content").forEach((content) => {
+    content.classList.remove("active");
   });
 
   // Remove active class from all buttons
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.classList.remove('active');
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.classList.remove("active");
   });
 
   // Show selected tab
-  document.getElementById(tabName).classList.add('active');
-  document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+  document.getElementById(tabName).classList.add("active");
+  document.querySelector(`[data-tab="${tabName}"]`).classList.add("active");
 }
 
 /**
  * Add domain from input field
  */
 async function addDomainFromInput() {
-  const input = document.getElementById('domain-input');
+  const input = document.getElementById("domain-input");
   const domain = input.value.trim().toLowerCase();
 
   if (!domain) {
-    alert('Please enter a domain name');
+    alert("Please enter a domain name");
     return;
   }
 
   if (!currentUser) {
-    alert('Please select a user first');
+    alert("Please select a user first");
     return;
   }
 
   try {
-    const success = await domainPolicyStore.addBlacklistDomain(currentUser, domain);
+    const success = await domainPolicyStore.addBlacklistDomain(
+      currentUser,
+      domain
+    );
     if (success) {
-      input.value = '';
+      input.value = "";
       renderBlacklist();
       logger.log(`[Popup] Added domain to blacklist: ${domain}`);
+
+      // Notify all tabs about policy change
+      notifyTabsOfPolicyChange();
     } else {
-      alert('Failed to add domain');
+      alert("Failed to add domain");
     }
   } catch (error) {
-    logger.error('[Popup] Error adding domain', error);
-    alert('Error adding domain: ' + error.message);
+    logger.error("[Popup] Error adding domain", error);
+    alert("Error adding domain: " + error.message);
   }
 }
 
@@ -803,13 +894,19 @@ async function removeDomainFromBlacklist(domain) {
   if (!currentUser) return;
 
   try {
-    const success = await domainPolicyStore.removeBlacklistDomain(currentUser, domain);
+    const success = await domainPolicyStore.removeBlacklistDomain(
+      currentUser,
+      domain
+    );
     if (success) {
       renderBlacklist();
       logger.log(`[Popup] Removed domain from blacklist: ${domain}`);
+
+      // Notify all tabs about policy change
+      notifyTabsOfPolicyChange();
     }
   } catch (error) {
-    logger.error('[Popup] Error removing domain', error);
+    logger.error("[Popup] Error removing domain", error);
   }
 }
 
@@ -818,31 +915,33 @@ async function removeDomainFromBlacklist(domain) {
  */
 function renderBlacklist() {
   const domains = domainPolicyStore.getBlacklistDomains();
-  const container = document.getElementById('blacklist-items');
-  const emptyMsg = document.getElementById('empty-blacklist-msg');
-  const count = document.getElementById('blacklist-count');
+  const container = document.getElementById("blacklist-items");
+  const emptyMsg = document.getElementById("empty-blacklist-msg");
+  const count = document.getElementById("blacklist-count");
 
   count.textContent = domains.length;
 
   // Clear container
-  container.innerHTML = '';
+  container.innerHTML = "";
 
   if (domains.length === 0) {
-    emptyMsg.style.display = 'block';
+    emptyMsg.style.display = "block";
   } else {
-    emptyMsg.style.display = 'none';
-    domains.forEach(domain => {
-      const li = document.createElement('li');
-      li.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px;';
+    emptyMsg.style.display = "none";
+    domains.forEach((domain) => {
+      const li = document.createElement("li");
+      li.style.cssText =
+        "display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px;";
 
-      const domainSpan = document.createElement('span');
+      const domainSpan = document.createElement("span");
       domainSpan.textContent = domain;
-      domainSpan.style.cssText = 'flex: 1;';
+      domainSpan.style.cssText = "flex: 1;";
 
-      const removeBtn = document.createElement('button');
-      removeBtn.textContent = '✕';
-      removeBtn.style.cssText = 'background: #dc3545; color: white; border: none; border-radius: 3px; padding: 2px 6px; cursor: pointer; font-size: 11px;';
-      removeBtn.addEventListener('click', () => {
+      const removeBtn = document.createElement("button");
+      removeBtn.textContent = "✕";
+      removeBtn.style.cssText =
+        "background: #dc3545; color: white; border: none; border-radius: 3px; padding: 2px 6px; cursor: pointer; font-size: 11px;";
+      removeBtn.addEventListener("click", () => {
         if (confirm(`Remove ${domain} from blacklist?`)) {
           removeDomainFromBlacklist(domain);
         }
@@ -868,7 +967,7 @@ function showPresetDialog() {
     },
     () => {
       // User cancelled
-      logger.log('[Popup] Preset dialog cancelled');
+      logger.log("[Popup] Preset dialog cancelled");
     }
   );
 }
@@ -878,20 +977,51 @@ function showPresetDialog() {
  */
 async function addPresetDomains(domains) {
   if (!currentUser) {
-    alert('Please select a user first');
+    alert("Please select a user first");
     return;
   }
 
   try {
-    const success = await domainPolicyStore.addBlacklistDomainsBatch(currentUser, domains);
+    const success = await domainPolicyStore.addBlacklistDomainsBatch(
+      currentUser,
+      domains
+    );
     if (success) {
       renderBlacklist();
       logger.log(`[Popup] Added ${domains.length} preset domains`);
       alert(`Added ${domains.length} domains to blacklist`);
     } else {
-      alert('Failed to add preset domains');
+      alert("Failed to add preset domains");
     }
   } catch (error) {
-    logger.error('[Popup] Error adding preset domains', error);
+    logger.error("[Popup] Error adding preset domains", error);
   }
+}
+
+/**
+ * Notify all tabs that domain policy has changed
+ */
+function notifyTabsOfPolicyChange() {
+  chrome.tabs.query({}, (tabs) => {
+    tabs.forEach((tab) => {
+      if (tab.url && tab.url.startsWith("http")) {
+        chrome.tabs.sendMessage(
+          tab.id,
+          {
+            type: "DOMAIN_POLICY_CHANGED",
+            userId: currentUser,
+          },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              // Tab might not have content script loaded, that's ok
+              console.log(
+                `[Popup] Could not notify tab ${tab.id}:`,
+                chrome.runtime.lastError.message
+              );
+            }
+          }
+        );
+      }
+    });
+  });
 }

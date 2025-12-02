@@ -6,7 +6,7 @@
  */
 
 class ApiClient {
-  constructor(baseURL = 'http://localhost:8000') {
+  constructor(baseURL = "http://localhost:8000") {
     this.baseURL = baseURL;
     this.timeout = 10000; // 10 second timeout
   }
@@ -24,9 +24,9 @@ class ApiClient {
       const options = {
         method,
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        mode: 'cors',
+        mode: "cors",
       };
 
       if (data) {
@@ -48,21 +48,21 @@ class ApiClient {
 
   // Convenience methods
   get(path) {
-    return this.request('GET', path);
+    return this.request("GET", path);
   }
 
   post(path, data) {
-    return this.request('POST', path, data);
+    return this.request("POST", path, data);
   }
 
   put(path, data) {
-    return this.request('PUT', path, data);
+    return this.request("PUT", path, data);
   }
 
   delete(path) {
-    return this.request('DELETE', path);
+    return this.request("DELETE", path);
   }
 }
 
 // Create global API client instance
-const apiClient = new ApiClient();
+window.apiClient = new ApiClient();
