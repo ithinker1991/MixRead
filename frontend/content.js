@@ -207,14 +207,19 @@ async function initializeModules() {
 ChromeAPI.storage.get(
   ["difficultyLevel", "vocabulary", "showChinese"],
   (result) => {
-    if (result.difficultyLevel) {
-      currentDifficultyLevel = result.difficultyLevel;
-    }
-    if (result.vocabulary) {
-      userVocabulary = new Set(result.vocabulary);
-    }
-    if (result.showChinese !== undefined) {
-      showChinese = result.showChinese;
+    try {
+      if (result.difficultyLevel) {
+        currentDifficultyLevel = result.difficultyLevel;
+      }
+      if (result.vocabulary) {
+        userVocabulary = new Set(result.vocabulary);
+      }
+      if (result.showChinese !== undefined) {
+        showChinese = result.showChinese;
+      }
+      console.log('[MixRead] Settings loaded successfully');
+    } catch (error) {
+      console.error('[MixRead] Error loading settings:', error);
     }
   }
 );
@@ -761,15 +766,21 @@ function addWordToVocabulary(word) {
 
   // Get current vocabulary dates
   ChromeAPI.storage.get(["vocabulary_dates"], (result) => {
-    const dates = result.vocabulary_dates || {};
-    const today = new Date().toISOString().split("T")[0];
-    dates[wordLower] = today;
+    try {
+      const dates = result.vocabulary_dates || {};
+      const today = new Date().toISOString().split("T")[0];
+      dates[wordLower] = today;
 
-    // Save to local storage
-    ChromeAPI.storage.set({
-      vocabulary: Array.from(userVocabulary),
-      vocabulary_dates: dates,
-    });
+      // Save to local storage
+      ChromeAPI.storage.set({
+        vocabulary: Array.from(userVocabulary),
+        vocabulary_dates: dates,
+      }, () => {
+        console.debug('[MixRead] Vocabulary saved for word:', wordLower);
+      });
+    } catch (error) {
+      console.error('[MixRead] Error saving vocabulary:', error);
+    }
   });
 
   // Extract sentence context for the word
@@ -1194,17 +1205,21 @@ function recordReadingSession() {
 
   if (sessionDurationMinutes > 0) {
     ChromeAPI.storage.get(["reading_sessions"], (result) => {
-      const sessions = result.reading_sessions || {};
-      const today = new Date().toISOString().split("T")[0];
+      try {
+        const sessions = result.reading_sessions || {};
+        const today = new Date().toISOString().split("T")[0];
 
-      // Add session duration to today's total
-      sessions[today] = (sessions[today] || 0) + sessionDurationMinutes;
+        // Add session duration to today's total
+        sessions[today] = (sessions[today] || 0) + sessionDurationMinutes;
 
-      ChromeAPI.storage.set({
-        reading_sessions: sessions,
-      }, () => {
-        console.log(`[MixRead] Recorded ${sessionDurationMinutes} minutes of reading for ${today}`);
-      });
+        ChromeAPI.storage.set({
+          reading_sessions: sessions,
+        }, () => {
+          console.log(`[MixRead] Recorded ${sessionDurationMinutes} minutes of reading for ${today}`);
+        });
+      } catch (error) {
+        console.error('[MixRead] Error recording session:', error);
+      }
     });
   }
 }
