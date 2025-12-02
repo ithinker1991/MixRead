@@ -11,50 +11,50 @@ class PresetDialog {
     this.selectedDomains = new Set();
     this.presetDomains = [
       {
-        domain: 'localhost',
-        category: 'Development',
-        description: 'Local development environment'
+        domain: "localhost",
+        category: "Development",
+        description: "Local development environment",
       },
       {
-        domain: 'github.com',
-        category: 'Development',
-        description: 'Code repository and collaboration'
+        domain: "github.com",
+        category: "Development",
+        description: "Code repository and collaboration",
       },
       {
-        domain: 'stackoverflow.com',
-        category: 'Development',
-        description: 'Programming Q&A and reference'
+        domain: "stackoverflow.com",
+        category: "Development",
+        description: "Programming Q&A and reference",
       },
       {
-        domain: 'twitter.com',
-        category: 'Social Media',
-        description: 'Social networking platform'
+        domain: "twitter.com",
+        category: "Social Media",
+        description: "Social networking platform",
       },
       {
-        domain: 'reddit.com',
-        category: 'Social Media',
-        description: 'Discussion and community platform'
+        domain: "reddit.com",
+        category: "Social Media",
+        description: "Discussion and community platform",
       },
       {
-        domain: 'facebook.com',
-        category: 'Social Media',
-        description: 'Social networking platform'
+        domain: "facebook.com",
+        category: "Social Media",
+        description: "Social networking platform",
       },
       {
-        domain: 'instagram.com',
-        category: 'Social Media',
-        description: 'Photo and video sharing'
+        domain: "instagram.com",
+        category: "Social Media",
+        description: "Photo and video sharing",
       },
       {
-        domain: 'tiktok.com',
-        category: 'Social Media',
-        description: 'Short-form video platform'
+        domain: "tiktok.com",
+        category: "Social Media",
+        description: "Short-form video platform",
       },
       {
-        domain: 'youtube.com',
-        category: 'Video',
-        description: 'Video sharing platform'
-      }
+        domain: "youtube.com",
+        category: "Video",
+        description: "Video sharing platform",
+      },
     ];
   }
 
@@ -63,14 +63,16 @@ class PresetDialog {
    */
   createDialogHTML() {
     const categories = this.groupByCategory();
-    let categoriesHTML = '';
+    let categoriesHTML = "";
 
     for (const [category, domains] of Object.entries(categories)) {
       categoriesHTML += `
         <div class="preset-category" data-category="${category}">
           <h4 class="preset-category-title">${category}</h4>
           <div class="preset-domains-list">
-            ${domains.map(item => `
+            ${domains
+              .map(
+                (item) => `
               <label class="preset-domain-item">
                 <input
                   type="checkbox"
@@ -84,7 +86,9 @@ class PresetDialog {
                   <small>${item.description}</small>
                 </span>
               </label>
-            `).join('')}
+            `
+              )
+              .join("")}
           </div>
         </div>
       `;
@@ -136,7 +140,7 @@ class PresetDialog {
    */
   groupByCategory() {
     const categories = {};
-    this.presetDomains.forEach(item => {
+    this.presetDomains.forEach((item) => {
       if (!categories[item.category]) {
         categories[item.category] = [];
       }
@@ -155,25 +159,25 @@ class PresetDialog {
 
     // Create and inject dialog HTML
     const dialogHTML = this.createDialogHTML();
-    document.body.insertAdjacentHTML('beforeend', dialogHTML);
+    document.body.insertAdjacentHTML("beforeend", dialogHTML);
 
     // Get dialog elements
-    const overlay = document.getElementById('preset-dialog-overlay');
-    const confirmBtn = document.getElementById('preset-dialog-confirm');
-    const cancelBtn = document.getElementById('preset-dialog-cancel');
-    const checkboxes = document.querySelectorAll('.preset-domain-checkbox');
+    const overlay = document.getElementById("preset-dialog-overlay");
+    const confirmBtn = document.getElementById("preset-dialog-confirm");
+    const cancelBtn = document.getElementById("preset-dialog-cancel");
+    const checkboxes = document.querySelectorAll(".preset-domain-checkbox");
 
     // Initialize selected domains
     this.selectedDomains = new Set();
-    checkboxes.forEach(checkbox => {
+    checkboxes.forEach((checkbox) => {
       if (checkbox.checked) {
         this.selectedDomains.add(checkbox.dataset.domain);
       }
     });
 
     // Update stats on checkbox change
-    checkboxes.forEach(checkbox => {
-      checkbox.addEventListener('change', () => {
+    checkboxes.forEach((checkbox) => {
+      checkbox.addEventListener("change", () => {
         if (checkbox.checked) {
           this.selectedDomains.add(checkbox.dataset.domain);
         } else {
@@ -184,7 +188,7 @@ class PresetDialog {
     });
 
     // Handle confirm button
-    confirmBtn.addEventListener('click', () => {
+    confirmBtn.addEventListener("click", () => {
       this.close();
       if (onConfirm) {
         onConfirm(Array.from(this.selectedDomains));
@@ -192,7 +196,7 @@ class PresetDialog {
     });
 
     // Handle cancel button
-    cancelBtn.addEventListener('click', () => {
+    cancelBtn.addEventListener("click", () => {
       this.close();
       if (onCancel) {
         onCancel();
@@ -200,7 +204,7 @@ class PresetDialog {
     });
 
     // Handle overlay click (close)
-    overlay.addEventListener('click', (e) => {
+    overlay.addEventListener("click", (e) => {
       if (e.target === overlay) {
         this.close();
         if (onCancel) {
@@ -211,44 +215,46 @@ class PresetDialog {
 
     // Handle Escape key
     this.escapeHandler = (e) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         this.close();
         if (onCancel) {
           onCancel();
         }
       }
     };
-    document.addEventListener('keydown', this.escapeHandler);
+    document.addEventListener("keydown", this.escapeHandler);
 
     this.isOpen = true;
-    logger.log('[PresetDialog] Opened');
+    logger.log("[PresetDialog] Opened");
   }
 
   /**
    * Close the dialog
    */
   close() {
-    const overlay = document.getElementById('preset-dialog-overlay');
+    const overlay = document.getElementById("preset-dialog-overlay");
     if (overlay) {
       overlay.remove();
     }
 
     if (this.escapeHandler) {
-      document.removeEventListener('keydown', this.escapeHandler);
+      document.removeEventListener("keydown", this.escapeHandler);
     }
 
     this.isOpen = false;
-    logger.log('[PresetDialog] Closed');
+    logger.log("[PresetDialog] Closed");
   }
 
   /**
    * Update selected count display
    */
   updateStats() {
-    const countDisplay = document.getElementById('preset-selected-count');
+    const countDisplay = document.getElementById("preset-selected-count");
     if (countDisplay) {
       const count = this.selectedDomains.size;
-      countDisplay.textContent = `${count} domain${count !== 1 ? 's' : ''} selected`;
+      countDisplay.textContent = `${count} domain${
+        count !== 1 ? "s" : ""
+      } selected`;
     }
   }
 

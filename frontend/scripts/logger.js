@@ -42,7 +42,10 @@ class Logger {
   }
 
   static debug(message, data = null) {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('mixread_debug')) {
+    if (
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem("mixread_debug")
+    ) {
       const timestamp = new Date().toISOString();
       if (data) {
         console.debug(`[${timestamp}] [MixRead DEBUG] ${message}`, data);
