@@ -875,6 +875,12 @@ function addWordToVocabulary(word) {
  * Calls backend API to persist the marking
  */
 function markWordAsKnown(word) {
+  // Check if extension context is still valid
+  if (!chrome || !chrome.runtime) {
+    console.warn('[MixRead] Extension context invalidated, cannot mark word as known');
+    return;
+  }
+
   // Use stemmer to normalize word form (evaluates → evalu)
   const stemmedWord = Stemmer.stem(word);
 
@@ -1142,11 +1148,28 @@ function recordReadingSession() {
   }
 }
 
+// Wrapper to handle extension context invalidation
+function safeRecordReadingSession() {
+  try {
+    // Check if extension context is valid before calling
+    if (chrome && chrome.storage && chrome.runtime) {
+      recordReadingSession();
+    }
+  } catch (error) {
+    // Silently handle extension context errors
+    if (error.message && error.message.includes('Extension context invalidated')) {
+      console.debug('[MixRead] Extension context invalidated, skipping session recording');
+    } else {
+      console.error('[MixRead] Unexpected error in session recording:', error);
+    }
+  }
+}
+
 // Record session time when user leaves the page
-window.addEventListener("beforeunload", recordReadingSession);
+window.addEventListener("beforeunload", safeRecordReadingSession);
 
 // Also record session periodically (every 5 minutes)
 setInterval(() => {
-  recordReadingSession();
+  safeRecordReadingSession();
   sessionStartTime = Date.now(); // Reset for next interval
 }, 5 * 60 * 1000);
