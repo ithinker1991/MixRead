@@ -757,25 +757,18 @@ function renderBlacklist() {
  * Show preset domains dialog
  */
 function showPresetDialog() {
-  // Preset domains (from Phase 1 requirements)
-  const presetDomains = [
-    'localhost',
-    'github.com',
-    'stackoverflow.com',
-    'twitter.com',
-    'reddit.com',
-    'facebook.com',
-    'instagram.com',
-    'tiktok.com',
-    'youtube.com'
-  ];
-
-  const message = 'Add these preset domains to your blacklist?\n\n' +
-    presetDomains.join('\n');
-
-  if (confirm(message)) {
-    addPresetDomains(presetDomains);
-  }
+  presetDialog.open(
+    (selectedDomains) => {
+      // User confirmed
+      if (selectedDomains.length > 0) {
+        addPresetDomains(selectedDomains);
+      }
+    },
+    () => {
+      // User cancelled
+      logger.log('[Popup] Preset dialog cancelled');
+    }
+  );
 }
 
 /**

@@ -29,6 +29,7 @@
         "modules/unknown-words/unknown-words-service.js",
         "modules/domain-policy/domain-policy-store.js",
         "modules/domain-policy/domain-policy-filter.js",
+        "modules/domain-policy/preset-dialog.js",
         "modules/highlight/context-menu.js",
         "modules/highlight/highlight-filter.js",
         "modules/panel/batch-marking-panel.js",
@@ -36,7 +37,8 @@
       ],
       "css": [
         "content.css",
-        "modules/panel/batch-marking-panel.css"
+        "modules/panel/batch-marking-panel.css",
+        "modules/domain-policy/preset-dialog.css"
       ]
     }
   ],

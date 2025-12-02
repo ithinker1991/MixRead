@@ -20,6 +20,8 @@ let unknownWordsService;
 let contextMenu;
 let highlightFilter;
 let batchMarkingPanel;
+let domainPolicyStore;
+let shouldExcludeCurrentPage = false;
 
 // ===== Initialize Modules =====
 async function initializeModules() {
@@ -81,6 +83,20 @@ async function initializeModules() {
     batchMarkingPanel = new BatchMarkingPanel(unknownWordsService, userStore);
     batchMarkingPanel.init();
     console.log('[MixRead] BatchMarkingPanel created');
+
+    // 8. Initialize domain policy store
+    domainPolicyStore = new DomainPolicyStore();
+    await domainPolicyStore.initialize(userId);
+    console.log('[MixRead] DomainPolicyStore created and initialized');
+
+    // 9. Check if current page should be excluded
+    shouldExcludeCurrentPage = DomainPolicyFilter.shouldExcludeCurrentPage(window.location.href, domainPolicyStore);
+    if (shouldExcludeCurrentPage) {
+      console.log('[MixRead] ⚠️ Current domain is in blacklist - highlighting disabled');
+      logger.warn('Domain is blacklisted - highlighting disabled', {domain: window.location.hostname});
+    } else {
+      console.log('[MixRead] ✓ Domain check passed - highlighting enabled');
+    }
 
     console.log('[MixRead] ✅ All modules initialized successfully');
     logger.info('All modules initialized successfully');
@@ -217,6 +233,12 @@ function highlightPageWords() {
   // Prevent infinite loop from MutationObserver
   if (isHighlighting) {
     console.log('[MixRead] Already highlighting, skipping...');
+    return;
+  }
+
+  // Check if current domain is excluded (domain blacklist)
+  if (shouldExcludeCurrentPage) {
+    console.log('[MixRead] ⚠️ Skipping: domain is in blacklist');
     return;
   }
 
