@@ -593,6 +593,7 @@ function syncCurrentUserToContentScripts() {
 // ========== Domain Management UI Logic ==========
 
 let domainPolicyStore;
+let presetDialog;
 
 /**
  * Initialize domain management
@@ -600,6 +601,9 @@ let domainPolicyStore;
 async function initializeDomainManagement() {
   // Create store instance
   domainPolicyStore = new DomainPolicyStore();
+
+  // Create preset dialog instance
+  presetDialog = new PresetDialog();
 
   // Initialize from backend
   if (currentUser) {
