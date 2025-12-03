@@ -107,6 +107,23 @@
   color: var(--highlight-yellow);
 }
 
+/* Frequency statistics */
+.sidebar-frequency-stats {
+  padding: 6px 16px;
+  background: #fafafa;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--sidebar-border);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.stat-high-freq,
+.stat-low-freq {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 /* Content area (word list) */
 .sidebar-content {
   flex: 1;

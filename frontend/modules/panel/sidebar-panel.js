@@ -18,6 +18,7 @@ class SidebarPanel {
     this.sidebarElement = null;
     this.contentArea = null;
     this.statsElement = null;
+    this.frequencyStatsElement = null;
 
     // State
     this.isOpen = false;         // Internal state (always listening)
@@ -83,6 +84,10 @@ class SidebarPanel {
           📊 <span class="stat-count">0</span> 词汇 | <span class="stat-unique">0</span> 独特
         </div>
 
+        <div class="sidebar-frequency-stats">
+          🔥 <span class="stat-high-freq">0</span> 高频 | ❄️ <span class="stat-low-freq">0</span> 低频
+        </div>
+
         <div class="sidebar-content"></div>
 
         <div class="sidebar-footer">
@@ -96,6 +101,7 @@ class SidebarPanel {
     this.sidebarElement = document.getElementById('mixread-sidebar');
     this.contentArea = this.sidebarElement.querySelector('.sidebar-content');
     this.statsElement = this.sidebarElement.querySelector('.sidebar-stats');
+    this.frequencyStatsElement = this.sidebarElement.querySelector('.sidebar-frequency-stats');
 
     console.log('[SidebarPanel] DOM created');
   }
@@ -492,14 +498,24 @@ class SidebarPanel {
     const words = Object.entries(this.wordState)
       .sort((a, b) => b[1].count - a[1].count);
 
+    // Calculate statistics
+    const totalCount = words.reduce((sum, [, data]) => sum + data.count, 0);
+    const uniqueCount = words.length;
+    const highFreqCount = words.filter(([, data]) => data.count >= 3).length;
+    const lowFreqCount = words.filter(([, data]) => data.count === 1).length;
+
     // Update stats
     if (this.statsElement) {
-      const totalCount = words.reduce((sum, [, data]) => sum + data.count, 0);
-      const uniqueCount = words.length;
-
       this.statsElement.innerHTML = `
         📊 <span class="stat-count">${totalCount}</span> 词汇 |
         <span class="stat-unique">${uniqueCount}</span> 独特
+      `;
+    }
+
+    // Update frequency stats
+    if (this.frequencyStatsElement) {
+      this.frequencyStatsElement.innerHTML = `
+        🔥 <span class="stat-high-freq">${highFreqCount}</span> 高频 | ❄️ <span class="stat-low-freq">${lowFreqCount}</span> 低频
       `;
     }
 
@@ -509,7 +525,7 @@ class SidebarPanel {
       this.contentArea.appendChild(wordItem);
     });
 
-    console.log(`[SidebarPanel] Rendered ${words.length} words`);
+    console.log(`[SidebarPanel] Rendered ${words.length} words (${highFreqCount} high-freq, ${lowFreqCount} low-freq)`);
   }
 
   /**
