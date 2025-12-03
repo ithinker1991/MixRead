@@ -491,7 +491,12 @@ class SidebarPanel {
    * Render word list
    */
   renderWordList() {
-    if (!this.contentArea) return;
+    console.log('[SidebarPanel] renderWordList called, contentArea:', !!this.contentArea, 'wordState keys:', Object.keys(this.wordState).length);
+
+    if (!this.contentArea) {
+      console.error('[SidebarPanel] contentArea is null or undefined!');
+      return;
+    }
 
     // Clear existing
     this.contentArea.innerHTML = '';
@@ -499,6 +504,8 @@ class SidebarPanel {
     // Get sorted word list (by count, descending)
     const words = Object.entries(this.wordState)
       .sort((a, b) => b[1].count - a[1].count);
+
+    console.log('[SidebarPanel] Words to render:', words.length);
 
     // Calculate statistics
     const totalCount = words.reduce((sum, [, data]) => sum + data.count, 0);
