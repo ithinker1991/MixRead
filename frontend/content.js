@@ -1850,16 +1850,17 @@ function notifyPanelOfNewWords(wordDetails) {
       if (!newWordsMap[normalizedWord]) {
         newWordsMap[normalizedWord] = {
           count: elements.length,
-          originalWords: new Set(),
+          originalWords: [],  // Use array instead of Set for serialization
           chinese: firstElement.dataset.translation || "",
           definition: firstElement.dataset.definition || "",
         };
       }
 
       elements.forEach((el) => {
-        newWordsMap[normalizedWord].originalWords.add(
-          el.dataset.word || el.textContent
-        );
+        const word = el.dataset.word || el.textContent;
+        if (!newWordsMap[normalizedWord].originalWords.includes(word)) {
+          newWordsMap[normalizedWord].originalWords.push(word);
+        }
       });
     }
   });

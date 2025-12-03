@@ -179,9 +179,25 @@ class SidebarPanel {
         // Restore from cache and convert originalWords back to Set
         this.wordState = {};
         Object.entries(cachedWordState).forEach(([key, data]) => {
+          // Handle originalWords which might be Array, Set, or Object after serialization
+          let originalWordsSet = new Set();
+          if (data.originalWords) {
+            if (Array.isArray(data.originalWords)) {
+              originalWordsSet = new Set(data.originalWords);
+            } else if (typeof data.originalWords === 'object') {
+              // Might be serialized Set or object with string keys
+              if (Set.prototype.isPrototypeOf(data.originalWords)) {
+                originalWordsSet = new Set(data.originalWords);
+              } else {
+                // Try to get keys from object
+                originalWordsSet = new Set(Object.keys(data.originalWords));
+              }
+            }
+          }
+
           this.wordState[key] = {
             ...data,
-            originalWords: new Set(data.originalWords || [])
+            originalWords: originalWordsSet
           };
         });
         this.renderWordList();
