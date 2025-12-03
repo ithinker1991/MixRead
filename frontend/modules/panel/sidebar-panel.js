@@ -523,9 +523,13 @@ class SidebarPanel {
     div.dataset.word = normalizedWord;
 
     // Display text: show variants count if multiple forms
-    const hasVariants = data.originalWords.size > 1;
+    // Handle both Set and Array formats for originalWords
+    const variantsCount = Set.prototype.isPrototypeOf(data.originalWords)
+      ? data.originalWords.size
+      : (Array.isArray(data.originalWords) ? data.originalWords.length : 0);
+    const hasVariants = variantsCount > 1;
     const displayWord = hasVariants
-      ? `${normalizedWord}* (${data.originalWords.size})`
+      ? `${normalizedWord}* (${variantsCount})`
       : normalizedWord;
 
     div.innerHTML = `
