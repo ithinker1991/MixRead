@@ -1819,7 +1819,16 @@ function notifyPanelOfNewWords(wordDetails) {
   const newWordsMap = {};
 
   wordDetails.forEach((detail) => {
-    const stem = detail.word.toLowerCase();
+    // Apply stemming to match DOM data-word-stem attribute
+    let stem = detail.word.toLowerCase();
+    if (typeof Stemmer !== 'undefined' && Stemmer.stem) {
+      try {
+        stem = Stemmer.stem(stem);
+      } catch (e) {
+        console.warn('[MixRead] Stemming error in notifyPanelOfNewWords:', e);
+      }
+    }
+
     const elements = document.querySelectorAll(
       `.mixread-highlight[data-word-stem="${stem}"]`
     );
