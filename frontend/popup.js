@@ -173,7 +173,7 @@ let readingTimeDisplay = document.getElementById("reading-time");
 
 const btnViewVocab = document.getElementById("btn-view-vocabulary");
 const btnResetVocab = document.getElementById("btn-reset-vocab");
-const btnBatchMark = document.getElementById("btn-batch-mark");
+const btnToggleSidebar = document.getElementById("btn-toggle-sidebar");
 const btnViewLibrary = document.getElementById("btn-view-library");
 const libraryCountDisplay = document.getElementById("library-count");
 
@@ -418,83 +418,31 @@ btnResetVocab.addEventListener("click", () => {
 /**
  * Batch marking panel button
  */
-if (btnBatchMark) {
-  btnBatchMark.addEventListener("click", () => {
-    console.log("[Popup] Batch mark button clicked");
-    console.log("[Popup] Current user:", currentUser);
+if (btnToggleSidebar) {
+  btnToggleSidebar.addEventListener("click", () => {
+    console.log("[Popup] Toggle sidebar button clicked");
 
-    // Send message to content script to open batch marking panel
+    // Send message to content script to toggle sidebar visibility
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      console.log("[Popup] Current tabs:", tabs);
-
       if (tabs[0]?.id) {
         const tabId = tabs[0].id;
-        console.log("[Popup] Sending message to tab:", tabId);
+        console.log("[Popup] Sending toggle sidebar message to tab:", tabId);
 
-        // First, send current user ID to content script
+        // Send message to toggle sidebar
         chrome.tabs.sendMessage(
           tabId,
           {
-            type: "UPDATE_CURRENT_USER",
-            userId: currentUser,
+            type: "TOGGLE_SIDEBAR",
           },
           (response) => {
-            console.log("[Popup] User update response:", response);
-
-            // Then send OPEN_BATCH_PANEL message
-            chrome.tabs.sendMessage(
-              tabId,
-              {
-                type: "OPEN_BATCH_PANEL",
-              },
-              (response) => {
-                console.log("[Popup] Batch panel response:", response);
-                if (chrome.runtime.lastError) {
-                  console.error(
-                    "[Popup] Error sending batch panel message:",
-                    chrome.runtime.lastError
-                  );
-
-                  // Try to inject content script as fallback
-                  console.log("[Popup] Attempting to inject content script...");
-                  chrome.scripting.executeScript(
-                    {
-                      target: { tabId: tabId },
-                      files: ["content.js"],
-                    },
-                    () => {
-                      if (chrome.runtime.lastError) {
-                        console.error(
-                          "[Popup] Failed to inject content script:",
-                          chrome.runtime.lastError
-                        );
-                        alert("Please refresh the page and try again.");
-                      } else {
-                        // Wait a bit and try again
-                        setTimeout(() => {
-                          // Send user ID first
-                          chrome.tabs.sendMessage(
-                            tabId,
-                            {
-                              type: "UPDATE_CURRENT_USER",
-                              userId: currentUser,
-                            },
-                            () => {
-                              // Then send OPEN_BATCH_PANEL
-                              setTimeout(() => {
-                                chrome.tabs.sendMessage(tabId, {
-                                  type: "OPEN_BATCH_PANEL",
-                                });
-                              }, 500);
-                            }
-                          );
-                        }, 1000);
-                      }
-                    }
-                  );
-                }
-              }
-            );
+            if (chrome.runtime.lastError) {
+              console.error(
+                "[Popup] Error sending toggle sidebar message:",
+                chrome.runtime.lastError
+              );
+            } else {
+              console.log("[Popup] Sidebar toggled successfully");
+            }
           }
         );
       } else {

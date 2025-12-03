@@ -1549,6 +1549,20 @@ if (ChromeAPI.isContextValid()) {
       );
       markWordAsKnown(word); // markWordAsKnown will apply stemming internally
       sendResponse({ success: true });
+    } else if (request.type === "TOGGLE_SIDEBAR") {
+      // Handle sidebar toggle request
+      console.log("[MixRead] Toggling sidebar visibility");
+      if (sidebarPanel) {
+        sidebarPanel.toggleVisibility();
+        sendResponse({ success: true });
+      } else {
+        console.error("[MixRead] Sidebar panel not initialized");
+        sendResponse({
+          success: false,
+          error: "Sidebar initialization failed",
+        });
+      }
+      return true; // Keep message channel open
     } else if (request.type === "OPEN_BATCH_PANEL") {
       // Handle batch marking panel open request
       console.log("[MixRead] Opening batch marking panel");
