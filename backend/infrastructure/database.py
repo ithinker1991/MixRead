@@ -5,7 +5,7 @@ Sets up the ORM, session factory, and database connection
 """
 
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 # Database URL - can be SQLite, PostgreSQL, MySQL, etc.
@@ -61,10 +61,10 @@ def init_db():
     if "sqlite" in DATABASE_URL:
         with engine.connect() as conn:
             # Enable optimizations for SQLite
-            conn.execute("PRAGMA journal_mode=WAL")  # Write-Ahead Logging for better concurrency
-            conn.execute("PRAGMA synchronous=NORMAL")  # Balance between safety and performance
-            conn.execute("PRAGMA cache_size=10000")  # Increase cache
-            conn.execute("PRAGMA temp_store=MEMORY")  # Use memory for temp storage
+            conn.execute(text("PRAGMA journal_mode=WAL"))  # Write-Ahead Logging for better concurrency
+            conn.execute(text("PRAGMA synchronous=NORMAL"))  # Balance between safety and performance
+            conn.execute(text("PRAGMA cache_size=10000"))  # Increase cache
+            conn.execute(text("PRAGMA temp_store=MEMORY"))  # Use memory for temp storage
             conn.commit()
 
     Base.metadata.create_all(bind=engine)
