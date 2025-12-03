@@ -35,3 +35,9 @@ diagnose.html
 *.tmp
 *.bak
 *.db
+*.db-shm
+*.db-wal
+
+# Development plans (temporary documentation)
+PHASE1_*_PLAN.md
+SIDEBAR_PERSISTENT_DESIGN.md
