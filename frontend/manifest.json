@@ -33,11 +33,14 @@
         "modules/highlight/context-menu.js",
         "modules/highlight/highlight-filter.js",
         "modules/panel/batch-marking-panel.js",
+        "modules/panel/word-cache-manager.js",
+        "modules/panel/sidebar-panel.js",
         "content.js"
       ],
       "css": [
         "content.css",
         "modules/panel/batch-marking-panel.css",
+        "modules/panel/sidebar-panel.css",
         "modules/domain-policy/preset-dialog.css"
       ]
     }

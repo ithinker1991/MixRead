@@ -158,6 +158,10 @@ let batchMarkingPanel;
 let domainPolicyStore;
 let shouldExcludeCurrentPage = false;
 
+// ===== Sidebar Panel (Phase 1) =====
+let wordCacheManager = null;
+let sidebarPanel = null;
+
 // ===== Initialize Modules =====
 async function initializeModules() {
   try {
@@ -233,7 +237,13 @@ async function initializeModules() {
     await domainPolicyStore.initialize(userId);
     console.log("[MixRead] DomainPolicyStore created and initialized");
 
-    // 9. Check if current page should be excluded
+    // 9. Initialize sidebar panel with cache manager (Phase 1)
+    wordCacheManager = new WordCacheManager();
+    console.log("[MixRead] WordCacheManager created");
+    sidebarPanel = new SidebarPanel(wordCacheManager);
+    console.log("[MixRead] SidebarPanel created");
+
+    // 10. Check if current page should be excluded
     shouldExcludeCurrentPage = DomainPolicyFilter.shouldExcludeCurrentPage(
       window.location.href,
       domainPolicyStore
@@ -562,16 +572,17 @@ function highlightPageWords() {
         );
 
         // Now walk through and actually highlight the words in the DOM
-        highlightWordsInDOM(highlightedVariants);
+        highlightWordsInDOM(highlightedVariants).then(() => {
+          // Reset flag after highlighting is complete
+          isHighlighting = false;
+        });
       } else {
         console.error(
           "[MixRead] Error getting highlighted words:",
           response.error
         );
+        isHighlighting = false;
       }
-
-      // Reset flag after highlighting is complete
-      isHighlighting = false;
     }
   );
 }
@@ -611,7 +622,7 @@ function clearHighlights() {
 }
 
 /**
- * Get all text nodes from an element
+ * Get all text nodes from a DOM element (excluding scripts, styles, etc.)
  */
 function getTextNodes(element) {
   const textNodes = [];
@@ -646,96 +657,261 @@ function getTextNodes(element) {
 }
 
 /**
- * Actually highlight words in the DOM
+ * Extract sentence context for a given word from a text node
+ * @param {Node} textNode - The text node containing the word
+ * @param {string} word - The word to find context for
+ * @returns {string|null} - The sentence containing the word, or null if not found
  */
-function highlightWordsInDOM(highlightedWords) {
-  const wordSet = new Set(highlightedWords.map((w) => w.toLowerCase()));
+function extractSentenceContext(textNode, word) {
+  try {
+    // Get the paragraph/container text
+    let container = textNode.parentElement;
 
-  const textNodes = getTextNodes(document.body);
-
-  for (const node of textNodes) {
-    if (wordSet.size === 0) break;
-
-    const text = node.textContent;
-    const words = tokenizeText(text);
-    let hasMatch = false;
-
-    // Check if any words in this node need highlighting
-    for (const word of words) {
-      if (wordSet.has(word.toLowerCase())) {
-        hasMatch = true;
-        break;
-      }
+    // Walk up to find a good container (p, div, li, td, etc.)
+    while (
+      container &&
+      !["P", "DIV", "LI", "TD", "TH", "ARTICLE", "SECTION"].includes(
+        container.tagName
+      )
+    ) {
+      container = container.parentElement;
+      if (!container || container === document.body) break;
     }
 
-    if (!hasMatch) continue;
+    if (!container) return null;
 
-    // Split text and create span elements for matching words
-    const fragment = document.createDocumentFragment();
-    let lastIndex = 0;
-    const wordPattern = /\b[a-z''-]+\b/gi;
-    let match;
+    // Get text content and remove Chinese characters that may have been added
+    let text = container.textContent || "";
 
-    while ((match = wordPattern.exec(text)) !== null) {
-      const word = match[0];
+    // Remove Chinese characters (Unicode range: \u4e00-\u9fff)
+    text = text.replace(/[\u4e00-\u9fff]/g, "");
+
+    // Normalize whitespace
+    text = text.replace(/\s+/g, " ").trim();
+
+    if (!text) return null;
+
+    // Use Intl.Segmenter for sentence boundary detection
+    if (typeof Intl !== "undefined" && Intl.Segmenter) {
+      const segmenter = new Intl.Segmenter("en", { granularity: "sentence" });
+      const segments = Array.from(segmenter.segment(text));
+
+      // Find sentence containing the word (case-insensitive)
+      const wordLower = word.toLowerCase();
+      for (const segment of segments) {
+        const sentence = segment.segment.trim();
+        const sentenceLower = sentence.toLowerCase();
+
+        // Check if word is in this sentence as a whole word
+        const wordRegex = new RegExp(`\\b${wordLower}\\b`, "i");
+        if (wordRegex.test(sentenceLower)) {
+          // Basic quality filter: not too short, not too many special chars
+          if (sentence.length > 15 && sentence.length < 500) {
+            return sentence;
+          }
+        }
+      }
+    } else {
+      // Fallback: simple split by period/question/exclamation
+      const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
       const wordLower = word.toLowerCase();
 
-      // Add text before the word
-      if (match.index > lastIndex) {
-        fragment.appendChild(
-          document.createTextNode(text.substring(lastIndex, match.index))
-        );
-      }
+      for (const sentence of sentences) {
+        const sentenceLower = sentence.toLowerCase();
+        const wordRegex = new RegExp(`\\b${wordLower}\\b`, "i");
 
-      // Check if word should be highlighted
-      if (wordSet.has(wordLower)) {
-        const span = document.createElement("span");
-        span.className = "mixread-highlight";
-        span.textContent = word;
-        span.dataset.word = word;
-
-        // Add click handler to show tooltip
-        span.addEventListener("click", (e) => {
-          console.log("[MixRead] Click event triggered for word:", word);
-          e.stopPropagation();
-          showTooltip(e, word);
-        });
-
-        fragment.appendChild(span);
-
-        // Add Chinese translation if enabled and available
-        if (showChinese && highlightedWordsMap[wordLower]?.chinese) {
-          const chineseSpan = document.createElement("span");
-          chineseSpan.className = "mixread-chinese";
-          chineseSpan.textContent = highlightedWordsMap[wordLower].chinese;
-          fragment.appendChild(chineseSpan);
-          console.log(
-            `[MixRead] Added Chinese for "${word}": ${highlightedWordsMap[wordLower].chinese}`
-          );
-        } else if (showChinese) {
-          console.log(
-            `[MixRead] No Chinese for "${word}" (showChinese=${showChinese}, hasData=${!!highlightedWordsMap[
-              wordLower
-            ]}, chinese=${highlightedWordsMap[wordLower]?.chinese})`
-          );
+        if (wordRegex.test(sentenceLower)) {
+          const trimmed = sentence.trim();
+          if (trimmed.length > 15 && trimmed.length < 500) {
+            return trimmed + "."; // Add period back
+          }
         }
-      } else {
-        fragment.appendChild(document.createTextNode(word));
       }
-
-      lastIndex = wordPattern.lastIndex;
     }
 
-    // Add remaining text
-    if (lastIndex < text.length) {
-      fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
-    }
-
-    // Replace original node with processed fragment
-    node.parentNode.replaceChild(fragment, node);
+    return null;
+  } catch (error) {
+    console.warn("[MixRead] Error extracting sentence context:", error);
+    return null;
   }
 }
 
+/**
+ * Process a single text node to highlight words
+ * Returns true if node was modified
+ */
+function processTextNode(node, wordSet) {
+  const text = node.textContent;
+  const words = tokenizeText(text);
+  let hasMatch = false;
+
+  // Check if any words in this node need highlighting
+  for (const word of words) {
+    if (wordSet.has(word.toLowerCase())) {
+      hasMatch = true;
+      break;
+    }
+  }
+
+  if (!hasMatch) return false;
+
+  // Split text and create span elements for matching words
+  const fragment = document.createDocumentFragment();
+  let lastIndex = 0;
+  const wordPattern = /\b[a-z''-]+\b/gi;
+  let match;
+
+  while ((match = wordPattern.exec(text)) !== null) {
+    const word = match[0];
+    const wordLower = word.toLowerCase();
+
+    // Add text before the word
+    if (match.index > lastIndex) {
+      fragment.appendChild(
+        document.createTextNode(text.substring(lastIndex, match.index))
+      );
+    }
+
+    // Check if word should be highlighted
+    if (wordSet.has(wordLower)) {
+      const span = document.createElement("span");
+      span.className = "mixread-highlight";
+      span.textContent = word;
+      span.dataset.word = word;
+
+      // Extract and cache sentence context
+      const sentenceContext = extractSentenceContext(node, word);
+      if (sentenceContext) {
+        span.dataset.sentenceContext = sentenceContext;
+      }
+
+      // Add word stem for easy querying
+      if (typeof Stemmer !== "undefined" && Stemmer.stem) {
+        const stem = Stemmer.stem(wordLower);
+        span.dataset.wordStem = stem;
+      } else {
+        span.dataset.wordStem = wordLower;
+      }
+
+      // Add translation if available
+      if (highlightedWordsMap[wordLower]?.chinese) {
+        span.dataset.translation = highlightedWordsMap[wordLower].chinese;
+      }
+
+      // Add click handler to show tooltip
+      span.addEventListener("click", (e) => {
+        console.log("[MixRead] Click event triggered for word:", word);
+        e.stopPropagation();
+        showTooltip(e, word);
+      });
+
+      fragment.appendChild(span);
+
+      // Add Chinese translation if enabled and available
+      if (showChinese && highlightedWordsMap[wordLower]?.chinese) {
+        const chineseSpan = document.createElement("span");
+        chineseSpan.className = "mixread-chinese";
+        chineseSpan.textContent = highlightedWordsMap[wordLower].chinese;
+        fragment.appendChild(chineseSpan);
+        console.log(
+          `[MixRead] Added Chinese for "${word}": ${highlightedWordsMap[wordLower].chinese}`
+        );
+      } else if (showChinese) {
+        console.log(
+          `[MixRead] No Chinese for "${word}" (showChinese=${showChinese}, hasData=${!!highlightedWordsMap[
+            wordLower
+          ]}, chinese=${highlightedWordsMap[wordLower]?.chinese})`
+        );
+      }
+    } else {
+      fragment.appendChild(document.createTextNode(word));
+    }
+
+    lastIndex = wordPattern.lastIndex;
+  }
+
+  // Add remaining text
+  if (lastIndex < text.length) {
+    fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
+  }
+
+  // Replace original node with processed fragment
+  if (node.parentNode) {
+    node.parentNode.replaceChild(fragment, node);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Process a list of nodes in batches using requestAnimationFrame
+ * @param {Array} nodes - List of nodes to process
+ * @param {Function} processor - Function to call for each node
+ * @returns {Promise} - Resolves when all nodes are processed
+ */
+function processNodesInBatches(nodes, processor) {
+  let processedCount = 0;
+  return new Promise((resolve) => {
+    function processBatch() {
+      const batchStart = performance.now();
+
+      // Process nodes for up to 10ms
+      while (processedCount < nodes.length) {
+        if (performance.now() - batchStart > 10) {
+          requestAnimationFrame(processBatch);
+          return;
+        }
+
+        processor(nodes[processedCount]);
+        processedCount++;
+      }
+      resolve();
+    }
+    processBatch();
+  });
+}
+
+/**
+ * Actually highlight words in the DOM (Batched)
+ */
+function highlightWordsInDOM(highlightedWords) {
+  const startTime = performance.now();
+  console.log("[MixRead] Starting batched highlightWordsInDOM...");
+
+  // Clear pending nodes as we are about to scan the full DOM
+  if (typeof pendingNodes !== "undefined") {
+    pendingNodes.clear();
+  }
+
+  const wordSet = new Set(highlightedWords.map((w) => w.toLowerCase()));
+  const textNodes = getTextNodes(document.body);
+  console.log(`[MixRead] Found ${textNodes.length} text nodes to scan`);
+
+  let nodesModified = 0;
+
+  return processNodesInBatches(textNodes, (node) => {
+    if (processTextNode(node, wordSet)) {
+      nodesModified++;
+    }
+  }).then(() => {
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+    console.log(
+      `[MixRead Performance] Highlighting finished. Modified ${nodesModified} nodes.`
+    );
+    console.log(
+      `[MixRead Performance] Total execution time: ${duration.toFixed(2)}ms`
+    );
+
+    if (duration > 50) {
+      console.warn(
+        `[MixRead Performance] ⚠️ Long task detected! Highlighting took ${duration.toFixed(
+          2
+        )}ms, which exceeds the 50ms budget for smooth frame rendering.`
+      );
+    }
+  });
+}
 /**
  * Show tooltip with word definition
  */
@@ -974,10 +1150,30 @@ function addWordToVocabulary(word) {
   // Extract sentences using Intl.Segmenter for robust boundary detection
   let text = paragraph.textContent || paragraph.innerText || "";
 
+  console.log(`[MixRead DEBUG] Extracting sentences for word "${word}"`);
+  console.log(
+    `[MixRead DEBUG] Original text (first 200 chars):`,
+    text.substring(0, 200)
+  );
+
   // CRITICAL: Clean up frequency markers like (1×), (2×), etc. that some websites embed
   text = text.replace(/\(\d+×\)/g, ""); // Remove (1×), (2×), (3×), etc.
   text = text.replace(/→\s*/g, " "); // Replace arrows with spaces
+
+  // CRITICAL: Remove Chinese translations that MixRead extension adds to the DOM
+  // Pattern: "word 中文翻译" where Chinese follows English word
+  // This prevents Chinese chars from triggering the non-ASCII filter
+  text = text.replace(
+    /[\u4E00-\u9FFF\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\uFF00-\uFFEF\uFF10-\uFF19\uFF21-\uFF3A\uFF41-\uFF5A\uFF61-\uFF64\uFF01-\uFF0F\uFF1A-\uFF20\uFF3B-\uFF40\uFF5B-\uFF60\uFFE0-\uFFE6\u2000-\u206F\u2070-\u209F\u20A0-\u20CF\u20D0-\u20FF\u2100-\u214F\u2150-\u218F\u2190-\u21FF\u2200-\u22FF\u2300-\u23FF\u2400-\u243F\u2440-\u245F\u2460-\u24FF\u2500-\u257F\u2580-\u259F\u25A0-\u25FF\u2600-\u26FF\u2700-\u27BF\u27C0-\u27EF\u27F0-\u27FF\u2800-\u28FF\u2900-\u297F\u2980-\u29FF\u2A00-\u2AFF\u2B00-\u2BFF\u2C00-\u2C5F\u2C60-\u2C7F\u2C80-\u2CFF\u2D00-\u2D2F\u2D30-\u2D7F\u2D80-\u2DDF\u2DE0-\u2DFF\u2E00-\u2E7F\u2E80-\u2EFF\u2F00-\u2FDF\u2FF0-\u2FFF\u3000-\u303F\u3040-\u309F\u30A0-\u30FF\u3100-\u312F\u3130-\u318F\u3190-\u319F\u31A0-\u31BF\u31C0-\u31EF\u31F0-\u32FF\u3300-\u33FF\u3400-\u4DBF\u4DC0-\u4DFF\u4E00-\u9FFF\uA000-\uA48F\uA490-\uA4CF\uA4D0-\uA4FF\uA500-\uA63F\uA640-\uA69F\uA6A0-\uA6FF\uA700-\uA71F\uA720-\uA7FF\uA800-\uA82F\uA830-\uA83F\uA840-\uA87F\uA880-\uA8DF\uA8E0-\uA8FF\uA900-\uA92F\uA930-\uA95F\uA960-\uA97F\uA980-\uA9DF\uA9E0-\uA9FF\uAA00-\uAA3F\uAA40-\uAA6F\uAA70-\uAA7F\uAA80-\uAADF\uAAE0-\uAAFF\uAB00-\uAB2F\uAB30-\uAB6F\uAB70-\uABBF\uABC0-\uABFF\uAC00-\uD7AF\uD7B0-\uD7FF\uD800-\uDB7F\uDB80-\uDBFF\uDC00-\uDFFF\uE000-\uF8FF\uF900-\uFAFF\uFB00-\uFB4F\uFB50-\uFDFF\uFE00-\uFE0F\uFE10-\uFE1F\uFE20-\uFE2F\uFE30-\uFE4F\uFE50-\uFE6F\uFE70-\uFEFF\uFF00-\uFFEF\uFFF0-\uFFFF]+/g,
+    " "
+  );
+
   text = text.replace(/\s+/g, " ").trim();
+
+  console.log(
+    `[MixRead DEBUG] Cleaned text (first 200 chars):`,
+    text.substring(0, 200)
+  );
 
   let sentences = [];
   const wordLowerVar = word.toLowerCase();
@@ -993,6 +1189,9 @@ function addWordToVocabulary(word) {
         sentences.push(sentence);
       }
     }
+    console.log(
+      `[MixRead DEBUG] Segmenter extracted ${sentences.length} sentences containing "${word}"`
+    );
   } catch (e) {
     console.warn(
       "[MixRead] Intl.Segmenter not supported or failed, falling back to simple split",
@@ -1002,6 +1201,9 @@ function addWordToVocabulary(word) {
     sentences = text
       .split(/[.!?]+/)
       .filter((s) => s.toLowerCase().includes(wordLowerVar));
+    console.log(
+      `[MixRead DEBUG] Fallback extracted ${sentences.length} sentences containing "${word}"`
+    );
   }
 
   // Clean up sentences
@@ -1016,40 +1218,81 @@ function addWordToVocabulary(word) {
 
   // Remove duplicates
   sentences = [...new Set(sentences)];
+  console.log(
+    `[MixRead DEBUG] After cleanup: ${sentences.length} unique sentences`
+  );
 
   // Filter sentences
+  const beforeFilter = sentences.length;
   sentences = sentences
     .filter((s) => {
       // Basic length checks
-      if (s.length < 10) return false;
+      if (s.length < 10) {
+        console.log(
+          `[MixRead DEBUG] Filtered out (too short): "${s.substring(0, 50)}..."`
+        );
+        return false;
+      }
       // Relaxed word count check (2 words might be enough for short exclamations or commands, but 3 is safer)
-      if (s.split(/\s+/).length < 3) return false;
+      if (s.split(/\s+/).length < 3) {
+        console.log(
+          `[MixRead DEBUG] Filtered out (< 3 words): "${s.substring(0, 50)}..."`
+        );
+        return false;
+      }
 
       // Relaxed special character check
       // Allow more special characters, especially parentheses and brackets which are common in examples
       const specialCharCount = (s.match(/[×→]/g) || []).length; // Only count "bad" special chars
-      if (specialCharCount > 2) return false;
+      if (specialCharCount > 2) {
+        console.log(
+          `[MixRead DEBUG] Filtered out (special chars): "${s.substring(
+            0,
+            50
+          )}..."`
+        );
+        return false;
+      }
 
       // Skip if looks like it's mixing different languages/formats
       if (s.includes("1x") || s.includes("→") || s.match(/\d+×/)) {
+        console.log(
+          `[MixRead DEBUG] Filtered out (format chars): "${s.substring(
+            0,
+            50
+          )}..."`
+        );
         return false;
       }
 
       // CRITICAL: Skip sentences that contain multiple word-form patterns like "word(1×)"
       const wordFormPatterns = (s.match(/\([0-9×]+\)/g) || []).length;
       if (wordFormPatterns > 3) {
+        console.log(
+          `[MixRead DEBUG] Filtered out (word-form patterns): "${s.substring(
+            0,
+            50
+          )}..."`
+        );
         return false;
       }
 
       // Skip sentences with non-ASCII characters mixed in (multilingual content)
       // But allow common punctuation
       if (/[\u4E00-\u9FFF]/.test(s) || /[\u3040-\u309F]/.test(s)) {
+        console.log(
+          `[MixRead DEBUG] Filtered out (non-ASCII): "${s.substring(0, 50)}..."`
+        );
         return false;
       }
 
       return true;
     })
     .slice(0, 3);
+
+  console.log(
+    `[MixRead DEBUG] After filtering: ${sentences.length}/${beforeFilter} sentences kept`
+  );
 
   // Fallback if no sentences found
   if (sentences.length === 0) {
@@ -1476,3 +1719,230 @@ setInterval(() => {
   safeRecordReadingSession();
   sessionStartTime = Date.now(); // Reset for next interval
 }, 5 * 60 * 1000);
+
+// ===== Dynamic Content Support =====
+
+let mutationTimeout;
+const pendingNodes = new Set();
+
+/**
+ * Highlight words in newly added dynamic content
+ */
+async function highlightDynamicContent(addedNodes) {
+  console.log(
+    `[MixRead Debug] highlightDynamicContent called with ${addedNodes.length} nodes`
+  );
+
+  // 1. Extract words from new nodes
+  const textNodes = [];
+  for (const node of addedNodes) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      textNodes.push(...getTextNodes(node));
+    }
+  }
+  if (textNodes.length === 0) return;
+
+  const allWords = [];
+  for (const node of textNodes) {
+    const words = tokenizeText(node.textContent);
+    allWords.push(...words);
+  }
+  const uniqueWords = [...new Set(allWords)];
+  if (uniqueWords.length === 0) return;
+
+  // 2. Query Backend
+  const stemMap = createStemMapping(uniqueWords);
+  const stemsToQuery = Object.keys(stemMap);
+  const userId = userStore ? userStore.getUserId() : null;
+
+  console.log(
+    `[MixRead] Querying ${stemsToQuery.length} stems for dynamic content`
+  );
+
+  sendMessageWithRetry(
+    {
+      type: "GET_HIGHLIGHTED_WORDS",
+      words: stemsToQuery,
+      difficulty_level: currentDifficultyLevel,
+      user_id: userId,
+    },
+    async (response) => {
+      if (response.success) {
+        // 3. Update Map
+        const highlightedVariants = [];
+        if (response.word_details) {
+          response.word_details.forEach((detail) => {
+            const stem = detail.word.toLowerCase();
+            const variants = stemMap[stem] || [stem];
+            variants.forEach((variant) => {
+              highlightedWordsMap[variant.toLowerCase()] = detail;
+              highlightedVariants.push(variant);
+            });
+          });
+        }
+
+        console.log(
+          `[MixRead] Dynamic query returned ${highlightedVariants.length} variants to highlight`
+        );
+
+        // 4. Apply Highlights
+        // We use the updated global map
+        const wordSet = new Set(Object.keys(highlightedWordsMap));
+        if (wordSet.size === 0) return;
+
+        await processNodesInBatches(textNodes, (node) => {
+          processTextNode(node, wordSet);
+        });
+
+        // 5. Notify batch panel of new highlighted words
+        notifyPanelOfNewWords(response.word_details);
+      } else {
+        console.error(
+          "[MixRead] Error querying dynamic words:",
+          response.error
+        );
+      }
+    }
+  );
+}
+
+/**
+ * Notify sidebar panel of newly highlighted words
+ * This enables the sidebar to update incrementally when feed content loads
+ */
+function notifyPanelOfNewWords(wordDetails) {
+  if (!wordDetails || wordDetails.length === 0) return;
+
+  // Collect information about newly highlighted words from DOM
+  const newWordsMap = {};
+
+  wordDetails.forEach((detail) => {
+    const stem = detail.word.toLowerCase();
+    const elements = document.querySelectorAll(
+      `.mixread-highlight[data-word-stem="${stem}"]`
+    );
+
+    if (elements.length > 0) {
+      const firstElement = elements[0];
+      const word = firstElement.dataset.word || stem;
+      const wordLower = word.toLowerCase();
+
+      if (!newWordsMap[wordLower]) {
+        newWordsMap[wordLower] = {
+          count: elements.length,
+          originalWords: new Set(),
+          chinese: firstElement.dataset.chinese || "",
+          definition: firstElement.dataset.definition || "",
+        };
+      }
+
+      elements.forEach((el) => {
+        newWordsMap[wordLower].originalWords.add(
+          el.dataset.word || el.textContent
+        );
+      });
+    }
+  });
+
+  if (Object.keys(newWordsMap).length === 0) return;
+
+  console.log(
+    `[MixRead] Notifying sidebar of ${Object.keys(newWordsMap).length} new highlighted words`
+  );
+
+  // Notify sidebar directly (if available)
+  if (sidebarPanel) {
+    sidebarPanel.onNewWordsHighlighted(newWordsMap);
+  }
+
+  // Also send message for any other listeners
+  if (ChromeAPI.isContextValid()) {
+    try {
+      chrome.runtime.sendMessage({
+        type: "NEW_WORDS_HIGHLIGHTED",
+        newWords: newWordsMap,
+      });
+    } catch (e) {
+      console.warn("[MixRead] Failed to send NEW_WORDS_HIGHLIGHTED message:", e);
+    }
+  }
+}
+
+function setupMutationObserver() {
+  console.log("[MixRead Debug] setupMutationObserver called");
+  if (window.mixreadObserver) {
+    console.log("[MixRead Debug] Observer already exists");
+    return;
+  }
+
+  const observer = new MutationObserver((mutations) => {
+    // console.log(`[MixRead Debug] Mutation callback with ${mutations.length} mutations`);
+    let hasRelevantAdded = false;
+    let hasRelevantRemoved = false;
+    const removedStems = [];
+
+    for (const mutation of mutations) {
+      if (mutation.type === "childList") {
+        // Track added nodes (existing logic)
+        for (const node of mutation.addedNodes) {
+          if (
+            node.nodeType === Node.ELEMENT_NODE &&
+            !node.classList.contains("mixread-ui") &&
+            !node.closest(".mixread-ui") &&
+            !node.closest("#mixread-batch-panel") &&
+            !node.closest("#mixread-sidebar")
+          ) {
+            pendingNodes.add(node);
+            hasRelevantAdded = true;
+          }
+        }
+
+        // Track removed nodes (Phase 1 - Feed flow fix)
+        for (const node of mutation.removedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // Check if node contains any highlights
+            const highlightElements = node.querySelectorAll('.mixread-highlight');
+            if (highlightElements.length > 0) {
+              // Extract word stems from removed elements
+              highlightElements.forEach((el) => {
+                const stem = el.dataset.wordStem;
+                if (stem) {
+                  removedStems.push(stem);
+                }
+              });
+              hasRelevantRemoved = true;
+            }
+          }
+        }
+      }
+    }
+
+    // Notify sidebar of removed words
+    if (hasRelevantRemoved && removedStems.length > 0 && sidebarPanel) {
+      console.log(`[MixRead] Feed removed ${removedStems.length} words`);
+      sidebarPanel.onWordsRemoved(removedStems);
+    }
+
+    if (hasRelevantAdded) {
+      clearTimeout(mutationTimeout);
+      mutationTimeout = setTimeout(() => {
+        console.log("[MixRead Debug] Debounce fired, processing pending nodes");
+        const nodesToProcess = Array.from(pendingNodes);
+        pendingNodes.clear();
+        highlightDynamicContent(nodesToProcess);
+      }, 1000); // Debounce 1s
+    }
+  });
+
+  if (document.body) {
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+    window.mixreadObserver = observer;
+    console.log("[MixRead] MutationObserver set up for dynamic content");
+  }
+}
+
+// Start observer immediately
+setupMutationObserver();
