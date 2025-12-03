@@ -28,7 +28,7 @@ class HighlightFilter {
       const difficultyLevel = this.userStore.getDifficultyLevel();
 
       // API call with all words - backend will handle full filtering logic
-      const response = await apiClient.post('/highlight-words', {
+      const response = await apiClient.post("/highlight-words", {
         user_id: userId,
         words: words,
         difficulty_level: difficultyLevel,
@@ -41,14 +41,14 @@ class HighlightFilter {
         return response;
       }
 
-      logger.warn('Highlight API returned error', response.error);
+      logger.warn("Highlight API returned error", response.error);
       return {
         success: false,
         highlighted_words: [],
         word_details: [],
       };
     } catch (error) {
-      logger.error('Failed to get highlighted words', error);
+      logger.error("Failed to get highlighted words", error);
       return {
         success: false,
         highlighted_words: [],
@@ -74,4 +74,11 @@ class HighlightFilter {
     // Default: likely should be highlighted (backend will decide)
     return true;
   }
+}
+
+// Export for use in both module and global scope
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = HighlightFilter;
+} else if (typeof window !== "undefined") {
+  window.HighlightFilter = HighlightFilter;
 }

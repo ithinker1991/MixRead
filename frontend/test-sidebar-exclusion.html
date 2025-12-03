@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sidebar Exclusion Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+        }
+
+        .content {
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+
+        .test-section {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        p {
+            color: #666;
+        }
+
+        .instructions {
+            background: #e3f2fd;
+            padding: 15px;
+            border-left: 4px solid #2196f3;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>MixRead Sidebar Exclusion Test</h1>
+
+    <div class="instructions">
+        <h3>测试说明</h3>
+        <p>
+            此页面用于测试 sidebar 中的文本不被标注。
+            打开扩展后，观察：
+        </p>
+        <ul>
+            <li>主内容区域的单词应该被高亮标注（如果难度级别匹配）</li>
+            <li>右侧 sidebar 中的单词 <strong>不应该</strong> 被高亮标注</li>
+            <li>检查浏览器控制台，查看 [MixRead] 日志确认 sidebar 被排除</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>Main Content - Should Be Highlighted</h2>
+        <p>
+            The strangers walked through the garden and dreamed of building a new world.
+            They made plans to explore the mountains and discover new places.
+            The adventure would change their lives forever.
+        </p>
+    </div>
+
+    <div class="test-section">
+        <h2>Another Paragraph</h2>
+        <p>
+            Learning new vocabulary is essential for improving English proficiency.
+            The students were eager to understand complex concepts and expand their knowledge.
+            They spent hours reading challenging materials and taking notes.
+        </p>
+    </div>
+
+    <!-- Simulate sidebar content that should NOT be highlighted -->
+    <div id="mixread-sidebar" style="
+        position: fixed;
+        right: 0;
+        top: 0;
+        width: 350px;
+        height: 100vh;
+        background: white;
+        border-left: 1px solid #e0e0e0;
+        box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+        padding: 20px;
+        overflow-y: auto;
+        z-index: 2147483647;
+        display: block;
+    ">
+        <h3 style="margin-top: 0;">Sidebar - Should NOT Be Highlighted</h3>
+
+        <div style="font-size: 12px; margin-bottom: 20px;">
+            <p>
+                <strong>strangers:</strong> People you don't know. This word should NOT be highlighted
+                even if it appears in the main content.
+            </p>
+        </div>
+
+        <div style="font-size: 12px; margin-bottom: 20px;">
+            <p>
+                <strong>dreamed:</strong> Past tense of dream. Test if this word in sidebar is not highlighted.
+            </p>
+        </div>
+
+        <div style="font-size: 12px; margin-bottom: 20px;">
+            <p>
+                <strong>building:</strong> Construction or the act of constructing. Should remain unhighlighted in sidebar.
+            </p>
+        </div>
+
+        <div style="font-size: 12px; margin-bottom: 20px;">
+            <p>
+                <strong>explore:</strong> To travel or search for something. Verify no highlight in sidebar.
+            </p>
+        </div>
+    </div>
+
+    <!-- Adjust main content margin to avoid sidebar overlap -->
+    <style>
+        body {
+            margin-right: 370px;
+        }
+    </style>
+
+    <div class="test-section">
+        <h2>Test Instructions</h2>
+        <ol>
+            <li>Open the extension (if not already open)</li>
+            <li>Press Ctrl+Shift+J (Windows) or Cmd+Option+J (Mac) to open DevTools</li>
+            <li>Go to the Console tab</li>
+            <li>Look for "[MixRead]" log messages showing getTextNodes() results</li>
+            <li>Verify that text nodes from the sidebar were excluded</li>
+            <li>Check that main content words ARE highlighted in yellow</li>
+            <li>Check that sidebar content is NOT highlighted in yellow</li>
+        </ol>
+    </div>
+
+</body>
+</html>

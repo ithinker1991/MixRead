@@ -8,7 +8,7 @@ class UserStore {
   constructor() {
     this.user = {
       id: null,
-      difficultyLevel: 'B1',
+      difficultyLevel: "B1",
     };
     this.listeners = [];
   }
@@ -20,7 +20,10 @@ class UserStore {
   async initialize() {
     try {
       // Get current user ID from popup's user management
-      const result = await StorageManager.getItems(['mixread_current_user', 'mixread_user_id']);
+      const result = await StorageManager.getItems([
+        "mixread_current_user",
+        "mixread_user_id",
+      ]);
       let userId = result.mixread_current_user || result.mixread_user_id;
 
       if (!userId) {
@@ -31,14 +34,16 @@ class UserStore {
       this.user.id = userId;
 
       // Load difficulty level
-      const difficulty = await StorageManager.getItem('difficulty_level');
+      const difficulty = await StorageManager.getItem("difficulty_level");
       if (difficulty) {
         this.user.difficultyLevel = difficulty;
       }
 
-      logger.log(`User initialized - ID: ${userId}, Difficulty: ${this.user.difficultyLevel}`);
+      logger.log(
+        `User initialized - ID: ${userId}, Difficulty: ${this.user.difficultyLevel}`
+      );
     } catch (error) {
-      logger.error('Failed to initialize user', error);
+      logger.error("Failed to initialize user", error);
       this.user.id = this.generateUserId();
     }
   }
@@ -77,7 +82,7 @@ class UserStore {
    */
   async setDifficultyLevel(level) {
     this.user.difficultyLevel = level;
-    await StorageManager.setItem('difficulty_level', level);
+    await StorageManager.setItem("difficulty_level", level);
     this.notify();
     logger.log(`Difficulty level changed to: ${level}`);
   }
@@ -94,7 +99,7 @@ class UserStore {
 
       if (response.success) {
         this.user.id = newUserId;
-        await StorageManager.setItem('user_id', newUserId);
+        await StorageManager.setItem("user_id", newUserId);
         this.notify();
         logger.info(`Switched to user: ${newUserId}`);
         return true;
@@ -115,7 +120,7 @@ class UserStore {
   subscribe(listener) {
     this.listeners.push(listener);
     return () => {
-      this.listeners = this.listeners.filter(l => l !== listener);
+      this.listeners = this.listeners.filter((l) => l !== listener);
     };
   }
 
@@ -123,12 +128,19 @@ class UserStore {
    * Notify all listeners
    */
   notify() {
-    this.listeners.forEach(listener => {
+    this.listeners.forEach((listener) => {
       try {
         listener(this.user);
       } catch (error) {
-        logger.error('Error in user store listener', error);
+        logger.error("Error in user store listener", error);
       }
     });
   }
+}
+
+// Export for use in both module and global scope
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = UserStore;
+} else if (typeof window !== "undefined") {
+  window.UserStore = UserStore;
 }

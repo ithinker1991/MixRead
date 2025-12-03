@@ -21,21 +21,21 @@ class SidebarPanel {
     this.frequencyStatsElement = null;
 
     // State
-    this.isOpen = false;         // Internal state (always listening)
-    this.isVisible = false;      // UI visibility (user preference)
-    this.isInitialized = false;  // Track initialization completion
-    this.wordState = {};         // {normalizedWord → {count, originalWords, ...}}
+    this.isOpen = false; // Internal state (always listening)
+    this.isVisible = false; // UI visibility (user preference)
+    this.isInitialized = false; // Track initialization completion
+    this.wordState = {}; // {normalizedWord → {count, originalWords, ...}}
     this.currentUrl = null;
     this.currentCacheKey = null;
-    this.jumpIndex = {};         // Track jump position per word
-    this.tabId = null;           // Current tab ID (for tab-granular caching)
+    this.jumpIndex = {}; // Track jump position per word
+    this.tabId = null; // Current tab ID (for tab-granular caching)
 
     // Event listeners
     this.messageListener = null;
     this.urlChangeListeners = [];
 
     // Navigation tracking
-    this.navigationMode = 'normal';  // Track navigation type: 'spa' or 'normal'
+    this.navigationMode = "normal"; // Track navigation type: 'spa' or 'normal'
 
     // Rectangle selection state
     this.isSelecting = false;
@@ -43,9 +43,9 @@ class SidebarPanel {
     this.selectionRect = null;
 
     // Width preference (user adjustable)
-    this.sidebarWidth = '350px';
+    this.sidebarWidth = "350px";
 
-    console.log('[SidebarPanel] Initializing...');
+    console.log("[SidebarPanel] Initializing...");
     this.init();
   }
 
@@ -56,13 +56,15 @@ class SidebarPanel {
     try {
       // First, get the tab ID
       this.tabId = await this.getTabId();
-      console.log('[SidebarPanel] Got tabId:', this.tabId);
+      console.log("[SidebarPanel] Got tabId:", this.tabId);
 
       // Check if this is a page refresh
-      const wasPageUnloading = sessionStorage.getItem('mixread_page_unloading');
+      const wasPageUnloading = sessionStorage.getItem("mixread_page_unloading");
       if (wasPageUnloading) {
-        sessionStorage.removeItem('mixread_page_unloading');
-        console.log('[SidebarPanel] Detected page refresh/reload - will clear wordState on pageshow');
+        sessionStorage.removeItem("mixread_page_unloading");
+        console.log(
+          "[SidebarPanel] Detected page refresh/reload - will clear wordState on pageshow"
+        );
       }
 
       await this.createSidebarHTML();
@@ -70,11 +72,11 @@ class SidebarPanel {
       await this.loadPageData();
       await this.loadVisibilityPreference();
       this.isOpen = true;
-      this.isInitialized = true;  // Mark initialization as complete
-      console.log('[SidebarPanel] Initialization complete');
+      this.isInitialized = true; // Mark initialization as complete
+      console.log("[SidebarPanel] Initialization complete");
     } catch (e) {
-      console.error('[SidebarPanel] Init error:', e);
-      this.isInitialized = true;  // Mark as initialized even on error to prevent retry loops
+      console.error("[SidebarPanel] Init error:", e);
+      this.isInitialized = true; // Mark as initialized even on error to prevent retry loops
     }
   }
 
@@ -84,23 +86,23 @@ class SidebarPanel {
   async getTabId() {
     return new Promise((resolve) => {
       try {
-        chrome.runtime.sendMessage(
-          { type: 'GET_TAB_ID' },
-          (response) => {
-            if (chrome.runtime.lastError) {
-              console.warn('[SidebarPanel] Failed to get tabId:', chrome.runtime.lastError);
-              resolve(null);
-            } else if (response?.success && response?.tabId) {
-              console.log('[SidebarPanel] Received tabId:', response.tabId);
-              resolve(response.tabId);
-            } else {
-              console.warn('[SidebarPanel] Invalid tabId response:', response);
-              resolve(null);
-            }
+        chrome.runtime.sendMessage({ type: "GET_TAB_ID" }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.warn(
+              "[SidebarPanel] Failed to get tabId:",
+              chrome.runtime.lastError
+            );
+            resolve(null);
+          } else if (response?.success && response?.tabId) {
+            console.log("[SidebarPanel] Received tabId:", response.tabId);
+            resolve(response.tabId);
+          } else {
+            console.warn("[SidebarPanel] Invalid tabId response:", response);
+            resolve(null);
           }
-        );
+        });
       } catch (e) {
-        console.error('[SidebarPanel] Error requesting tabId:', e);
+        console.error("[SidebarPanel] Error requesting tabId:", e);
         resolve(null);
       }
     });
@@ -111,12 +113,14 @@ class SidebarPanel {
    */
   async createSidebarHTML() {
     // Check if already exists
-    if (document.getElementById('mixread-sidebar')) {
-      this.sidebarElement = document.getElementById('mixread-sidebar');
-      this.contentArea = this.sidebarElement.querySelector('.sidebar-content');
-      this.statsElement = this.sidebarElement.querySelector('.sidebar-stats');
-      this.frequencyStatsElement = this.sidebarElement.querySelector('.sidebar-frequency-stats');
-      console.log('[SidebarPanel] Reusing existing sidebar DOM');
+    if (document.getElementById("mixread-sidebar")) {
+      this.sidebarElement = document.getElementById("mixread-sidebar");
+      this.contentArea = this.sidebarElement.querySelector(".sidebar-content");
+      this.statsElement = this.sidebarElement.querySelector(".sidebar-stats");
+      this.frequencyStatsElement = this.sidebarElement.querySelector(
+        ".sidebar-frequency-stats"
+      );
+      console.log("[SidebarPanel] Reusing existing sidebar DOM");
       return;
     }
 
@@ -162,13 +166,15 @@ class SidebarPanel {
       </div>
     `;
 
-    document.body.insertAdjacentHTML('beforeend', sidebarHTML);
-    this.sidebarElement = document.getElementById('mixread-sidebar');
-    this.contentArea = this.sidebarElement.querySelector('.sidebar-content');
-    this.statsElement = this.sidebarElement.querySelector('.sidebar-stats');
-    this.frequencyStatsElement = this.sidebarElement.querySelector('.sidebar-frequency-stats');
+    document.body.insertAdjacentHTML("beforeend", sidebarHTML);
+    this.sidebarElement = document.getElementById("mixread-sidebar");
+    this.contentArea = this.sidebarElement.querySelector(".sidebar-content");
+    this.statsElement = this.sidebarElement.querySelector(".sidebar-stats");
+    this.frequencyStatsElement = this.sidebarElement.querySelector(
+      ".sidebar-frequency-stats"
+    );
 
-    console.log('[SidebarPanel] DOM created');
+    console.log("[SidebarPanel] DOM created");
   }
 
   /**
@@ -176,32 +182,40 @@ class SidebarPanel {
    */
   attachEventListeners() {
     // Close button
-    this.sidebarElement.querySelector('.sidebar-toggle-btn')
-      ?.addEventListener('click', () => this.toggleVisibility());
+    this.sidebarElement
+      .querySelector(".sidebar-toggle-btn")
+      ?.addEventListener("click", () => this.toggleVisibility());
 
     // Refresh button
-    this.sidebarElement.querySelector('.sidebar-refresh-btn')
-      ?.addEventListener('click', () => this.refresh());
+    this.sidebarElement
+      .querySelector(".sidebar-refresh-btn")
+      ?.addEventListener("click", () => this.refresh());
 
     // Toolbar buttons
-    this.sidebarElement.querySelector('#select-all-btn')
-      ?.addEventListener('click', () => this.selectAllCheckboxes());
+    this.sidebarElement
+      .querySelector("#select-all-btn")
+      ?.addEventListener("click", () => this.selectAllCheckboxes());
 
-    this.sidebarElement.querySelector('#deselect-all-btn')
-      ?.addEventListener('click', () => this.deselectAllCheckboxes());
+    this.sidebarElement
+      .querySelector("#deselect-all-btn")
+      ?.addEventListener("click", () => this.deselectAllCheckboxes());
 
-    this.sidebarElement.querySelector('#clear-selection-btn')
-      ?.addEventListener('click', () => this.deselectAllCheckboxes());
+    this.sidebarElement
+      .querySelector("#clear-selection-btn")
+      ?.addEventListener("click", () => this.deselectAllCheckboxes());
 
     // Action buttons
-    this.sidebarElement.querySelector('#mark-known-btn')
-      ?.addEventListener('click', () => this.markSelectedAsKnown());
+    this.sidebarElement
+      .querySelector("#mark-known-btn")
+      ?.addEventListener("click", () => this.markSelectedAsKnown());
 
-    this.sidebarElement.querySelector('#add-library-btn')
-      ?.addEventListener('click', () => this.addSelectedToLibrary());
+    this.sidebarElement
+      .querySelector("#add-library-btn")
+      ?.addEventListener("click", () => this.addSelectedToLibrary());
 
-    this.sidebarElement.querySelector('#mark-unknown-btn')
-      ?.addEventListener('click', () => this.markSelectedAsUnknown());
+    this.sidebarElement
+      .querySelector("#mark-unknown-btn")
+      ?.addEventListener("click", () => this.markSelectedAsUnknown());
 
     // Rectangle selection listeners
     this.attachSelectionListeners();
@@ -223,25 +237,25 @@ class SidebarPanel {
    * Setup page unload handler to save cache before leaving
    */
   setupUnloadHandler() {
-    window.addEventListener('beforeunload', async () => {
+    window.addEventListener("beforeunload", async () => {
       if (this.currentCacheKey && Object.keys(this.wordState).length > 0) {
         try {
           const userId = userStore?.getUserId();
           if (userId) {
             // Synchronously save to avoid delays (non-blocking)
-            this.cacheManager.setToCache(
-              this.currentCacheKey,
-              this.wordState,
-              userId
-            ).catch(e => console.warn('[SidebarPanel] Unload cache save error:', e));
+            this.cacheManager
+              .setToCache(this.currentCacheKey, this.wordState, userId)
+              .catch((e) =>
+                console.warn("[SidebarPanel] Unload cache save error:", e)
+              );
           }
         } catch (e) {
-          console.warn('[SidebarPanel] Unload handler error:', e);
+          console.warn("[SidebarPanel] Unload handler error:", e);
         }
       }
     });
 
-    console.log('[SidebarPanel] Unload handler registered');
+    console.log("[SidebarPanel] Unload handler registered");
   }
 
   /**
@@ -250,52 +264,60 @@ class SidebarPanel {
   attachScrollHandlers() {
     if (!this.sidebarElement) return;
 
-    const contentArea = this.sidebarElement.querySelector('.sidebar-content');
+    const contentArea = this.sidebarElement.querySelector(".sidebar-content");
     if (!contentArea) return;
 
     // Handle wheel events on sidebar content to prevent page scroll
-    contentArea.addEventListener('wheel', (e) => {
-      const element = e.target.closest('.sidebar-content');
-      if (!element) return;
+    contentArea.addEventListener(
+      "wheel",
+      (e) => {
+        const element = e.target.closest(".sidebar-content");
+        if (!element) return;
 
-      // Check if content can scroll in the direction of wheel movement
-      const canScrollDown = element.scrollHeight > element.scrollTop + element.clientHeight;
-      const canScrollUp = element.scrollTop > 0;
-      const isScrollingDown = e.deltaY > 0;
-      const isScrollingUp = e.deltaY < 0;
+        // Check if content can scroll in the direction of wheel movement
+        const canScrollDown =
+          element.scrollHeight > element.scrollTop + element.clientHeight;
+        const canScrollUp = element.scrollTop > 0;
+        const isScrollingDown = e.deltaY > 0;
+        const isScrollingUp = e.deltaY < 0;
 
-      // Only prevent default scroll if:
-      // 1. We're scrolling down and content can scroll down
-      // 2. We're scrolling up and content can scroll up
-      const shouldPreventDefault =
-        (isScrollingDown && canScrollDown) ||
-        (isScrollingUp && canScrollUp);
+        // Only prevent default scroll if:
+        // 1. We're scrolling down and content can scroll down
+        // 2. We're scrolling up and content can scroll up
+        const shouldPreventDefault =
+          (isScrollingDown && canScrollDown) || (isScrollingUp && canScrollUp);
 
-      if (shouldPreventDefault) {
-        // Allow sidebar to scroll naturally
-        return;
-      }
+        if (shouldPreventDefault) {
+          // Allow sidebar to scroll naturally
+          return;
+        }
 
-      // If we're at the top/bottom and trying to scroll further,
-      // prevent default to avoid page scroll
-      if (!canScrollDown && isScrollingDown) {
-        e.preventDefault();
-      } else if (!canScrollUp && isScrollingUp) {
-        e.preventDefault();
-      }
-    }, { passive: false });
+        // If we're at the top/bottom and trying to scroll further,
+        // prevent default to avoid page scroll
+        if (!canScrollDown && isScrollingDown) {
+          e.preventDefault();
+        } else if (!canScrollUp && isScrollingUp) {
+          e.preventDefault();
+        }
+      },
+      { passive: false }
+    );
 
     // Prevent page scroll when hovering over other sidebar areas
-    this.sidebarElement.addEventListener('wheel', (e) => {
-      if (e.target.closest('.sidebar-content')) {
-        // Already handled above
-        return;
-      }
-      // For non-content areas, always prevent default
-      e.preventDefault();
-    }, { passive: false });
+    this.sidebarElement.addEventListener(
+      "wheel",
+      (e) => {
+        if (e.target.closest(".sidebar-content")) {
+          // Already handled above
+          return;
+        }
+        // For non-content areas, always prevent default
+        e.preventDefault();
+      },
+      { passive: false }
+    );
 
-    console.log('[SidebarPanel] Scroll handlers attached');
+    console.log("[SidebarPanel] Scroll handlers attached");
   }
 
   /**
@@ -304,16 +326,18 @@ class SidebarPanel {
   attachSelectionListeners() {
     // Ensure we have content area before attaching listeners
     if (!this.contentArea) {
-      console.warn('[SidebarPanel] contentArea not ready for selection listeners');
+      console.warn(
+        "[SidebarPanel] contentArea not ready for selection listeners"
+      );
       return;
     }
 
     // Use document-level listeners for better tracking
-    document.addEventListener('mousedown', (e) => this.handleSelectionStart(e));
-    document.addEventListener('mousemove', (e) => this.handleSelectionMove(e));
-    document.addEventListener('mouseup', (e) => this.handleSelectionEnd(e));
+    document.addEventListener("mousedown", (e) => this.handleSelectionStart(e));
+    document.addEventListener("mousemove", (e) => this.handleSelectionMove(e));
+    document.addEventListener("mouseup", (e) => this.handleSelectionEnd(e));
 
-    console.log('[SidebarPanel] Rectangle selection listeners attached');
+    console.log("[SidebarPanel] Rectangle selection listeners attached");
   }
 
   /**
@@ -328,16 +352,19 @@ class SidebarPanel {
 
     // Don't start selection if clicking on checkboxes or buttons
     if (
-      e.target.closest('.word-checkbox') ||
-      e.target.closest('button') ||
-      e.target.closest('.word-item')?.querySelector('.word-checkbox').contains(e.target)
+      e.target.closest(".word-checkbox") ||
+      e.target.closest("button") ||
+      e.target
+        .closest(".word-item")
+        ?.querySelector(".word-checkbox")
+        .contains(e.target)
     ) {
       return;
     }
 
     this.isSelecting = true;
     this.selectionStart = { x: e.clientX, y: e.clientY };
-    console.log('[SidebarPanel] Selection started at', this.selectionStart);
+    console.log("[SidebarPanel] Selection started at", this.selectionStart);
   }
 
   /**
@@ -346,7 +373,9 @@ class SidebarPanel {
   handleSelectionMove(e) {
     if (!this.isSelecting || !this.selectionStart) return;
 
-    const canvas = this.sidebarElement?.querySelector('.sidebar-selection-canvas');
+    const canvas = this.sidebarElement?.querySelector(
+      ".sidebar-selection-canvas"
+    );
     if (!canvas) return;
 
     // Calculate rectangle
@@ -363,16 +392,16 @@ class SidebarPanel {
 
     // Only show if minimum size (5px)
     if (width < 5 || height < 5) {
-      canvas.classList.remove('active');
+      canvas.classList.remove("active");
       return;
     }
 
     // Apply styles
-    canvas.style.left = left + 'px';
-    canvas.style.top = top + 'px';
-    canvas.style.width = width + 'px';
-    canvas.style.height = height + 'px';
-    canvas.classList.add('active');
+    canvas.style.left = left + "px";
+    canvas.style.top = top + "px";
+    canvas.style.width = width + "px";
+    canvas.style.height = height + "px";
+    canvas.classList.add("active");
 
     // Store rectangle
     this.selectionRect = { left, top, width, height };
@@ -384,8 +413,10 @@ class SidebarPanel {
   handleSelectionEnd(e) {
     if (!this.isSelecting || !this.selectionRect) {
       this.isSelecting = false;
-      const canvas = this.sidebarElement?.querySelector('.sidebar-selection-canvas');
-      if (canvas) canvas.classList.remove('active');
+      const canvas = this.sidebarElement?.querySelector(
+        ".sidebar-selection-canvas"
+      );
+      if (canvas) canvas.classList.remove("active");
       return;
     }
 
@@ -393,23 +424,25 @@ class SidebarPanel {
     this.selectWordsInRect(this.selectionRect);
 
     this.isSelecting = false;
-    const canvas = this.sidebarElement?.querySelector('.sidebar-selection-canvas');
-    if (canvas) canvas.classList.remove('active');
+    const canvas = this.sidebarElement?.querySelector(
+      ".sidebar-selection-canvas"
+    );
+    if (canvas) canvas.classList.remove("active");
 
-    console.log('[SidebarPanel] Selection ended');
+    console.log("[SidebarPanel] Selection ended");
   }
 
   /**
    * Select words within rectangle
    */
   selectWordsInRect(rect) {
-    const checkboxes = this.contentArea?.querySelectorAll('.word-checkbox');
+    const checkboxes = this.contentArea?.querySelectorAll(".word-checkbox");
     let selectedCount = 0;
 
     if (!checkboxes) return;
 
     checkboxes.forEach((checkbox) => {
-      const wordItem = checkbox.closest('.word-item');
+      const wordItem = checkbox.closest(".word-item");
       if (!wordItem) return;
 
       // Get word item's position in viewport
@@ -430,20 +463,22 @@ class SidebarPanel {
     // Update action buttons state after selection
     this.updateActionButtonsState();
 
-    console.log(`[SidebarPanel] Selected/deselected ${selectedCount} words in rectangle`);
+    console.log(
+      `[SidebarPanel] Selected/deselected ${selectedCount} words in rectangle`
+    );
   }
 
   /**
    * Select all checkboxes in sidebar
    */
   selectAllCheckboxes() {
-    const checkboxes = this.contentArea?.querySelectorAll('.word-checkbox');
+    const checkboxes = this.contentArea?.querySelectorAll(".word-checkbox");
     if (checkboxes) {
-      checkboxes.forEach(checkbox => {
+      checkboxes.forEach((checkbox) => {
         checkbox.checked = true;
       });
       this.updateActionButtonsState();
-      console.log('[SidebarPanel] All checkboxes selected');
+      console.log("[SidebarPanel] All checkboxes selected");
     }
   }
 
@@ -451,13 +486,13 @@ class SidebarPanel {
    * Deselect all checkboxes in sidebar
    */
   deselectAllCheckboxes() {
-    const checkboxes = this.contentArea?.querySelectorAll('.word-checkbox');
+    const checkboxes = this.contentArea?.querySelectorAll(".word-checkbox");
     if (checkboxes) {
-      checkboxes.forEach(checkbox => {
+      checkboxes.forEach((checkbox) => {
         checkbox.checked = false;
       });
       this.updateActionButtonsState();
-      console.log('[SidebarPanel] All checkboxes deselected');
+      console.log("[SidebarPanel] All checkboxes deselected");
     }
   }
 
@@ -465,10 +500,12 @@ class SidebarPanel {
    * Get list of selected word stems
    */
   getSelectedWords() {
-    const checkboxes = this.contentArea?.querySelectorAll('.word-checkbox:checked');
+    const checkboxes = this.contentArea?.querySelectorAll(
+      ".word-checkbox:checked"
+    );
     const selectedWords = [];
     if (checkboxes) {
-      checkboxes.forEach(checkbox => {
+      checkboxes.forEach((checkbox) => {
         const word = checkbox.dataset.word;
         if (word) {
           selectedWords.push(word);
@@ -485,9 +522,11 @@ class SidebarPanel {
     const selectedWords = this.getSelectedWords();
     const hasSelection = selectedWords.length > 0;
 
-    const markKnownBtn = this.sidebarElement?.querySelector('#mark-known-btn');
-    const addLibraryBtn = this.sidebarElement?.querySelector('#add-library-btn');
-    const markUnknownBtn = this.sidebarElement?.querySelector('#mark-unknown-btn');
+    const markKnownBtn = this.sidebarElement?.querySelector("#mark-known-btn");
+    const addLibraryBtn =
+      this.sidebarElement?.querySelector("#add-library-btn");
+    const markUnknownBtn =
+      this.sidebarElement?.querySelector("#mark-unknown-btn");
 
     if (markKnownBtn) markKnownBtn.disabled = !hasSelection;
     if (addLibraryBtn) addLibraryBtn.disabled = !hasSelection;
@@ -500,22 +539,25 @@ class SidebarPanel {
   async markSelectedAsKnown() {
     const selectedWords = this.getSelectedWords();
     if (selectedWords.length === 0) {
-      console.warn('[SidebarPanel] No words selected');
+      console.warn("[SidebarPanel] No words selected");
       return;
     }
 
     try {
-      console.log('[SidebarPanel] Marking as known:', selectedWords);
+      console.log("[SidebarPanel] Marking as known:", selectedWords);
 
       // Update local state
-      selectedWords.forEach(word => {
+      selectedWords.forEach((word) => {
         if (this.wordState[word]) {
           this.wordState[word].isKnown = true;
         }
       });
 
       // Call API to mark words as known
-      if (typeof unknownWordsService !== 'undefined' && unknownWordsService.markWordsAsKnown) {
+      if (
+        typeof unknownWordsService !== "undefined" &&
+        unknownWordsService.markWordsAsKnown
+      ) {
         const userId = userStore?.getUserId();
         if (userId) {
           await unknownWordsService.markWordsAsKnown(userId, selectedWords);
@@ -525,9 +567,12 @@ class SidebarPanel {
       // Update UI
       this.renderWordList();
       this.deselectAllCheckboxes();
-      console.log('[SidebarPanel] Successfully marked as known:', selectedWords);
+      console.log(
+        "[SidebarPanel] Successfully marked as known:",
+        selectedWords
+      );
     } catch (e) {
-      console.error('[SidebarPanel] Error marking as known:', e);
+      console.error("[SidebarPanel] Error marking as known:", e);
     }
   }
 
@@ -537,15 +582,15 @@ class SidebarPanel {
   async addSelectedToLibrary() {
     const selectedWords = this.getSelectedWords();
     if (selectedWords.length === 0) {
-      console.warn('[SidebarPanel] No words selected');
+      console.warn("[SidebarPanel] No words selected");
       return;
     }
 
     try {
-      console.log('[SidebarPanel] Adding to library:', selectedWords);
+      console.log("[SidebarPanel] Adding to library:", selectedWords);
 
       // Update local state
-      selectedWords.forEach(word => {
+      selectedWords.forEach((word) => {
         if (this.wordState[word]) {
           this.wordState[word].isLibrary = true;
         }
@@ -558,7 +603,7 @@ class SidebarPanel {
       // Send each word to library via background.js
       const userId = userStore?.getUserId();
       if (!userId) {
-        console.warn('[SidebarPanel] No user ID available');
+        console.warn("[SidebarPanel] No user ID available");
         return;
       }
 
@@ -570,9 +615,12 @@ class SidebarPanel {
       // Update UI
       this.renderWordList();
       this.deselectAllCheckboxes();
-      console.log('[SidebarPanel] Successfully added to library:', selectedWords);
+      console.log(
+        "[SidebarPanel] Successfully added to library:",
+        selectedWords
+      );
     } catch (e) {
-      console.error('[SidebarPanel] Error adding to library:', e);
+      console.error("[SidebarPanel] Error adding to library:", e);
     }
   }
 
@@ -603,7 +651,9 @@ class SidebarPanel {
               `.mixread-highlight[data-word-stem="${wordStem}"]`
             );
 
-            console.log(`[SidebarPanel] Found ${allElements.length} highlighted elements for "${word}"`);
+            console.log(
+              `[SidebarPanel] Found ${allElements.length} highlighted elements for "${word}"`
+            );
 
             // Extract cached sentence contexts from data attributes
             allElements.forEach((element) => {
@@ -614,21 +664,29 @@ class SidebarPanel {
             });
 
             const sentences = Array.from(sentenceSet);
-            console.log(`[SidebarPanel] Extracted ${sentences.length} unique sentence contexts for "${word}"`);
+            console.log(
+              `[SidebarPanel] Extracted ${sentences.length} unique sentence contexts for "${word}"`
+            );
 
             if (sentences.length > 0) {
-              console.log(`[SidebarPanel] Sample sentences:`, sentences.slice(0, 2));
+              console.log(
+                `[SidebarPanel] Sample sentences:`,
+                sentences.slice(0, 2)
+              );
             }
 
             // Create contexts array with extracted sentences or fallback
-            const contexts = [{
-              page_url: pageUrl,
-              page_title: pageTitle,
-              sentences: sentences.length > 0
-                ? sentences
-                : [`Encountered "${word}" while reading.`],
-              timestamp: Date.now(),
-            }];
+            const contexts = [
+              {
+                page_url: pageUrl,
+                page_title: pageTitle,
+                sentences:
+                  sentences.length > 0
+                    ? sentences
+                    : [`Encountered "${word}" while reading.`],
+                timestamp: Date.now(),
+              },
+            ];
 
             chrome.runtime.sendMessage(
               {
@@ -646,11 +704,15 @@ class SidebarPanel {
                     );
                     setTimeout(sendAddToLibrary, 500);
                   } else if (response?.success) {
-                    const msg = sentences.length > 0
-                      ? `Added "${word}" with ${sentences.length} sentence(s)`
-                      : `Added "${word}" with fallback context`;
+                    const msg =
+                      sentences.length > 0
+                        ? `Added "${word}" with ${sentences.length} sentence(s)`
+                        : `Added "${word}" with fallback context`;
                     console.log(`[SidebarPanel] ${msg}`);
-                    console.log(`[SidebarPanel DEBUG] Contexts sent for "${word}":`, contexts);
+                    console.log(
+                      `[SidebarPanel DEBUG] Contexts sent for "${word}":`,
+                      contexts
+                    );
                     resolve(response);
                   } else {
                     console.warn(
@@ -660,19 +722,13 @@ class SidebarPanel {
                     reject(new Error(response?.error || "Unknown error"));
                   }
                 } catch (e) {
-                  console.error(
-                    `[SidebarPanel] Error in callback:`,
-                    e.message
-                  );
+                  console.error(`[SidebarPanel] Error in callback:`, e.message);
                   reject(e);
                 }
               }
             );
           } catch (e) {
-            console.error(
-              `[SidebarPanel] Failed to send message:`,
-              e.message
-            );
+            console.error(`[SidebarPanel] Failed to send message:`, e.message);
             reject(e);
           }
         };
@@ -694,22 +750,25 @@ class SidebarPanel {
   async markSelectedAsUnknown() {
     const selectedWords = this.getSelectedWords();
     if (selectedWords.length === 0) {
-      console.warn('[SidebarPanel] No words selected');
+      console.warn("[SidebarPanel] No words selected");
       return;
     }
 
     try {
-      console.log('[SidebarPanel] Marking as unknown:', selectedWords);
+      console.log("[SidebarPanel] Marking as unknown:", selectedWords);
 
       // Update local state
-      selectedWords.forEach(word => {
+      selectedWords.forEach((word) => {
         if (this.wordState[word]) {
           this.wordState[word].isKnown = false;
         }
       });
 
       // Call API to mark words as unknown
-      if (typeof unknownWordsService !== 'undefined' && unknownWordsService.markWordsAsUnknown) {
+      if (
+        typeof unknownWordsService !== "undefined" &&
+        unknownWordsService.markWordsAsUnknown
+      ) {
         const userId = userStore?.getUserId();
         if (userId) {
           await unknownWordsService.markWordsAsUnknown(userId, selectedWords);
@@ -719,9 +778,12 @@ class SidebarPanel {
       // Update UI
       this.renderWordList();
       this.deselectAllCheckboxes();
-      console.log('[SidebarPanel] Successfully marked as unknown:', selectedWords);
+      console.log(
+        "[SidebarPanel] Successfully marked as unknown:",
+        selectedWords
+      );
     } catch (e) {
-      console.error('[SidebarPanel] Error marking as unknown:', e);
+      console.error("[SidebarPanel] Error marking as unknown:", e);
     }
   }
 
@@ -736,7 +798,9 @@ class SidebarPanel {
     try {
       const userId = userStore?.getUserId();
       if (!userId || !this.tabId) {
-        console.warn('[SidebarPanel] Missing userId or tabId, cannot load data');
+        console.warn(
+          "[SidebarPanel] Missing userId or tabId, cannot load data"
+        );
         return;
       }
 
@@ -745,11 +809,13 @@ class SidebarPanel {
       this.currentCacheKey = this.cacheManager.getTabCacheKey(this.tabId);
 
       if (!this.currentCacheKey) {
-        console.warn('[SidebarPanel] Invalid tabId, cannot create cache key');
+        console.warn("[SidebarPanel] Invalid tabId, cannot create cache key");
         return;
       }
 
-      console.log(`[SidebarPanel] Initialized cache key: ${this.currentCacheKey} (tabId: ${this.tabId})`);
+      console.log(
+        `[SidebarPanel] Initialized cache key: ${this.currentCacheKey} (tabId: ${this.tabId})`
+      );
 
       // DON'T restore from cache here - pageshow event will handle it
       // If this is a fresh load (F5 refresh), pageshow will clear words
@@ -758,9 +824,9 @@ class SidebarPanel {
       this.wordState = {};
       this.renderWordList();
 
-      console.log('[SidebarPanel] Ready to receive words from highlight API');
+      console.log("[SidebarPanel] Ready to receive words from highlight API");
     } catch (e) {
-      console.error('[SidebarPanel] Load data error:', e);
+      console.error("[SidebarPanel] Load data error:", e);
       this.wordState = {};
       this.renderWordList();
     }
@@ -777,7 +843,7 @@ class SidebarPanel {
       if (data.originalWords) {
         if (Array.isArray(data.originalWords)) {
           originalWordsSet = new Set(data.originalWords);
-        } else if (typeof data.originalWords === 'object') {
+        } else if (typeof data.originalWords === "object") {
           // Might be serialized Set or object with string keys
           if (Set.prototype.isPrototypeOf(data.originalWords)) {
             originalWordsSet = new Set(data.originalWords);
@@ -790,7 +856,7 @@ class SidebarPanel {
 
       result[key] = {
         ...data,
-        originalWords: originalWordsSet
+        originalWords: originalWordsSet,
       };
     });
     return result;
@@ -804,36 +870,46 @@ class SidebarPanel {
   setupURLChangeListener() {
     // Guard against multiple calls
     if (window.__mixreadUrlListenerSetup) {
-      console.log('[SidebarPanel] URL change listener already installed (skipping duplicate)');
+      console.log(
+        "[SidebarPanel] URL change listener already installed (skipping duplicate)"
+      );
       return;
     }
 
     // === Page Lifecycle Listeners ===
     // pageshow: Fires when page is shown (including bfcache restoration)
-    window.addEventListener('pageshow', (event) => {
-      console.log('[SidebarPanel] pageshow event:', { persisted: event.persisted });
+    window.addEventListener("pageshow", (event) => {
+      console.log("[SidebarPanel] pageshow event:", {
+        persisted: event.persisted,
+      });
 
       if (event.persisted) {
         // Page restored from bfcache - keep existing wordState
-        console.log('[SidebarPanel] Page restored from bfcache - keeping wordState');
-        this.renderWordList();  // Re-render in case DOM was recreated
+        console.log(
+          "[SidebarPanel] Page restored from bfcache - keeping wordState"
+        );
+        this.renderWordList(); // Re-render in case DOM was recreated
         return;
       }
 
       // Page loaded fresh (not from bfcache)
       // This includes: F5 refresh, new URL, back/forward without bfcache, etc.
-      console.log('[SidebarPanel] Page loaded fresh - clearing wordState for fresh session');
+      console.log(
+        "[SidebarPanel] Page loaded fresh - clearing wordState for fresh session"
+      );
       this.wordState = {};
       this.jumpIndex = {};
       this.renderWordList();
     });
 
     // pagehide: Fires when page is hidden (including entering bfcache)
-    window.addEventListener('pagehide', (event) => {
+    window.addEventListener("pagehide", (event) => {
       if (event.persisted) {
-        console.log('[SidebarPanel] Page entering bfcache - state will be preserved');
+        console.log(
+          "[SidebarPanel] Page entering bfcache - state will be preserved"
+        );
       } else {
-        console.log('[SidebarPanel] Page being unloaded');
+        console.log("[SidebarPanel] Page being unloaded");
       }
     });
 
@@ -843,16 +919,20 @@ class SidebarPanel {
     const originalReplaceState = history.replaceState;
 
     history.pushState = (...args) => {
-      console.log('[SidebarPanel] pushState detected - marking as SPA navigation');
-      this.navigationMode = 'spa';  // Mark as SPA navigation
+      console.log(
+        "[SidebarPanel] pushState detected - marking as SPA navigation"
+      );
+      this.navigationMode = "spa"; // Mark as SPA navigation
       originalPushState.apply(history, args);
       setTimeout(() => this.onURLChange(), 50);
       return undefined;
     };
 
     history.replaceState = (...args) => {
-      console.log('[SidebarPanel] replaceState detected - marking as SPA navigation');
-      this.navigationMode = 'spa';  // Mark as SPA navigation
+      console.log(
+        "[SidebarPanel] replaceState detected - marking as SPA navigation"
+      );
+      this.navigationMode = "spa"; // Mark as SPA navigation
       originalReplaceState.apply(history, args);
       setTimeout(() => this.onURLChange(), 50);
       return undefined;
@@ -860,15 +940,19 @@ class SidebarPanel {
 
     // === Refresh Detection ===
     // Mark when page is about to unload (F5, refresh button, new URL input, etc.)
-    window.addEventListener('beforeunload', () => {
-      console.log('[SidebarPanel] beforeunload event - page is about to reload');
-      sessionStorage.setItem('mixread_page_unloading', 'true');
+    window.addEventListener("beforeunload", () => {
+      console.log(
+        "[SidebarPanel] beforeunload event - page is about to reload"
+      );
+      sessionStorage.setItem("mixread_page_unloading", "true");
     });
 
     // Mark as initialized to prevent duplicate setup
     window.__mixreadUrlListenerSetup = true;
 
-    console.log('[SidebarPanel] URL change listener installed with pageshow/pagehide and SPA detection');
+    console.log(
+      "[SidebarPanel] URL change listener installed with pageshow/pagehide and SPA detection"
+    );
   }
 
   /**
@@ -877,14 +961,16 @@ class SidebarPanel {
    */
   async onURLChange() {
     // Check if this is SPA navigation
-    if (this.navigationMode === 'spa') {
-      console.log('[SidebarPanel] SPA navigation detected - continuing to accumulate words');
-      this.navigationMode = 'normal';  // Reset for next navigation
-      return;  // Don't clear words, continue accumulating
+    if (this.navigationMode === "spa") {
+      console.log(
+        "[SidebarPanel] SPA navigation detected - continuing to accumulate words"
+      );
+      this.navigationMode = "normal"; // Reset for next navigation
+      return; // Don't clear words, continue accumulating
     }
 
     // This shouldn't happen anymore since regular navigation is handled by pageshow
-    console.log('[SidebarPanel] onURLChange called but not SPA navigation');
+    console.log("[SidebarPanel] onURLChange called but not SPA navigation");
   }
 
   /**
@@ -892,21 +978,25 @@ class SidebarPanel {
    */
   startListeningForNewWords() {
     if (this.messageListener) {
-      return;  // Already listening
+      return; // Already listening
     }
 
     this.messageListener = (request, sender, sendResponse) => {
-      if (request.type === 'NEW_WORDS_HIGHLIGHTED' && this.isOpen) {
-        console.log(`[SidebarPanel] Received NEW_WORDS_HIGHLIGHTED: ${Object.keys(request.newWords || {}).length} words`);
+      if (request.type === "NEW_WORDS_HIGHLIGHTED" && this.isOpen) {
+        console.log(
+          `[SidebarPanel] Received NEW_WORDS_HIGHLIGHTED: ${
+            Object.keys(request.newWords || {}).length
+          } words`
+        );
         this.onNewWordsHighlighted(request.newWords);
       }
     };
 
     try {
       chrome.runtime.onMessage.addListener(this.messageListener);
-      console.log('[SidebarPanel] Message listener registered');
+      console.log("[SidebarPanel] Message listener registered");
     } catch (e) {
-      console.warn('[SidebarPanel] Failed to add message listener:', e);
+      console.warn("[SidebarPanel] Failed to add message listener:", e);
     }
   }
 
@@ -918,9 +1008,9 @@ class SidebarPanel {
       try {
         chrome.runtime.onMessage.removeListener(this.messageListener);
         this.messageListener = null;
-        console.log('[SidebarPanel] Message listener removed');
+        console.log("[SidebarPanel] Message listener removed");
       } catch (e) {
-        console.warn('[SidebarPanel] Failed to remove message listener:', e);
+        console.warn("[SidebarPanel] Failed to remove message listener:", e);
       }
     }
   }
@@ -935,18 +1025,24 @@ class SidebarPanel {
 
     // Wait for initialization to complete if not yet ready
     if (!this.isInitialized) {
-      console.log('[SidebarPanel] Waiting for sidebar initialization before processing words');
+      console.log(
+        "[SidebarPanel] Waiting for sidebar initialization before processing words"
+      );
       let attempts = 0;
       while (!this.isInitialized && attempts < 50) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
         attempts++;
       }
       if (!this.isInitialized) {
-        console.warn('[SidebarPanel] Sidebar initialization timeout, proceeding anyway');
+        console.warn(
+          "[SidebarPanel] Sidebar initialization timeout, proceeding anyway"
+        );
       }
     }
 
-    console.log(`[SidebarPanel] Adding ${Object.keys(newWordsData).length} new words`);
+    console.log(
+      `[SidebarPanel] Adding ${Object.keys(newWordsData).length} new words`
+    );
 
     // Process each word and merge into wordState
     Object.entries(newWordsData).forEach(([word, data]) => {
@@ -957,19 +1053,23 @@ class SidebarPanel {
         this.wordState[normalizedWord] = {
           count: data.count || 0,
           originalWords: new Set(data.originalWords || [word]),
-          chinese: data.chinese || '',
-          definition: data.definition || '',
-          cefrLevel: data.cefrLevel || '',
+          chinese: data.chinese || "",
+          definition: data.definition || "",
+          cefrLevel: data.cefrLevel || "",
           baseWord: normalizedWord,
           isKnown: false,
-          isLibrary: false
+          isLibrary: false,
         };
       } else {
         // Existing word - merge
-        this.wordState[normalizedWord].count += (data.count || 0);
+        this.wordState[normalizedWord].count += data.count || 0;
 
         // Ensure originalWords is always a Set
-        if (!Set.prototype.isPrototypeOf(this.wordState[normalizedWord].originalWords)) {
+        if (
+          !Set.prototype.isPrototypeOf(
+            this.wordState[normalizedWord].originalWords
+          )
+        ) {
           this.wordState[normalizedWord].originalWords = new Set(
             this.wordState[normalizedWord].originalWords || []
           );
@@ -978,11 +1078,11 @@ class SidebarPanel {
         if (data.originalWords) {
           // Handle both Set and Array input
           if (Set.prototype.isPrototypeOf(data.originalWords)) {
-            data.originalWords.forEach(w => {
+            data.originalWords.forEach((w) => {
               this.wordState[normalizedWord].originalWords.add(w);
             });
           } else if (Array.isArray(data.originalWords)) {
-            data.originalWords.forEach(w => {
+            data.originalWords.forEach((w) => {
               this.wordState[normalizedWord].originalWords.add(w);
             });
           }
@@ -1003,7 +1103,7 @@ class SidebarPanel {
         );
       }
     } catch (e) {
-      console.warn('[SidebarPanel] Cache update error:', e);
+      console.warn("[SidebarPanel] Cache update error:", e);
     }
   }
 
@@ -1017,21 +1117,25 @@ class SidebarPanel {
 
     // Wait for initialization to complete if not yet ready
     if (!this.isInitialized) {
-      console.log('[SidebarPanel] Waiting for sidebar initialization before processing removal');
+      console.log(
+        "[SidebarPanel] Waiting for sidebar initialization before processing removal"
+      );
       let attempts = 0;
       while (!this.isInitialized && attempts < 50) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
         attempts++;
       }
       if (!this.isInitialized) {
-        console.warn('[SidebarPanel] Sidebar initialization timeout, proceeding with removal anyway');
+        console.warn(
+          "[SidebarPanel] Sidebar initialization timeout, proceeding with removal anyway"
+        );
       }
     }
 
     console.log(`[SidebarPanel] Removing ${wordStems.length} words from cache`);
 
     let changed = false;
-    wordStems.forEach(stem => {
+    wordStems.forEach((stem) => {
       const normalizedWord = this.normalizeWord(stem);
 
       if (this.wordState[normalizedWord]) {
@@ -1058,7 +1162,7 @@ class SidebarPanel {
           );
         }
       } catch (e) {
-        console.warn('[SidebarPanel] Cache update error:', e);
+        console.warn("[SidebarPanel] Cache update error:", e);
       }
     }
   }
@@ -1067,17 +1171,17 @@ class SidebarPanel {
    * Normalize word (stemming + deduplication)
    */
   normalizeWord(word) {
-    if (!word) return '';
+    if (!word) return "";
 
     // Convert to lowercase
     let normalized = word.toLowerCase();
 
     // Use Porter Stemmer if available (should be loaded by content.js)
-    if (typeof Stemmer !== 'undefined' && Stemmer.stem) {
+    if (typeof Stemmer !== "undefined" && Stemmer.stem) {
       try {
         normalized = Stemmer.stem(normalized);
       } catch (e) {
-        console.warn('[SidebarPanel] Stemming error for word:', word, e);
+        console.warn("[SidebarPanel] Stemming error for word:", word, e);
       }
     }
 
@@ -1088,21 +1192,27 @@ class SidebarPanel {
    * Render word list
    */
   renderWordList() {
-    console.log('[SidebarPanel] renderWordList called, contentArea:', !!this.contentArea, 'wordState keys:', Object.keys(this.wordState).length);
+    console.log(
+      "[SidebarPanel] renderWordList called, contentArea:",
+      !!this.contentArea,
+      "wordState keys:",
+      Object.keys(this.wordState).length
+    );
 
     if (!this.contentArea) {
-      console.error('[SidebarPanel] contentArea is null or undefined!');
+      console.error("[SidebarPanel] contentArea is null or undefined!");
       return;
     }
 
     // Clear existing
-    this.contentArea.innerHTML = '';
+    this.contentArea.innerHTML = "";
 
     // Get sorted word list (by count, descending)
-    const words = Object.entries(this.wordState)
-      .sort((a, b) => b[1].count - a[1].count);
+    const words = Object.entries(this.wordState).sort(
+      (a, b) => b[1].count - a[1].count
+    );
 
-    console.log('[SidebarPanel] Words to render:', words.length);
+    console.log("[SidebarPanel] Words to render:", words.length);
 
     // Calculate statistics
     const totalCount = words.reduce((sum, [, data]) => sum + data.count, 0);
@@ -1133,28 +1243,30 @@ class SidebarPanel {
 
     // Render high frequency section
     if (highFreq.length > 0) {
-      this.renderFrequencyGroup('🔥 High Frequency', highFreq);
+      this.renderFrequencyGroup("🔥 High Frequency", highFreq);
     }
 
     // Render medium frequency section
     if (mediumFreq.length > 0) {
-      this.renderFrequencyGroup('📊 Medium Frequency', mediumFreq);
+      this.renderFrequencyGroup("📊 Medium Frequency", mediumFreq);
     }
 
     // Render low frequency section
     if (lowFreq.length > 0) {
-      this.renderFrequencyGroup('❄️ Low Frequency', lowFreq);
+      this.renderFrequencyGroup("❄️ Low Frequency", lowFreq);
     }
 
     // If no words, show empty state
     if (words.length === 0) {
-      const emptyDiv = document.createElement('div');
-      emptyDiv.className = 'sidebar-empty';
-      emptyDiv.innerHTML = '<p>No words highlighted yet</p>';
+      const emptyDiv = document.createElement("div");
+      emptyDiv.className = "sidebar-empty";
+      emptyDiv.innerHTML = "<p>No words highlighted yet</p>";
       this.contentArea.appendChild(emptyDiv);
     }
 
-    console.log(`[SidebarPanel] Rendered ${words.length} words (${highFreqCount} high, ${mediumFreqCount} medium, ${lowFreqCount} low freq)`);
+    console.log(
+      `[SidebarPanel] Rendered ${words.length} words (${highFreqCount} high, ${mediumFreqCount} medium, ${lowFreqCount} low freq)`
+    );
   }
 
   /**
@@ -1162,18 +1274,18 @@ class SidebarPanel {
    */
   renderFrequencyGroup(title, words) {
     // Create group container
-    const groupDiv = document.createElement('div');
-    groupDiv.className = 'frequency-group';
+    const groupDiv = document.createElement("div");
+    groupDiv.className = "frequency-group";
 
     // Create group header
-    const headerDiv = document.createElement('div');
-    headerDiv.className = 'frequency-group-header';
+    const headerDiv = document.createElement("div");
+    headerDiv.className = "frequency-group-header";
     headerDiv.textContent = title;
     groupDiv.appendChild(headerDiv);
 
     // Create group content
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'frequency-group-content';
+    const contentDiv = document.createElement("div");
+    contentDiv.className = "frequency-group-content";
     words.forEach(([word, data]) => {
       const wordItem = this.createWordItem(word, data);
       contentDiv.appendChild(wordItem);
@@ -1187,17 +1299,19 @@ class SidebarPanel {
    * Create word item element
    */
   createWordItem(normalizedWord, data) {
-    const div = document.createElement('div');
-    div.className = 'word-item';
-    if (data.isKnown) div.classList.add('is-known');
-    if (data.isLibrary) div.classList.add('is-library');
+    const div = document.createElement("div");
+    div.className = "word-item";
+    if (data.isKnown) div.classList.add("is-known");
+    if (data.isLibrary) div.classList.add("is-library");
     div.dataset.word = normalizedWord;
 
     // Display text: show variants count if multiple forms
     // Handle both Set and Array formats for originalWords
     const variantsCount = Set.prototype.isPrototypeOf(data.originalWords)
       ? data.originalWords.size
-      : (Array.isArray(data.originalWords) ? data.originalWords.length : 0);
+      : Array.isArray(data.originalWords)
+      ? data.originalWords.length
+      : 0;
     const hasVariants = variantsCount > 1;
     const displayWord = hasVariants
       ? `${normalizedWord}* (${variantsCount})`
@@ -1205,13 +1319,17 @@ class SidebarPanel {
 
     // Extract example sentences for this word
     const sentences = this.extractWordSentences(normalizedWord);
-    const sentencesHTML = sentences.length > 0
-      ? `<div class="word-sentences">
-           ${sentences.slice(0, 2).map(sentence =>
-             `<div class="sentence-example">"${sentence}"</div>`
-           ).join('')}
+    const sentencesHTML =
+      sentences.length > 0
+        ? `<div class="word-sentences">
+           ${sentences
+             .slice(0, 2)
+             .map(
+               (sentence) => `<div class="sentence-example">"${sentence}"</div>`
+             )
+             .join("")}
          </div>`
-      : '';
+        : "";
 
     div.innerHTML = `
       <div class="word-main">
@@ -1220,24 +1338,36 @@ class SidebarPanel {
         <span class="word-count">[${data.count}]</span>
       </div>
       <div class="word-labels">
-        ${data.cefrLevel ? `<span class="label cefr" title="CEFR Level">${data.cefrLevel}</span>` : ''}
-        ${data.isKnown ? '<span class="label known" title="已标记为已知">✓ Known</span>' : ''}
-        ${data.isLibrary ? '<span class="label library" title="已添加到学习库">⭐ Library</span>' : ''}
+        ${
+          data.cefrLevel
+            ? `<span class="label cefr" title="CEFR Level">${data.cefrLevel}</span>`
+            : ""
+        }
+        ${
+          data.isKnown
+            ? '<span class="label known" title="已标记为已知">✓ Known</span>'
+            : ""
+        }
+        ${
+          data.isLibrary
+            ? '<span class="label library" title="已添加到学习库">⭐ Library</span>'
+            : ""
+        }
       </div>
       ${sentencesHTML}
       <button class="jump-btn" data-word="${normalizedWord}" title="快速跳转">🔍</button>
     `;
 
     // Jump button event (Phase 2)
-    const jumpBtn = div.querySelector('.jump-btn');
-    jumpBtn?.addEventListener('click', (e) => {
+    const jumpBtn = div.querySelector(".jump-btn");
+    jumpBtn?.addEventListener("click", (e) => {
       e.stopPropagation();
       this.jumpToWord(normalizedWord);
     });
 
     // Checkbox change event - update action buttons state
-    const checkbox = div.querySelector('.word-checkbox');
-    checkbox?.addEventListener('change', () => {
+    const checkbox = div.querySelector(".word-checkbox");
+    checkbox?.addEventListener("change", () => {
       this.updateActionButtonsState();
     });
 
@@ -1274,7 +1404,10 @@ class SidebarPanel {
 
       return Array.from(sentenceSet);
     } catch (error) {
-      console.error(`[SidebarPanel] Error extracting sentences for "${word}":`, error);
+      console.error(
+        `[SidebarPanel] Error extracting sentences for "${word}":`,
+        error
+      );
       return [];
     }
   }
@@ -1284,7 +1417,7 @@ class SidebarPanel {
    */
   jumpToWord(word) {
     // TODO: Phase 2 - implement jumping to positions
-    console.log('[SidebarPanel] Jump to word:', word);
+    console.log("[SidebarPanel] Jump to word:", word);
     // Will implement:
     // - Get all positions of this word
     // - Track current index
@@ -1297,15 +1430,15 @@ class SidebarPanel {
    * Refresh word list (manual)
    */
   async refresh() {
-    console.log('[SidebarPanel] Manual refresh - re-highlighting page');
+    console.log("[SidebarPanel] Manual refresh - re-highlighting page");
 
     // Just trigger a re-highlight without clearing word state
     // This will discover any new words on dynamically loaded content
-    if (typeof highlightPageWords === 'function') {
+    if (typeof highlightPageWords === "function") {
       highlightPageWords();
-      console.log('[SidebarPanel] Page re-highlighted');
+      console.log("[SidebarPanel] Page re-highlighted");
     } else {
-      console.warn('[SidebarPanel] highlightPageWords function not found');
+      console.warn("[SidebarPanel] highlightPageWords function not found");
     }
   }
 
@@ -1314,14 +1447,14 @@ class SidebarPanel {
    */
   async toggleVisibility() {
     this.isVisible = !this.isVisible;
-    this.sidebarElement.style.display = this.isVisible ? 'block' : 'none';
+    this.sidebarElement.style.display = this.isVisible ? "block" : "none";
 
     // Save preference
     try {
-      await StorageManager.setItem('sidebar_visible', this.isVisible);
-      console.log('[SidebarPanel] Visibility toggled:', this.isVisible);
+      await StorageManager.setItem("sidebar_visible", this.isVisible);
+      console.log("[SidebarPanel] Visibility toggled:", this.isVisible);
     } catch (e) {
-      console.warn('[SidebarPanel] Failed to save visibility preference:', e);
+      console.warn("[SidebarPanel] Failed to save visibility preference:", e);
     }
   }
 
@@ -1330,15 +1463,21 @@ class SidebarPanel {
    */
   async loadVisibilityPreference() {
     try {
-      const saved = await StorageManager.getItem('sidebar_visible');
+      const saved = await StorageManager.getItem("sidebar_visible");
       // Only hide if explicitly set to false
       // Default to true (open) for all other cases (null, undefined, etc.)
       this.isVisible = saved !== false ? true : false;
-      this.sidebarElement.style.display = this.isVisible ? 'flex' : 'none';
-      console.log('[SidebarPanel] Loaded visibility preference:', this.isVisible, '(saved:', saved, ')');
+      this.sidebarElement.style.display = this.isVisible ? "flex" : "none";
+      console.log(
+        "[SidebarPanel] Loaded visibility preference:",
+        this.isVisible,
+        "(saved:",
+        saved,
+        ")"
+      );
     } catch (e) {
-      console.warn('[SidebarPanel] Failed to load visibility preference:', e);
-      this.isVisible = true;  // Default to open on error
+      console.warn("[SidebarPanel] Failed to load visibility preference:", e);
+      this.isVisible = true; // Default to open on error
     }
   }
 
@@ -1351,8 +1490,8 @@ class SidebarPanel {
       this.sidebarElement.style.width = width;
     }
     // Save preference
-    StorageManager.setItem('sidebar_width', width).catch(e =>
-      console.warn('[SidebarPanel] Failed to save width:', e)
+    StorageManager.setItem("sidebar_width", width).catch((e) =>
+      console.warn("[SidebarPanel] Failed to save width:", e)
     );
   }
 
@@ -1367,12 +1506,14 @@ class SidebarPanel {
       currentCacheKey: this.currentCacheKey,
       wordStateSize: Object.keys(this.wordState).length,
       wordState: this.wordState,
-      cacheStats: this.cacheManager?.getStats()
+      cacheStats: this.cacheManager?.getStats(),
     };
   }
 }
 
-// Export for use
-if (typeof module !== 'undefined' && module.exports) {
+// Export for use in both module and global scope
+if (typeof module !== "undefined" && module.exports) {
   module.exports = SidebarPanel;
+} else if (typeof window !== "undefined") {
+  window.SidebarPanel = SidebarPanel;
 }

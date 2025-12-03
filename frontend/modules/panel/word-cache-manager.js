@@ -13,14 +13,16 @@
 class WordCacheManager {
   constructor(options = {}) {
     // Configuration
-    this.maxCacheSize = options.maxCacheSize || 20;  // Max URLs to cache
-    this.cacheExpiryMs = options.cacheExpiryMs || 86400000;  // 24 hours
+    this.maxCacheSize = options.maxCacheSize || 20; // Max URLs to cache
+    this.cacheExpiryMs = options.cacheExpiryMs || 86400000; // 24 hours
 
     // In-memory cache layer
-    this.memoryCache = new Map();  // {cacheKey → wordState}
-    this.cacheIndex = [];           // LRU index
+    this.memoryCache = new Map(); // {cacheKey → wordState}
+    this.cacheIndex = []; // LRU index
 
-    console.log('[WordCacheManager] Initialized with maxSize=' + this.maxCacheSize);
+    console.log(
+      "[WordCacheManager] Initialized with maxSize=" + this.maxCacheSize
+    );
   }
 
   /**
@@ -33,12 +35,12 @@ class WordCacheManager {
       const urlObj = new URL(url);
       // Normalize: remove trailing slash for root
       let path = urlObj.pathname;
-      if (path === '/' && url.includes('?')) {
-        path = '/?';  // Add ? if query params
+      if (path === "/" && url.includes("?")) {
+        path = "/?"; // Add ? if query params
       }
       return `${urlObj.hostname}|${path}`;
     } catch (e) {
-      console.warn('[WordCacheManager] Invalid URL:', url, e);
+      console.warn("[WordCacheManager] Invalid URL:", url, e);
       return null;
     }
   }
@@ -50,7 +52,7 @@ class WordCacheManager {
    */
   getTabCacheKey(tabId) {
     if (!tabId) {
-      console.warn('[WordCacheManager] Invalid tabId');
+      console.warn("[WordCacheManager] Invalid tabId");
       return null;
     }
     return `tab_${tabId}`;
@@ -88,7 +90,7 @@ class WordCacheManager {
         await StorageManager.removeItem(storageKey);
       }
     } catch (e) {
-      console.warn('[WordCacheManager] Storage read error:', e);
+      console.warn("[WordCacheManager] Storage read error:", e);
     }
 
     console.log(`[WordCacheManager] Cache MISS: ${cacheKey}`);
@@ -115,13 +117,14 @@ class WordCacheManager {
         const storageKey = this.getStorageKey(userId, oldestKey);
         await StorageManager.removeItem(storageKey);
       } catch (e) {
-        console.warn('[WordCacheManager] Storage cleanup error:', e);
+        console.warn("[WordCacheManager] Storage cleanup error:", e);
       }
     }
 
     // 3. Persist to storage (async, non-blocking)
-    this.persistToStorage(cacheKey, wordState, userId)
-      .catch(e => console.warn('[WordCacheManager] Persist error:', e));
+    this.persistToStorage(cacheKey, wordState, userId).catch((e) =>
+      console.warn("[WordCacheManager] Persist error:", e)
+    );
   }
 
   /**
@@ -134,12 +137,12 @@ class WordCacheManager {
         wordState: wordState,
         timestamp: Date.now(),
         version: 1,
-        url: cacheKey
+        url: cacheKey,
       };
       await StorageManager.setItem(storageKey, data);
       console.log(`[WordCacheManager] Persisted: ${cacheKey}`);
     } catch (e) {
-      console.warn('[WordCacheManager] Storage persist error:', e);
+      console.warn("[WordCacheManager] Storage persist error:", e);
       // Don't throw - cache still works from memory
     }
   }
@@ -168,7 +171,7 @@ class WordCacheManager {
    * Generate storage key for persistence
    */
   getStorageKey(userId, cacheKey) {
-    return `cache_${userId}_${cacheKey.replace(/[|\/]/g, '_')}`;
+    return `cache_${userId}_${cacheKey.replace(/[|\/]/g, "_")}`;
   }
 
   /**
@@ -191,16 +194,19 @@ class WordCacheManager {
       // In real usage, this might be slow for large storage
       // but necessary to find and clear all user-specific cache entries
       const allItems = await StorageManager.getItems();
-      const keysToRemove = Object.keys(allItems)
-        .filter(key => key.startsWith(prefix));
+      const keysToRemove = Object.keys(allItems).filter((key) =>
+        key.startsWith(prefix)
+      );
 
       for (const key of keysToRemove) {
         await StorageManager.removeItem(key);
       }
 
-      console.log(`[WordCacheManager] Cleared ${keysToRemove.length} cache entries`);
+      console.log(
+        `[WordCacheManager] Cleared ${keysToRemove.length} cache entries`
+      );
     } catch (e) {
-      console.warn('[WordCacheManager] Clear error:', e);
+      console.warn("[WordCacheManager] Clear error:", e);
     }
   }
 
@@ -228,7 +234,7 @@ class WordCacheManager {
         console.log(`[WordCacheManager] Cleared ${cleared} expired entries`);
       }
     } catch (e) {
-      console.warn('[WordCacheManager] Maintenance error:', e);
+      console.warn("[WordCacheManager] Maintenance error:", e);
     }
   }
 
@@ -241,12 +247,14 @@ class WordCacheManager {
       cacheIndexLength: this.cacheIndex.length,
       maxCacheSize: this.maxCacheSize,
       expiryTimeHours: this.cacheExpiryMs / 3600000,
-      cacheKeys: Array.from(this.cacheIndex)
+      cacheKeys: Array.from(this.cacheIndex),
     };
   }
 }
 
-// Export for use
-if (typeof module !== 'undefined' && module.exports) {
+// Export for use in both module and global scope
+if (typeof module !== "undefined" && module.exports) {
   module.exports = WordCacheManager;
+} else if (typeof window !== "undefined") {
+  window.WordCacheManager = WordCacheManager;
 }

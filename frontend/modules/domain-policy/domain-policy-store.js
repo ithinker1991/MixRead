@@ -349,3 +349,10 @@ class DomainPolicyStore {
     return this.isBlacklistEmpty() && this.isInitialized;
   }
 }
+
+// Export for use in both module and global scope
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = DomainPolicyStore;
+} else if (typeof window !== "undefined") {
+  window.DomainPolicyStore = DomainPolicyStore;
+}

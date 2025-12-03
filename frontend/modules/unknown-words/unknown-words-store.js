@@ -17,13 +17,15 @@ class UnknownWordsStore {
    */
   async load() {
     try {
-      const cached = await StorageManager.getItem('unknown_words');
+      const cached = await StorageManager.getItem("unknown_words");
       if (cached && Array.isArray(cached)) {
-        this.unknownWords = new Set(cached.map(w => w.toLowerCase()));
-        logger.info(`Loaded ${this.unknownWords.size} unknown words from storage`);
+        this.unknownWords = new Set(cached.map((w) => w.toLowerCase()));
+        logger.info(
+          `Loaded ${this.unknownWords.size} unknown words from storage`
+        );
       }
     } catch (error) {
-      logger.warn('Failed to load unknown words from storage', error);
+      logger.warn("Failed to load unknown words from storage", error);
       this.unknownWords = new Set();
     }
   }
@@ -77,7 +79,7 @@ class UnknownWordsStore {
   subscribe(listener) {
     this.listeners.push(listener);
     return () => {
-      this.listeners = this.listeners.filter(l => l !== listener);
+      this.listeners = this.listeners.filter((l) => l !== listener);
     };
   }
 
@@ -85,11 +87,11 @@ class UnknownWordsStore {
    * Notify all listeners of state change
    */
   notify() {
-    this.listeners.forEach(listener => {
+    this.listeners.forEach((listener) => {
       try {
         listener(this.unknownWords);
       } catch (error) {
-        logger.error('Error in unknown words listener', error);
+        logger.error("Error in unknown words listener", error);
       }
     });
   }
@@ -100,10 +102,10 @@ class UnknownWordsStore {
    */
   async sync() {
     try {
-      await StorageManager.setItem('unknown_words', this.getAll());
-      logger.debug('Unknown words synced to storage');
+      await StorageManager.setItem("unknown_words", this.getAll());
+      logger.debug("Unknown words synced to storage");
     } catch (error) {
-      logger.warn('Failed to sync unknown words to storage', error);
+      logger.warn("Failed to sync unknown words to storage", error);
     }
   }
 
@@ -116,4 +118,11 @@ class UnknownWordsStore {
       this.notify();
     }
   }
+}
+
+// Export for use in both module and global scope
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = UnknownWordsStore;
+} else if (typeof window !== "undefined") {
+  window.UnknownWordsStore = UnknownWordsStore;
 }

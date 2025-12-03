@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Test Module Exports</title>
+    <style>
+      body {
+        font-family: monospace;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .success {
+        color: green;
+      }
+      .error {
+        color: red;
+      }
+      .warning {
+        color: orange;
+      }
+      .result {
+        background: white;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🧪 Module Export Test</h1>
+    <div id="results"></div>
+    <!-- Load the modules in the same order as manifest.json -->
+    <script src="scripts/logger.js"></script>
+    <script src="scripts/storage.js"></script>
+    <script src="scripts/api-client.js"></script>
+    <script src="scripts/stemmer.js"></script>
+    <script src="modules/user/user-store.js"></script>
+    <script src="modules/unknown-words/unknown-words-store.js"></script>
+    <script src="modules/unknown-words/unknown-words-service.js"></script>
+    <script src="modules/domain-policy/domain-policy-store.js"></script>
+    <script src="modules/domain-policy/domain-policy-filter.js"></script>
+    <script src="modules/domain-policy/preset-dialog.js"></script>
+    <script src="modules/highlight/context-menu.js"></script>
+    <script src="modules/highlight/highlight-filter.js"></script>
+    <script src="modules/panel/batch-marking-panel.js"></script>
+    <script src="modules/panel/word-cache-manager.js"></script>
+    <script src="modules/panel/sidebar-panel.js"></script>
+
+    <script>
+      const results = document.getElementById("results");
+
+      function testModule(name, className) {
+        const div = document.createElement("div");
+        div.className = "result";
+
+        if (window[className]) {
+          try {
+            // Try to create an instance (if it's a class)
+            const instance = new window[className]();
+            div.innerHTML = `<span class="success">✅ ${name} (${className}) - Available and Instantiable</span>`;
+          } catch (e) {
+            div.innerHTML = `<span class="warning">⚠️ ${name} (${className}) - Available but failed to instantiate: ${e.message}</span>`;
+          }
+        } else {
+          div.innerHTML = `<span class="error">❌ ${name} (${className}) - NOT FOUND</span>`;
+        }
+
+        results.appendChild(div);
+      }
+
+      // Test all critical modules
+      const modules = [
+        { name: "User Store", class: "UserStore" },
+        { name: "Unknown Words Store", class: "UnknownWordsStore" },
+        { name: "Unknown Words Service", class: "UnknownWordsService" },
+        { name: "Domain Policy Store", class: "DomainPolicyStore" },
+        { name: "Domain Policy Filter", class: "DomainPolicyFilter" },
+        { name: "Context Menu", class: "ContextMenu" },
+        { name: "Highlight Filter", class: "HighlightFilter" },
+        { name: "Batch Marking Panel", class: "BatchMarkingPanel" },
+        { name: "Word Cache Manager", class: "WordCacheManager" },
+        { name: "Sidebar Panel", class: "SidebarPanel" },
+      ];
+
+      // Run tests
+      modules.forEach((module) => {
+        setTimeout(() => testModule(module.name, module.class), 100);
+      });
+
+      // Summary after all tests
+      setTimeout(() => {
+        const summary = document.createElement("div");
+        summary.className = "result";
+        summary.style.borderTop = "2px solid #333";
+        summary.style.marginTop = "20px";
+        summary.style.paddingTop = "20px";
+
+        const successCount = document.querySelectorAll(".success").length;
+        const warningCount = document.querySelectorAll(".warning").length;
+        const errorCount = document.querySelectorAll(".error").length;
+
+        summary.innerHTML = `
+                <h2>📊 Test Summary</h2>
+                <div><span class="success">✅ Success: ${successCount}</span></div>
+                <div><span class="warning">⚠️ Warnings: ${warningCount}</span></div>
+                <div><span class="error">❌ Errors: ${errorCount}</span></div>
+                <br>
+                <div><strong>Total: ${modules.length} modules</strong></div>
+            `;
+
+        results.appendChild(summary);
+      }, 2000);
+    </script>
+  </body>
+</html>

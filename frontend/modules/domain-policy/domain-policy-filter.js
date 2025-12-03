@@ -158,3 +158,10 @@ class DomainPolicyFilter {
     return null;
   }
 }
+
+// Export for use in both module and global scope
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = DomainPolicyFilter;
+} else if (typeof window !== "undefined") {
+  window.DomainPolicyFilter = DomainPolicyFilter;
+}

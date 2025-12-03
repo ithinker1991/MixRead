@@ -596,7 +596,9 @@ class BatchMarkingPanel {
     this.messageListener = (request, sender, sendResponse) => {
       if (request.type === "NEW_WORDS_HIGHLIGHTED" && this.isOpen) {
         console.log(
-          `[BatchMarkingPanel] Received NEW_WORDS_HIGHLIGHTED with ${Object.keys(request.newWords).length} words`
+          `[BatchMarkingPanel] Received NEW_WORDS_HIGHLIGHTED with ${
+            Object.keys(request.newWords).length
+          } words`
         );
         this.addNewHighlightedWords(request.newWords);
       }
@@ -674,8 +676,7 @@ class BatchMarkingPanel {
     }
 
     const newWordsCount = Object.keys(addedCount).length;
-    const updatedWordsCount =
-      Object.keys(newWordsMap).length - newWordsCount;
+    const updatedWordsCount = Object.keys(newWordsMap).length - newWordsCount;
 
     console.log(
       `[BatchMarkingPanel] Panel updated: +${newWordsCount} new words, ${updatedWordsCount} updated, total ${totalWords}`
@@ -1111,4 +1112,11 @@ class BatchMarkingPanel {
       }
     });
   }
+}
+
+// Export for use in both module and global scope
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = BatchMarkingPanel;
+} else if (typeof window !== "undefined") {
+  window.BatchMarkingPanel = BatchMarkingPanel;
 }

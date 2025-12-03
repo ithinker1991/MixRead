@@ -139,6 +139,13 @@ const ChromeAPI = {
   },
 };
 
+// ===== Constants =====
+const RETRY_DELAY_MS = 500; // Delay for retrying failed requests
+const MAX_SENTENCES_PER_WORD = 3; // Maximum sentences to extract per word
+const MIN_SENTENCE_LENGTH = 10; // Minimum sentence length to be valid
+const MAX_SENTENCE_LENGTH = 500; // Maximum sentence length to be valid
+const MUTATION_DEBOUNCE_MS = 1000; // Debounce delay for DOM mutations
+
 // ===== Global State =====
 let currentDifficultyLevel = "B1";
 let highlightedWordsMap = {};
@@ -482,23 +489,17 @@ function highlightPageWords() {
   );
   console.log("[MixRead] Sample stems:", stemsToQuery.slice(0, 10).join(", "));
 
-  // Debug: Check if test words are in the mapping
-  const testWords = [
-    "stranger",
-    "strangers",
-    "dream",
-    "dreamed",
-    "make",
-    "making",
-    "build",
-    "building",
-  ];
-  console.log("[MixRead] Test words stem mapping:");
-  testWords.forEach((word) => {
-    const stem = Stemmer.stem(word);
-    const isInQuery = stemsToQuery.includes(stem);
-    console.log(`  ${word} → stem: ${stem}, in query: ${isInQuery}`);
-  });
+  // Debug: Check if test words are in the mapping (development only)
+  if (false && stemsToQuery.length > 0) {
+    // Set to true for debugging
+    const testWords = ["stranger", "dream", "make", "build"];
+    console.log("[MixRead] Test words stem mapping:");
+    testWords.forEach((word) => {
+      const stem = Stemmer.stem(word);
+      const isInQuery = stemsToQuery.includes(stem);
+      console.log(`  ${word} → stem: ${stem}, in query: ${isInQuery}`);
+    });
+  }
 
   // Get user_id for API call (use userStore if initialized, fallback to legacy)
   const userId = userStore ? userStore.getUserId() : null;
@@ -577,6 +578,11 @@ function highlightPageWords() {
         highlightWordsInDOM(highlightedVariants).then(() => {
           // Reset flag after highlighting is complete
           isHighlighting = false;
+
+          // Notify sidebar of newly highlighted words
+          if (response.word_details && response.word_details.length > 0) {
+            notifyPanelOfNewWords(response.word_details);
+          }
         });
       } else {
         console.error(
@@ -636,16 +642,18 @@ function getTextNodes(element) {
         !["SCRIPT", "STYLE", "NOSCRIPT"].includes(node.parentElement.tagName) &&
         !node.parentElement.classList.contains("mixread-tooltip") &&
         !node.parentElement.classList.contains("mixread-highlight") &&
-        !node.parentElement.classList.contains("mixread-chinese")
+        !node.parentElement.classList.contains("mixread-chinese") &&
+        !node.parentElement.closest("#mixread-sidebar") // Exclude sidebar panel
       ) {
         textNodes.push(node);
       }
     } else if (node.nodeType === Node.ELEMENT_NODE) {
-      // Skip MixRead elements
+      // Skip MixRead elements and sidebar
       if (
         !node.classList.contains("mixread-tooltip") &&
         !node.classList.contains("mixread-highlight") &&
-        !node.classList.contains("mixread-chinese")
+        !node.classList.contains("mixread-chinese") &&
+        !node.closest("#mixread-sidebar") // Exclude sidebar panel
       ) {
         for (let child of node.childNodes) {
           walk(child);
@@ -708,7 +716,10 @@ function extractSentenceContext(textNode, word) {
         const wordRegex = new RegExp(`\\b${wordLower}\\b`, "i");
         if (wordRegex.test(sentenceLower)) {
           // Basic quality filter: not too short, not too many special chars
-          if (sentence.length > 15 && sentence.length < 500) {
+          if (
+            sentence.length > MIN_SENTENCE_LENGTH &&
+            sentence.length < MAX_SENTENCE_LENGTH
+          ) {
             return sentence;
           }
         }
@@ -724,7 +735,10 @@ function extractSentenceContext(textNode, word) {
 
         if (wordRegex.test(sentenceLower)) {
           const trimmed = sentence.trim();
-          if (trimmed.length > 15 && trimmed.length < 500) {
+          if (
+            trimmed.length > MIN_SENTENCE_LENGTH &&
+            trimmed.length < MAX_SENTENCE_LENGTH
+          ) {
             return trimmed + "."; // Add period back
           }
         }
@@ -1300,7 +1314,7 @@ function addWordToVocabulary(word) {
 
       return true;
     })
-    .slice(0, 3);
+    .slice(0, MAX_SENTENCES_PER_WORD);
 
   console.log(
     `[MixRead DEBUG] After filtering: ${sentences.length}/${beforeFilter} sentences kept`
@@ -1362,7 +1376,7 @@ function addWordToVocabulary(word) {
                   `[MixRead] Extension context invalidated, retrying...`
                 );
                 // Retry after a short delay
-                setTimeout(sendAddToLibrary, 500);
+                setTimeout(sendAddToLibrary, RETRY_DELAY_MS);
               }
             } catch (e) {
               console.error(`[MixRead] Error in callback:`, e.message);
@@ -1845,11 +1859,11 @@ function notifyPanelOfNewWords(wordDetails) {
   wordDetails.forEach((detail) => {
     // Apply stemming to match DOM data-word-stem attribute
     let stem = detail.word.toLowerCase();
-    if (typeof Stemmer !== 'undefined' && Stemmer.stem) {
+    if (typeof Stemmer !== "undefined" && Stemmer.stem) {
       try {
         stem = Stemmer.stem(stem);
       } catch (e) {
-        console.warn('[MixRead] Stemming error in notifyPanelOfNewWords:', e);
+        console.warn("[MixRead] Stemming error in notifyPanelOfNewWords:", e);
       }
     }
 
@@ -1863,18 +1877,18 @@ function notifyPanelOfNewWords(wordDetails) {
 
       // Normalize word consistently (must match sidebar-panel.js normalizeWord logic)
       let normalizedWord = word.toLowerCase();
-      if (typeof Stemmer !== 'undefined' && Stemmer.stem) {
+      if (typeof Stemmer !== "undefined" && Stemmer.stem) {
         try {
           normalizedWord = Stemmer.stem(normalizedWord);
         } catch (e) {
-          console.warn('[MixRead] Stemming error:', e);
+          console.warn("[MixRead] Stemming error:", e);
         }
       }
 
       if (!newWordsMap[normalizedWord]) {
         newWordsMap[normalizedWord] = {
           count: elements.length,
-          originalWords: [],  // Use array instead of Set for serialization
+          originalWords: [], // Use array instead of Set for serialization
           chinese: firstElement.dataset.translation || "",
           definition: firstElement.dataset.definition || "",
           cefrLevel: firstElement.dataset.cefrLevel || "",
@@ -1893,7 +1907,9 @@ function notifyPanelOfNewWords(wordDetails) {
   if (Object.keys(newWordsMap).length === 0) return;
 
   console.log(
-    `[MixRead] Notifying sidebar of ${Object.keys(newWordsMap).length} new highlighted words`
+    `[MixRead] Notifying sidebar of ${
+      Object.keys(newWordsMap).length
+    } new highlighted words`
   );
 
   // Notify sidebar directly (if available)
@@ -1909,7 +1925,10 @@ function notifyPanelOfNewWords(wordDetails) {
         newWords: newWordsMap,
       });
     } catch (e) {
-      console.warn("[MixRead] Failed to send NEW_WORDS_HIGHLIGHTED message:", e);
+      console.warn(
+        "[MixRead] Failed to send NEW_WORDS_HIGHLIGHTED message:",
+        e
+      );
     }
   }
 }
@@ -1947,7 +1966,8 @@ function setupMutationObserver() {
         for (const node of mutation.removedNodes) {
           if (node.nodeType === Node.ELEMENT_NODE) {
             // Check if node contains any highlights
-            const highlightElements = node.querySelectorAll('.mixread-highlight');
+            const highlightElements =
+              node.querySelectorAll(".mixread-highlight");
             if (highlightElements.length > 0) {
               // Extract word stems from removed elements
               highlightElements.forEach((el) => {
@@ -1978,7 +1998,7 @@ function setupMutationObserver() {
         const nodesToProcess = Array.from(pendingNodes);
         pendingNodes.clear();
         highlightDynamicContent(nodesToProcess);
-      }, 1000); // Debounce 1s
+      }, MUTATION_DEBOUNCE_MS); // Debounce delay
     }
   });
 
