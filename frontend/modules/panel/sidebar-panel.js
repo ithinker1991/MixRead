@@ -28,10 +28,14 @@ class SidebarPanel {
     this.currentUrl = null;
     this.currentCacheKey = null;
     this.jumpIndex = {};         // Track jump position per word
+    this.tabId = null;           // Current tab ID (for tab-granular caching)
 
     // Event listeners
     this.messageListener = null;
     this.urlChangeListeners = [];
+
+    // Navigation tracking
+    this.navigationMode = 'normal';  // Track navigation type: 'spa' or 'normal'
 
     // Rectangle selection state
     this.isSelecting = false;
@@ -50,6 +54,17 @@ class SidebarPanel {
    */
   async init() {
     try {
+      // First, get the tab ID
+      this.tabId = await this.getTabId();
+      console.log('[SidebarPanel] Got tabId:', this.tabId);
+
+      // Check if this is a page refresh
+      const wasPageUnloading = sessionStorage.getItem('mixread_page_unloading');
+      if (wasPageUnloading) {
+        sessionStorage.removeItem('mixread_page_unloading');
+        console.log('[SidebarPanel] Detected page refresh/reload - will clear wordState on pageshow');
+      }
+
       await this.createSidebarHTML();
       this.attachEventListeners();
       await this.loadPageData();
@@ -61,6 +76,34 @@ class SidebarPanel {
       console.error('[SidebarPanel] Init error:', e);
       this.isInitialized = true;  // Mark as initialized even on error to prevent retry loops
     }
+  }
+
+  /**
+   * Get current tab ID from background service worker
+   */
+  async getTabId() {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage(
+          { type: 'GET_TAB_ID' },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              console.warn('[SidebarPanel] Failed to get tabId:', chrome.runtime.lastError);
+              resolve(null);
+            } else if (response?.success && response?.tabId) {
+              console.log('[SidebarPanel] Received tabId:', response.tabId);
+              resolve(response.tabId);
+            } else {
+              console.warn('[SidebarPanel] Invalid tabId response:', response);
+              resolve(null);
+            }
+          }
+        );
+      } catch (e) {
+        console.error('[SidebarPanel] Error requesting tabId:', e);
+        resolve(null);
+      }
+    });
   }
 
   /**
@@ -684,70 +727,79 @@ class SidebarPanel {
 
   /**
    * Load or restore page data from cache
+   * Now uses tab-granular caching instead of URL-based
+   *
+   * IMPORTANT: Don't restore from cache on init() - let pageshow event handle it
+   * pageshow fires AFTER init() and determines if we should clear or keep words
    */
   async loadPageData() {
     try {
       const userId = userStore?.getUserId();
-      if (!userId) {
-        console.warn('[SidebarPanel] No userId, cannot load data');
+      if (!userId || !this.tabId) {
+        console.warn('[SidebarPanel] Missing userId or tabId, cannot load data');
         return;
       }
 
       this.currentUrl = window.location.href;
-      this.currentCacheKey = this.cacheManager.getCacheKey(this.currentUrl);
+      // Use tab ID for cache key instead of URL
+      this.currentCacheKey = this.cacheManager.getTabCacheKey(this.tabId);
 
       if (!this.currentCacheKey) {
-        console.warn('[SidebarPanel] Invalid URL, cannot create cache key');
+        console.warn('[SidebarPanel] Invalid tabId, cannot create cache key');
         return;
       }
 
-      console.log(`[SidebarPanel] Loading data for ${this.currentCacheKey}`);
+      console.log(`[SidebarPanel] Initialized cache key: ${this.currentCacheKey} (tabId: ${this.tabId})`);
 
-      // Try to restore from cache
-      const cachedWordState = await this.cacheManager.getFromCache(
-        this.currentCacheKey,
-        userId
-      );
+      // DON'T restore from cache here - pageshow event will handle it
+      // If this is a fresh load (F5 refresh), pageshow will clear words
+      // If this is a BFCache restore, pageshow will keep words
+      // Initial wordState is empty
+      this.wordState = {};
+      this.renderWordList();
 
-      if (cachedWordState && Object.keys(cachedWordState).length > 0) {
-        console.log(`[SidebarPanel] Restored from cache: ${Object.keys(cachedWordState).length} words`);
-        // Restore from cache and convert originalWords back to Set
-        this.wordState = {};
-        Object.entries(cachedWordState).forEach(([key, data]) => {
-          // Handle originalWords which might be Array, Set, or Object after serialization
-          let originalWordsSet = new Set();
-          if (data.originalWords) {
-            if (Array.isArray(data.originalWords)) {
-              originalWordsSet = new Set(data.originalWords);
-            } else if (typeof data.originalWords === 'object') {
-              // Might be serialized Set or object with string keys
-              if (Set.prototype.isPrototypeOf(data.originalWords)) {
-                originalWordsSet = new Set(data.originalWords);
-              } else {
-                // Try to get keys from object
-                originalWordsSet = new Set(Object.keys(data.originalWords));
-              }
-            }
-          }
-
-          this.wordState[key] = {
-            ...data,
-            originalWords: originalWordsSet
-          };
-        });
-        this.renderWordList();
-        return;
-      }
-
-      console.log('[SidebarPanel] Cache miss, waiting for API response...');
-      // Will be populated by onNewWordsHighlighted when API returns
+      console.log('[SidebarPanel] Ready to receive words from highlight API');
     } catch (e) {
       console.error('[SidebarPanel] Load data error:', e);
+      this.wordState = {};
+      this.renderWordList();
     }
   }
 
   /**
+   * Deserialize cached word state, converting originalWords back to Set
+   */
+  deserializeWordState(cachedState) {
+    const result = {};
+    Object.entries(cachedState).forEach(([key, data]) => {
+      // Handle originalWords which might be Array, Set, or Object after serialization
+      let originalWordsSet = new Set();
+      if (data.originalWords) {
+        if (Array.isArray(data.originalWords)) {
+          originalWordsSet = new Set(data.originalWords);
+        } else if (typeof data.originalWords === 'object') {
+          // Might be serialized Set or object with string keys
+          if (Set.prototype.isPrototypeOf(data.originalWords)) {
+            originalWordsSet = new Set(data.originalWords);
+          } else {
+            // Try to get keys from object
+            originalWordsSet = new Set(Object.keys(data.originalWords));
+          }
+        }
+      }
+
+      result[key] = {
+        ...data,
+        originalWords: originalWordsSet
+      };
+    });
+    return result;
+  }
+
+  /**
    * Handle URL changes (for SPA)
+   * Detects SPA navigation vs regular navigation
+   * Uses pageshow/pagehide for accurate lifecycle tracking
    */
   setupURLChangeListener() {
     // Guard against multiple calls
@@ -756,66 +808,83 @@ class SidebarPanel {
       return;
     }
 
-    // Listen for popstate (back/forward buttons)
-    window.addEventListener('popstate', () => {
-      this.onURLChange();
+    // === Page Lifecycle Listeners ===
+    // pageshow: Fires when page is shown (including bfcache restoration)
+    window.addEventListener('pageshow', (event) => {
+      console.log('[SidebarPanel] pageshow event:', { persisted: event.persisted });
+
+      if (event.persisted) {
+        // Page restored from bfcache - keep existing wordState
+        console.log('[SidebarPanel] Page restored from bfcache - keeping wordState');
+        this.renderWordList();  // Re-render in case DOM was recreated
+        return;
+      }
+
+      // Page loaded fresh (not from bfcache)
+      // This includes: F5 refresh, new URL, back/forward without bfcache, etc.
+      console.log('[SidebarPanel] Page loaded fresh - clearing wordState for fresh session');
+      this.wordState = {};
+      this.jumpIndex = {};
+      this.renderWordList();
     });
 
-    // Intercept pushState/replaceState for better SPA support
+    // pagehide: Fires when page is hidden (including entering bfcache)
+    window.addEventListener('pagehide', (event) => {
+      if (event.persisted) {
+        console.log('[SidebarPanel] Page entering bfcache - state will be preserved');
+      } else {
+        console.log('[SidebarPanel] Page being unloaded');
+      }
+    });
+
+    // === SPA Navigation Detection ===
+    // Intercept pushState/replaceState for SPA navigation detection
     const originalPushState = history.pushState;
     const originalReplaceState = history.replaceState;
 
     history.pushState = (...args) => {
+      console.log('[SidebarPanel] pushState detected - marking as SPA navigation');
+      this.navigationMode = 'spa';  // Mark as SPA navigation
       originalPushState.apply(history, args);
       setTimeout(() => this.onURLChange(), 50);
       return undefined;
     };
 
     history.replaceState = (...args) => {
+      console.log('[SidebarPanel] replaceState detected - marking as SPA navigation');
+      this.navigationMode = 'spa';  // Mark as SPA navigation
       originalReplaceState.apply(history, args);
       setTimeout(() => this.onURLChange(), 50);
       return undefined;
     };
 
+    // === Refresh Detection ===
+    // Mark when page is about to unload (F5, refresh button, new URL input, etc.)
+    window.addEventListener('beforeunload', () => {
+      console.log('[SidebarPanel] beforeunload event - page is about to reload');
+      sessionStorage.setItem('mixread_page_unloading', 'true');
+    });
+
     // Mark as initialized to prevent duplicate setup
     window.__mixreadUrlListenerSetup = true;
 
-    console.log('[SidebarPanel] URL change listener installed');
+    console.log('[SidebarPanel] URL change listener installed with pageshow/pagehide and SPA detection');
   }
 
   /**
-   * Called when URL changes
+   * Called when URL changes via SPA navigation (pushState/replaceState)
+   * Note: Page reloads are now handled by pageshow event
    */
   async onURLChange() {
-    const newUrl = window.location.href;
-    const newCacheKey = this.cacheManager.getCacheKey(newUrl);
-
-    if (!newCacheKey || newCacheKey === this.currentCacheKey) {
-      return;  // Same page
+    // Check if this is SPA navigation
+    if (this.navigationMode === 'spa') {
+      console.log('[SidebarPanel] SPA navigation detected - continuing to accumulate words');
+      this.navigationMode = 'normal';  // Reset for next navigation
+      return;  // Don't clear words, continue accumulating
     }
 
-    console.log(`[SidebarPanel] URL changed: ${this.currentCacheKey} → ${newCacheKey}`);
-
-    try {
-      const userId = userStore?.getUserId();
-      if (!userId) return;
-
-      // Save current cache
-      if (this.currentCacheKey && Object.keys(this.wordState).length > 0) {
-        await this.cacheManager.setToCache(
-          this.currentCacheKey,
-          this.wordState,
-          userId
-        );
-      }
-
-      // Load new page
-      this.wordState = {};
-      this.jumpIndex = {};
-      await this.loadPageData();
-    } catch (e) {
-      console.error('[SidebarPanel] URL change error:', e);
-    }
+    // This shouldn't happen anymore since regular navigation is handled by pageshow
+    console.log('[SidebarPanel] onURLChange called but not SPA navigation');
   }
 
   /**

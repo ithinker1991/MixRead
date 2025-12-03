@@ -44,6 +44,19 @@ class WordCacheManager {
   }
 
   /**
+   * Generate cache key from Tab ID
+   * Format: "tab_12345"
+   * Used for tab-granular caching instead of URL-based
+   */
+  getTabCacheKey(tabId) {
+    if (!tabId) {
+      console.warn('[WordCacheManager] Invalid tabId');
+      return null;
+    }
+    return `tab_${tabId}`;
+  }
+
+  /**
    * Get cached word state (try memory first, then storage)
    */
   async getFromCache(cacheKey, userId) {

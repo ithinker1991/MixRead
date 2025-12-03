@@ -95,6 +95,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleMarkAsKnown(request, sendResponse);
   } else if (request.type === "ADD_TO_LIBRARY") {
     handleAddToLibrary(request, sendResponse);
+  } else if (request.type === "GET_TAB_ID") {
+    handleGetTabId(request, sender, sendResponse);
   }
   return true; // Keep the message channel open for async response
 });
@@ -300,6 +302,29 @@ async function handleAddToLibrary(request, sendResponse) {
     });
   } catch (error) {
     console.error("Error in handleAddToLibrary:", error);
+    sendResponse({
+      success: false,
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Get the current tab ID
+ */
+function handleGetTabId(request, sender, sendResponse) {
+  try {
+    const tabId = sender.tab?.id;
+    if (!tabId) {
+      throw new Error("Unable to determine tab ID");
+    }
+    console.log('[Background] Returning tab ID:', tabId);
+    sendResponse({
+      success: true,
+      tabId: tabId,
+    });
+  } catch (error) {
+    console.error("Error in handleGetTabId:", error);
     sendResponse({
       success: false,
       error: error.message,
