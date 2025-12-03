@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MixRead Extension Health Check</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      padding: 40px;
+    }
+
+    h1 {
+      color: #333;
+      margin-top: 0;
+      text-align: center;
+    }
+
+    .check-item {
+      padding: 20px;
+      margin: 15px 0;
+      border-radius: 8px;
+      border-left: 4px solid;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .check-item.pending {
+      background: #f0f0f0;
+      border-left-color: #999;
+    }
+
+    .check-item.pass {
+      background: #e8f5e9;
+      border-left-color: #4caf50;
+    }
+
+    .check-item.fail {
+      background: #ffebee;
+      border-left-color: #f44336;
+    }
+
+    .check-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .check-content {
+      flex: 1;
+    }
+
+    .check-title {
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 5px;
+    }
+
+    .check-detail {
+      font-size: 13px;
+      color: #666;
+      margin: 5px 0;
+    }
+
+    .code {
+      background: #f5f5f5;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 30px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-secondary {
+      background: #f0f0f0;
+      color: #333;
+      border: 1px solid #ddd;
+    }
+
+    .btn-secondary:hover {
+      background: #e8e8e8;
+    }
+
+    .solution {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 6px;
+      padding: 15px;
+      margin-top: 20px;
+      display: none;
+    }
+
+    .solution.show {
+      display: block;
+    }
+
+    .solution h3 {
+      margin-top: 0;
+      color: #856404;
+    }
+
+    .solution ol {
+      padding-left: 20px;
+      color: #856404;
+    }
+
+    .solution li {
+      margin: 8px 0;
+    }
+
+    .summary {
+      margin-top: 30px;
+      padding: 20px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .summary.healthy {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    .summary.unhealthy {
+      background: #ffebee;
+      color: #c62828;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏥 MixRead Extension Health Check</h1>
+
+    <div id="checks-container">
+      <!-- Checks will be inserted here -->
+    </div>
+
+    <div class="button-group">
+      <button class="btn-primary" onclick="runChecks()">🔄 Run Check</button>
+      <button class="btn-secondary" onclick="openExtensions()">⚙️ Open Extensions</button>
+      <button class="btn-secondary" onclick="openDevTools()">🛠️ Open DevTools</button>
+    </div>
+
+    <div id="solution-box" class="solution"></div>
+
+    <div id="summary" class="summary"></div>
+  </div>
+
+  <script>
+    const checks = [
+      {
+        id: 'extension-loaded',
+        title: 'Extension Loaded in chrome://extensions',
+        detail: 'Check if MixRead extension appears in chrome://extensions',
+        test: () => {
+          // We can't directly detect this, so we check for extension features
+          return {
+            pass: typeof chrome !== 'undefined' && chrome.runtime,
+            message: 'Chrome API available'
+          };
+        }
+      },
+      {
+        id: 'content-script',
+        title: 'Content Script Injection',
+        detail: 'Check if extension is injecting content scripts into this page',
+        test: () => {
+          // Look for evidence of content script execution
+          const hasLogger = typeof logger !== 'undefined';
+          const hasStorage = typeof Storage !== 'undefined';
+          const hasApiClient = typeof apiClient !== 'undefined';
+
+          return {
+            pass: hasApiClient || hasLogger,
+            message: hasApiClient ? 'Extension modules loaded' : 'Extension modules NOT loaded'
+          };
+        }
+      },
+      {
+        id: 'stemmer-load',
+        title: 'Stemmer Module Load',
+        detail: 'Check if Stemmer is available in page',
+        test: () => {
+          const hasStemmer = typeof Stemmer !== 'undefined';
+          const hasStem = hasStemmer && typeof Stemmer.stem === 'function';
+
+          return {
+            pass: hasStem,
+            message: hasStem ? 'Stemmer loaded' : 'Stemmer NOT loaded'
+          };
+        }
+      },
+      {
+        id: 'message-passing',
+        title: 'Extension Message Passing',
+        detail: 'Check if extension can receive messages from content script',
+        test: () => {
+          return {
+            pass: typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage,
+            message: 'Message API available'
+          };
+        }
+      },
+      {
+        id: 'page-url',
+        title: 'Page URL Protocol',
+        detail: `Current page: ${window.location.href}`,
+        test: () => {
+          const isHttp = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+
+          return {
+            pass: isHttp,
+            message: isHttp ? 'HTTP(S) protocol ✓' : 'File protocol - content scripts won\'t run!'
+          };
+        }
+      }
+    ];
+
+    function renderCheck(check) {
+      const status = check.status || 'pending';
+      const icon = status === 'pass' ? '✓' : status === 'fail' ? '✗' : '⏳';
+      const iconEmoji = status === 'pass' ? '✅' : status === 'fail' ? '❌' : '⏳';
+
+      return `
+        <div class="check-item ${status}">
+          <div class="check-icon">${iconEmoji}</div>
+          <div class="check-content">
+            <div class="check-title">${check.title}</div>
+            <div class="check-detail">${check.detail}</div>
+            ${check.result ? `<div class="check-detail" style="color: #333; margin-top: 8px;"><strong>${check.result.message}</strong></div>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    function runChecks() {
+      // Clear previous results
+      document.getElementById('solution-box').classList.remove('show');
+      document.getElementById('summary').innerHTML = '';
+
+      // Run all checks
+      checks.forEach(check => {
+        try {
+          check.result = check.test();
+          check.status = check.result.pass ? 'pass' : 'fail';
+        } catch (e) {
+          check.result = { message: `Error: ${e.message}` };
+          check.status = 'fail';
+        }
+      });
+
+      // Render checks
+      const container = document.getElementById('checks-container');
+      container.innerHTML = checks.map(c => renderCheck(c)).join('');
+
+      // Check overall health
+      const allPass = checks.every(c => c.status === 'pass');
+      const failedChecks = checks.filter(c => c.status === 'fail');
+
+      if (allPass) {
+        document.getElementById('summary').classList.add('healthy');
+        document.getElementById('summary').innerHTML = `
+          <h2>✅ Extension is Healthy!</h2>
+          <p>All systems operational. The extension should be working correctly.</p>
+          <p>If words still aren't being highlighted, try:</p>
+          <ul style="text-align: left; display: inline-block;">
+            <li>Reload this page (F5)</li>
+            <li>Check the difficulty level in the popup</li>
+            <li>Open DevTools (F12) and check Console for errors</li>
+          </ul>
+        `;
+      } else {
+        document.getElementById('summary').classList.add('unhealthy');
+        document.getElementById('summary').innerHTML = `
+          <h2>❌ Extension Issues Found</h2>
+          <p>${failedChecks.length} check(s) failed:</p>
+          <ul style="text-align: left; display: inline-block;">
+            ${failedChecks.map(c => `<li><strong>${c.title}</strong>: ${c.result.message}</li>`).join('')}
+          </ul>
+        `;
+
+        // Show solution for file protocol
+        const fileProtocolCheck = failedChecks.find(c => c.id === 'page-url');
+        if (fileProtocolCheck && !fileProtocolCheck.result.pass) {
+          document.getElementById('solution-box').classList.add('show');
+          document.getElementById('solution-box').innerHTML = `
+            <h3>⚠️ Page Protocol Issue</h3>
+            <p>Content scripts don't run on <code>file://</code> URLs. You must serve this page over HTTP.</p>
+            <ol>
+              <li>Make sure your HTTP server is running:
+                <div class="code">python3 -m http.server 8001 --bind localhost</div>
+              </li>
+              <li>Then access the page at:
+                <div class="code">http://localhost:8001/extension-check.html</div>
+              </li>
+              <li>NOT at <code>file:///...</code></li>
+            </ol>
+          `;
+        }
+
+        // Show solution for extension modules
+        const scriptCheck = failedChecks.find(c => c.id === 'content-script');
+        if (scriptCheck && !scriptCheck.result.pass) {
+          document.getElementById('solution-box').classList.add('show');
+          document.getElementById('solution-box').innerHTML = `
+            <h3>⚠️ Content Script Not Loaded</h3>
+            <p>The extension's content script is not running on this page.</p>
+            <ol>
+              <li>Open <code>chrome://extensions</code></li>
+              <li>Find "MixRead" extension</li>
+              <li>Check if it has any errors (red banner)</li>
+              <li>Try disabling and re-enabling the extension</li>
+              <li>Check Developer Mode console for errors:
+                <ul>
+                  <li>Click extension ID link to open the extension's background page</li>
+                  <li>Look at the Console tab for errors</li>
+                </ul>
+              </li>
+            </ol>
+          `;
+        }
+      }
+    }
+
+    function openExtensions() {
+      window.location.href = 'chrome://extensions';
+    }
+
+    function openDevTools() {
+      alert('Press F12 to open DevTools\nGo to Console tab to see detailed logs');
+    }
+
+    // Auto-run on load
+    window.addEventListener('load', () => {
+      setTimeout(runChecks, 500);
+    });
+  </script>
+</body>
+</html>

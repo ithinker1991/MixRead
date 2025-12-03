@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MixRead Stemming Test - Auto Analysis</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #ecf0f1;
+      color: #333;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      min-height: 100vh;
+    }
+
+    .panel {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      overflow-y: auto;
+      max-height: 90vh;
+    }
+
+    .left-panel {
+      order: 1;
+    }
+
+    .right-panel {
+      order: 2;
+      background: #f8f9fa;
+    }
+
+    h1 {
+      color: #2c3e50;
+      margin-top: 0;
+      font-size: 20px;
+      border-bottom: 2px solid #3498db;
+      padding-bottom: 10px;
+    }
+
+    h2 {
+      color: #34495e;
+      font-size: 16px;
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+
+    .article-text {
+      font-size: 16px;
+      line-height: 1.8;
+      color: #444;
+      text-align: justify;
+    }
+
+    .article-text p {
+      margin-bottom: 15px;
+    }
+
+    .controls {
+      background: #ecf0f1;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+      margin-bottom: 10px;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #2980b9;
+    }
+
+    button.secondary {
+      background: #95a5a6;
+    }
+
+    button.secondary:hover {
+      background: #7f8c8d;
+    }
+
+    button.success {
+      background: #27ae60;
+    }
+
+    button.success:hover {
+      background: #229954;
+    }
+
+    button:disabled {
+      background: #bdc3c7;
+      cursor: not-allowed;
+    }
+
+    .stats {
+      background: #e8f8f5;
+      padding: 12px;
+      border-left: 4px solid #27ae60;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+
+    .stats.warning {
+      background: #fdeaa8;
+      border-left-color: #f39c12;
+    }
+
+    .stats.error {
+      background: #fadbd8;
+      border-left-color: #e74c3c;
+    }
+
+    .analysis-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+
+    .analysis-table th {
+      background: #34495e;
+      color: white;
+      padding: 10px;
+      text-align: left;
+      border-bottom: 2px solid #2c3e50;
+    }
+
+    .analysis-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #ecf0f1;
+    }
+
+    .analysis-table tr:hover {
+      background: #f5f5f5;
+    }
+
+    .word-highlighted {
+      background: #ffeb3b;
+      font-weight: bold;
+      padding: 2px 4px;
+      border-radius: 2px;
+    }
+
+    .word-not-highlighted {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      margin-right: 5px;
+      margin-bottom: 5px;
+    }
+
+    .badge.highlighted {
+      background: #ffeb3b;
+      color: #333;
+    }
+
+    .badge.not-highlighted {
+      background: #e74c3c;
+      color: white;
+    }
+
+    .badge.match {
+      background: #27ae60;
+      color: white;
+    }
+
+    .stem-group {
+      background: #f9f9f9;
+      padding: 12px;
+      margin-bottom: 12px;
+      border-left: 4px solid #3498db;
+      border-radius: 4px;
+    }
+
+    .stem-group strong {
+      color: #2980b9;
+      font-size: 15px;
+    }
+
+    .variants-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .variant-item {
+      display: inline-block;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #7f8c8d;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #ecf0f1;
+      border-top-color: #3498db;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .summary-box {
+      background: #e3f2fd;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+      border-left: 4px solid #2196f3;
+    }
+
+    .summary-box.success {
+      background: #e8f5e9;
+      border-left-color: #4caf50;
+    }
+
+    .summary-box.warning {
+      background: #fff3e0;
+      border-left-color: #ff9800;
+    }
+
+    .summary-box.error {
+      background: #ffebee;
+      border-left-color: #f44336;
+    }
+
+    code {
+      background: #ecf0f1;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+    }
+
+    @media (max-width: 1024px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .left-panel {
+        order: 1;
+      }
+
+      .right-panel {
+        order: 2;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Load Stemmer directly -->
+  <script src="scripts/stemmer.js"></script>
+  <div class="layout">
+    <!-- Left Panel: Article Text -->
+    <div class="panel left-panel">
+      <h1>📄 Test Article</h1>
+
+      <div class="controls">
+        <button id="btn-check-highlights" class="success">🔍 Check Highlights Now</button>
+        <button id="btn-mark-stranger" class="secondary">Mark 'stranger' as Known</button>
+        <button id="btn-reload" class="secondary">🔄 Reload & Re-analyze</button>
+        <button id="btn-clear" class="secondary">Clear Analysis</button>
+      </div>
+
+      <div id="article-status" class="stats" style="display:none;"></div>
+
+      <div class="article-text">
+        <p>
+          Whatever skeptics have said can't be done, Elon has gone out and made real.
+          Remember in the 1990s, when we would call strangers and give them our credit-card
+          numbers? Elon dreamed up a little thing called PayPal. His Tesla Motors and
+          SolarCity companies are making a clean, renewable-energy future a reality…his
+          SpaceX [is] reopening space for exploration…it's a paradox that Elon is working
+          to improve our planet at the same time he's building spacecraft to help us
+          leave it.
+        </p>
+      </div>
+    </div>
+
+    <!-- Right Panel: Analysis -->
+    <div class="panel right-panel">
+      <h1>📊 Stemming Analysis</h1>
+
+      <div id="analysis-content">
+        <div class="stats">
+          <strong>ℹ️ Instructions:</strong><br>
+          1. Wait for page to load (extension initializes)<br>
+          2. Click "Check Highlights Now" to analyze<br>
+          3. See which words are highlighted vs. missed<br>
+          4. Compare stems and variants below
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Analysis state
+    let analysisState = {
+      initialHighlights: null,
+      currentHighlights: null,
+      wordVariants: {}
+    };
+
+    // Wait for Stemmer to load (it's loaded by <script src="scripts/stemmer.js">)
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        if (typeof window.Stemmer !== 'undefined' && typeof window.Stemmer.stem === 'function') {
+          console.log('[TEST PAGE] ✓ Stemmer loaded successfully');
+          updateAnalysis('<div class="stats"><strong>✓ Stemmer loaded!</strong> Click "Check Highlights Now" to analyze.</div>');
+        } else {
+          console.error('[TEST PAGE] ✗ Stemmer not found');
+          updateAnalysis('<div class="stats error">❌ Stemmer failed to load. Check browser console for errors.</div>');
+        }
+      }, 500);
+    });
+
+    // Get all highlighted words from page
+    function getHighlightedWords() {
+      const highlights = document.querySelectorAll('.mixread-highlight');
+      return Array.from(highlights).map(h => h.textContent.toLowerCase().trim());
+    }
+
+    // Extract all text words from article
+    function getArticleWords() {
+      const article = document.querySelector('.article-text');
+      const text = article.textContent;
+      const wordPattern = /\b[a-z''-]+\b/gi;
+      const words = [];
+      let match;
+      while ((match = wordPattern.exec(text)) !== null) {
+        words.push(match[0].toLowerCase());
+      }
+      return [...new Set(words)]; // unique only
+    }
+
+    // Create stem mapping
+    function createStemMapping(words) {
+      if (!window.Stemmer || typeof window.Stemmer.stem !== 'function') return {};
+      const map = {};
+      for (const word of words) {
+        const stem = window.Stemmer.stem(word);
+        if (!map[stem]) map[stem] = [];
+        map[stem].push(word);
+      }
+      return map;
+    }
+
+    // Analyze and display results
+    function analyzeAndDisplay() {
+      if (!window.Stemmer || typeof window.Stemmer.stem !== 'function') {
+        console.error('[TEST PAGE] Stemmer is not available or not properly initialized', { Stemmer: window.Stemmer });
+        updateAnalysis('<div class="stats error">❌ Stemmer not available. Please refresh the page and ensure stemmer.js loaded correctly.</div>');
+        return;
+      }
+
+      const allWords = getArticleWords();
+      const highlightedWords = getHighlightedWords();
+      const stemMap = createStemMapping(allWords);
+
+      analysisState.currentHighlights = highlightedWords;
+      analysisState.wordVariants = stemMap;
+
+      // Build analysis HTML
+      let html = `
+        <div class="summary-box">
+          <strong>📈 Current Status:</strong><br>
+          Total unique words: <strong>${allWords.length}</strong><br>
+          Highlighted words: <strong>${highlightedWords.length}</strong><br>
+          Unique stems: <strong>${Object.keys(stemMap).length}</strong><br>
+          Coverage: <strong>${(highlightedWords.length / allWords.length * 100).toFixed(1)}%</strong>
+        </div>
+      `;
+
+      // Find stems with variants where only some are highlighted
+      const partialMatches = [];
+      for (const [stem, variants] of Object.entries(stemMap)) {
+        if (variants.length > 1) {
+          const highlightedVariants = variants.filter(v => highlightedWords.includes(v));
+          const notHighlightedVariants = variants.filter(v => !highlightedWords.includes(v));
+
+          if (highlightedVariants.length > 0 && notHighlightedVariants.length > 0) {
+            partialMatches.push({
+              stem,
+              all: variants,
+              highlighted: highlightedVariants,
+              notHighlighted: notHighlightedVariants
+            });
+          }
+        }
+      }
+
+      if (partialMatches.length > 0) {
+        html += `
+          <div class="summary-box warning">
+            <strong>⚠️ Word Variants Issue Found!</strong><br>
+            <strong>${partialMatches.length}</strong> stem(s) have some variants highlighted but not others.
+            This indicates stemming extraction is <strong>NOT working properly</strong>.
+          </div>
+        `;
+
+        html += '<h2>Problematic Stems:</h2>';
+        partialMatches.forEach(({stem, highlighted, notHighlighted}) => {
+          html += `
+            <div class="stem-group">
+              <strong>Stem: <code>${stem}</code></strong><br>
+              ✅ Highlighted: ${highlighted.map(w => `<span class="badge highlighted">${w}</span>`).join('')}<br>
+              ❌ NOT Highlighted: ${notHighlighted.map(w => `<span class="badge not-highlighted">${w}</span>`).join('')}
+            </div>
+          `;
+        });
+      } else if (highlightedWords.length > 0 && Object.keys(stemMap).length > highlightedWords.length) {
+        html += `
+          <div class="summary-box success">
+            <strong>✅ Stemming appears to be working!</strong><br>
+            All word variants are consistently highlighted.
+          </div>
+        `;
+      } else {
+        html += `
+          <div class="summary-box">
+            <strong>⏳ Not enough data yet.</strong><br>
+            No word variants found on this page or no words highlighted.
+          </div>
+        `;
+      }
+
+      // Detailed stem analysis table
+      html += '<h2>All Stems & Variants:</h2>';
+      html += `
+        <table class="analysis-table">
+          <thead>
+            <tr>
+              <th>Stem</th>
+              <th>Variants</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      for (const [stem, variants] of Object.entries(stemMap)) {
+        if (variants.length > 1) {
+          const highlightedCount = variants.filter(v => highlightedWords.includes(v)).length;
+          const allHighlighted = highlightedCount === variants.length;
+          const noneHighlighted = highlightedCount === 0;
+
+          let statusBadge = '';
+          if (allHighlighted) {
+            statusBadge = '<span class="badge match">ALL ✓</span>';
+          } else if (noneHighlighted) {
+            statusBadge = '<span class="badge not-highlighted">NONE</span>';
+          } else {
+            statusBadge = `<span class="badge">${highlightedCount}/${variants.length}</span>`;
+          }
+
+          html += `
+            <tr>
+              <td><strong>${stem}</strong></td>
+              <td>${variants.map(v => {
+                const isHighlighted = highlightedWords.includes(v);
+                return `<span class="${isHighlighted ? 'word-highlighted' : ''}">${v}</span>`;
+              }).join(', ')}</td>
+              <td>${statusBadge}</td>
+            </tr>
+          `;
+        }
+      }
+
+      html += `
+          </tbody>
+        </table>
+      `;
+
+      updateAnalysis(html);
+    }
+
+    // Update analysis panel
+    function updateAnalysis(content) {
+      document.getElementById('analysis-content').innerHTML = content;
+    }
+
+    // Button handlers
+    document.getElementById('btn-check-highlights').addEventListener('click', () => {
+      if (!window.Stemmer || typeof window.Stemmer.stem !== 'function') {
+        updateAnalysis('<div class="stats error">❌ Stemmer not loaded. Please check DevTools console for errors.</div>');
+        return;
+      }
+      analyzeAndDisplay();
+    });
+
+    document.getElementById('btn-reload').addEventListener('click', () => {
+      window.location.reload();
+    });
+
+    document.getElementById('btn-clear').addEventListener('click', () => {
+      analysisState = { initialHighlights: null, currentHighlights: null, wordVariants: {} };
+      updateAnalysis(`
+        <div class="stats">
+          <strong>ℹ️ Analysis cleared.</strong><br>
+          Click "Check Highlights Now" to perform new analysis.
+        </div>
+      `);
+    });
+
+    document.getElementById('btn-mark-stranger').addEventListener('click', () => {
+      const stickers = document.querySelectorAll('.mixread-highlight');
+      for (const el of stickers) {
+        if (el.textContent.toLowerCase() === 'stranger') {
+          // Trigger the click to show tooltip
+          el.click();
+          // Simulate adding to vocabulary
+          setTimeout(() => {
+            const btn = document.querySelector('#btn-add-to-vocab');
+            if (btn) btn.click();
+          }, 500);
+          break;
+        }
+      }
+    });
+
+    // Auto-check after page fully loads (extension and highlighting)
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        if (window.Stemmer && typeof window.Stemmer.stem === 'function') {
+          const highlights = document.querySelectorAll('.mixread-highlight');
+          if (highlights.length > 0) {
+            console.log('[TEST PAGE] Extension highlights detected, auto-analyzing...');
+            analyzeAndDisplay();
+          } else {
+            console.log('[TEST PAGE] Waiting for extension to highlight words...');
+          }
+        }
+      }, 3000);
+    });
+  </script>
+</body>
+</html>

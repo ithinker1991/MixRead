@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Sentence Extraction</title>
+</head>
+<body>
+    <h1>Test Sentence Extraction</h1>
+
+    <!-- Simulate what textContent returns from LLM blog -->
+    <p id="test-para">
+        This is a normal sentence with some words.
+        The word approximate(1×) and track(1×) appear here.
+        More text about components(2×) and evaluate(1×).
+    </p>
+
+    <script>
+        // Test what textContent actually returns
+        const para = document.getElementById('test-para');
+        console.log('Raw textContent:', para.textContent);
+        console.log('Raw innerText:', para.innerText);
+
+        // Test our extraction logic
+        let text = para.textContent || para.innerText || '';
+        text = text.replace(/\s+/g, ' ').trim();
+        console.log('After whitespace cleanup:', text);
+
+        // Check for patterns
+        const wordFormPatterns = (text.match(/\([0-9×]+\)/g) || []);
+        console.log('Found patterns:', wordFormPatterns);
+        console.log('Pattern count:', wordFormPatterns.length);
+
+        // Split by punctuation
+        const sentences = text.split(/[.!?]/);
+        console.log('Split sentences:', sentences);
+    </script>
+</body>
+</html>

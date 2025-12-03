@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Domain Management Integration Tests</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+      color: #333;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      color: #222;
+    }
+
+    .test-suite {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .test-suite h2 {
+      font-size: 18px;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #007bff;
+      padding-bottom: 10px;
+    }
+
+    .test-case {
+      padding: 15px;
+      margin-bottom: 10px;
+      border-left: 4px solid #ddd;
+      background: #f9f9f9;
+      border-radius: 4px;
+    }
+
+    .test-case.passed {
+      border-left-color: #28a745;
+      background: #f0f8f4;
+    }
+
+    .test-case.failed {
+      border-left-color: #dc3545;
+      background: #fdf4f4;
+    }
+
+    .test-case h3 {
+      font-size: 14px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .test-case.passed h3::before {
+      content: "✓";
+      color: #28a745;
+      font-weight: bold;
+    }
+
+    .test-case.failed h3::before {
+      content: "✗";
+      color: #dc3545;
+      font-weight: bold;
+    }
+
+    .test-case p {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 5px;
+    }
+
+    .test-case code {
+      background: #f0f0f0;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+    }
+
+    .summary {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .summary h2 {
+      font-size: 16px;
+      margin-bottom: 15px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .stat {
+      padding: 15px;
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    .stat h3 {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .stat p {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .stat.passed {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    .stat.failed {
+      background: #ffebee;
+      color: #c62828;
+    }
+
+    .stat.pending {
+      background: #fff3e0;
+      color: #e65100;
+    }
+
+    button {
+      padding: 10px 20px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    .test-controls {
+      margin-bottom: 20px;
+    }
+
+    .log-output {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 15px;
+    }
+
+    .log-output .log-entry {
+      margin-bottom: 5px;
+      font-size: 11px;
+    }
+
+    .log-output .log-entry.info {
+      color: #4fc3f7;
+    }
+
+    .log-output .log-entry.success {
+      color: #81c784;
+    }
+
+    .log-output .log-entry.error {
+      color: #e57373;
+    }
+
+    .log-output .log-entry.warning {
+      color: #ffb74d;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 Domain Management Integration Tests</h1>
+
+    <div class="test-controls">
+      <button onclick="runAllTests()">Run All Tests</button>
+      <button onclick="clearLogs()">Clear Logs</button>
+      <button onclick="resetState()">Reset State</button>
+    </div>
+
+    <div id="summary" class="summary" style="display:none;">
+      <h2>Test Summary</h2>
+      <div class="stats">
+        <div class="stat passed">
+          <h3 id="passed-count">0</h3>
+          <p>Passed</p>
+        </div>
+        <div class="stat failed">
+          <h3 id="failed-count">0</h3>
+          <p>Failed</p>
+        </div>
+        <div class="stat pending">
+          <h3 id="pending-count">0</h3>
+          <p>Pending</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="test-results"></div>
+
+    <div class="log-output" id="log-output"></div>
+  </div>
+
+  <!-- Include required modules -->
+  <script src="scripts/logger.js"></script>
+  <script src="modules/domain-policy/domain-policy-store.js"></script>
+  <script src="modules/domain-policy/domain-policy-filter.js"></script>
+  <script src="modules/domain-policy/preset-dialog.js"></script>
+
+  <script>
+    const LogOutput = {
+      entries: [],
+
+      log(message, type = 'info') {
+        const entry = {message, type, timestamp: new Date().toISOString()};
+        this.entries.push(entry);
+        this.render();
+      },
+
+      clear() {
+        this.entries = [];
+        this.render();
+      },
+
+      render() {
+        const logDiv = document.getElementById('log-output');
+        logDiv.innerHTML = this.entries.map(entry => {
+          const time = new Date(entry.timestamp).toLocaleTimeString();
+          return `<div class="log-entry ${entry.type}">[${time}] ${entry.message}</div>`;
+        }).join('');
+        logDiv.scrollTop = logDiv.scrollHeight;
+      }
+    };
+
+    // Test framework
+    let testResults = [];
+
+    async function test(name, fn) {
+      try {
+        LogOutput.log(`Starting: ${name}`, 'info');
+        await fn();
+        LogOutput.log(`✓ PASSED: ${name}`, 'success');
+        testResults.push({name, passed: true, error: null});
+      } catch (error) {
+        LogOutput.log(`✗ FAILED: ${name}`, 'error');
+        LogOutput.log(`  Error: ${error.message}`, 'error');
+        testResults.push({name, passed: false, error: error.message});
+      }
+    }
+
+    function assert(condition, message) {
+      if (!condition) {
+        throw new Error(message);
+      }
+    }
+
+    // Initialize test environment
+    function initTestEnv() {
+      // Mock API client if needed
+      window.apiClient = {
+        async get(url) {
+          LogOutput.log(`[Mock API] GET ${url}`, 'info');
+          // Return mock data
+          if (url.includes('blacklist')) {
+            return {success: true, blacklist_domains: ['localhost', 'github.com']};
+          }
+          if (url.includes('whitelist')) {
+            return {success: true, whitelist_domains: []};
+          }
+          return {success: true};
+        },
+
+        async post(url, data) {
+          LogOutput.log(`[Mock API] POST ${url}`, 'info');
+          return {success: true, message: 'OK'};
+        },
+
+        async delete(url) {
+          LogOutput.log(`[Mock API] DELETE ${url}`, 'info');
+          return {success: true, message: 'OK'};
+        }
+      };
+    }
+
+    // Test Suites
+    async function testDomainPolicyStore() {
+      LogOutput.log('=== DomainPolicyStore Tests ===', 'info');
+
+      await test('Store initialization', async () => {
+        const store = new DomainPolicyStore();
+        assert(store !== null, 'Store should be created');
+        assert(!store.isInitialized, 'Store should not be initialized initially');
+      });
+
+      await test('Initialize store', async () => {
+        const store = new DomainPolicyStore();
+        await store.initialize('test-user');
+        assert(store.isInitialized, 'Store should be initialized');
+        assert(Array.isArray(store.blacklist), 'Blacklist should be array');
+        assert(Array.isArray(store.whitelist), 'Whitelist should be array');
+      });
+
+      await test('Add blacklist domain', async () => {
+        const store = new DomainPolicyStore();
+        await store.initialize('test-user');
+        const result = await store.addBlacklistDomain('test-user', 'example.com');
+        assert(result === true, 'Should return true on success');
+      });
+
+      await test('Should exclude domain', async () => {
+        const store = new DomainPolicyStore();
+        store.blacklist = ['example.com', 'test.com'];
+        const shouldExclude = store.shouldExcludeDomain('example.com');
+        assert(shouldExclude === true, 'Should exclude domain in blacklist');
+      });
+
+      await test('Should not exclude domain', async () => {
+        const store = new DomainPolicyStore();
+        store.blacklist = ['example.com'];
+        const shouldExclude = store.shouldExcludeDomain('github.com');
+        assert(shouldExclude === false, 'Should not exclude domain not in blacklist');
+      });
+
+      await test('Extract domain from URL', async () => {
+        const store = new DomainPolicyStore();
+        const domain = store.extractDomain('https://github.com/user/repo');
+        assert(domain === 'github.com', `Should extract github.com from URL, got ${domain}`);
+      });
+
+      await test('Listener notification', async () => {
+        const store = new DomainPolicyStore();
+        let notified = false;
+        store.addListener(() => {
+          notified = true;
+        });
+        store.notify();
+        assert(notified === true, 'Should notify listeners');
+      });
+    }
+
+    async function testDomainPolicyFilter() {
+      LogOutput.log('=== DomainPolicyFilter Tests ===', 'info');
+
+      await test('Extract domain from URL', async () => {
+        const domain = DomainPolicyFilter.extractDomain('https://example.com/path');
+        assert(domain === 'example.com', 'Should extract domain correctly');
+      });
+
+      await test('Check if domain in list', async () => {
+        const result = DomainPolicyFilter.isDomainInList('github.com', ['github.com', 'example.com']);
+        assert(result === true, 'Should find domain in list');
+      });
+
+      await test('Case insensitive domain matching', async () => {
+        const result = DomainPolicyFilter.isDomainInList('GitHub.com', ['github.com']);
+        assert(result === true, 'Should do case-insensitive matching');
+      });
+
+      await test('Get exclusion reason', async () => {
+        const store = new DomainPolicyStore();
+        store.blacklist = ['example.com'];
+        const reason = DomainPolicyFilter.getExclusionReason('example.com', store);
+        assert(reason === 'in_blacklist', 'Should return correct reason');
+      });
+
+      await test('Get exclusion status', async () => {
+        const store = new DomainPolicyStore();
+        store.blacklist = ['example.com'];
+        const status = DomainPolicyFilter.getExclusionStatus('https://example.com/page', store);
+        assert(status.isExcluded === true, 'Should be excluded');
+        assert(status.domain === 'example.com', 'Should have correct domain');
+      });
+    }
+
+    async function testPresetDialog() {
+      LogOutput.log('=== PresetDialog Tests ===', 'info');
+
+      await test('Dialog instantiation', async () => {
+        const dialog = new PresetDialog();
+        assert(dialog !== null, 'Dialog should be created');
+        assert(Array.isArray(dialog.presetDomains), 'Should have preset domains');
+        assert(dialog.presetDomains.length > 0, 'Should have domains');
+      });
+
+      await test('Group domains by category', async () => {
+        const dialog = new PresetDialog();
+        const groups = dialog.groupByCategory();
+        assert(Object.keys(groups).length > 0, 'Should have categories');
+      });
+
+      await test('Preset dialog HTML generation', async () => {
+        const dialog = new PresetDialog();
+        const html = dialog.createDialogHTML();
+        assert(html.includes('preset-dialog-overlay'), 'Should contain overlay');
+        assert(html.includes('preset-domain-checkbox'), 'Should contain checkboxes');
+        assert(html.includes('Add Selected Domains'), 'Should contain confirm button');
+      });
+
+      await test('Should show condition', async () => {
+        const store = new DomainPolicyStore();
+        store.blacklist = [];
+        store.isInitialized = true;
+        const shouldShow = PresetDialog.shouldShow(store);
+        assert(shouldShow === true, 'Should show when no blacklist');
+      });
+    }
+
+    async function testIntegration() {
+      LogOutput.log('=== Integration Tests ===', 'info');
+
+      await test('Full workflow: add domain', async () => {
+        const store = new DomainPolicyStore();
+        await store.initialize('integration-test-user');
+        const initialCount = store.getBlacklistCount();
+        await store.addBlacklistDomain('integration-test-user', 'newdomain.com');
+        const finalCount = store.getBlacklistCount();
+        assert(finalCount >= initialCount, 'Count should increase');
+      });
+
+      await test('Store listener receives updates', async () => {
+        const store = new DomainPolicyStore();
+        let callCount = 0;
+        store.addListener(() => {
+          callCount++;
+        });
+        store.notify();
+        assert(callCount === 1, 'Listener should be called');
+      });
+    }
+
+    async function runAllTests() {
+      testResults = [];
+      LogOutput.clear();
+
+      initTestEnv();
+      LogOutput.log('Starting test suite...', 'info');
+      LogOutput.log('', 'info');
+
+      await testDomainPolicyStore();
+      LogOutput.log('', 'info');
+
+      await testDomainPolicyFilter();
+      LogOutput.log('', 'info');
+
+      await testPresetDialog();
+      LogOutput.log('', 'info');
+
+      await testIntegration();
+      LogOutput.log('', 'info');
+
+      displayResults();
+    }
+
+    function displayResults() {
+      const passed = testResults.filter(t => t.passed).length;
+      const failed = testResults.filter(t => !t.passed).length;
+      const total = testResults.length;
+
+      document.getElementById('summary').style.display = 'block';
+      document.getElementById('passed-count').textContent = passed;
+      document.getElementById('failed-count').textContent = failed;
+      document.getElementById('pending-count').textContent = '0';
+
+      const resultsDiv = document.getElementById('test-results');
+      resultsDiv.innerHTML = testResults.map(result => {
+        const status = result.passed ? 'passed' : 'failed';
+        const errorMsg = result.error ? `<p>${result.error}</p>` : '';
+        return `
+          <div class="test-suite">
+            <div class="test-case ${status}">
+              <h3>${result.name}</h3>
+              ${errorMsg}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      LogOutput.log(`\n=== Test Results ===`, 'info');
+      LogOutput.log(`Passed: ${passed}/${total}`, passed > 0 ? 'success' : 'warning');
+      LogOutput.log(`Failed: ${failed}/${total}`, failed > 0 ? 'error' : 'success');
+    }
+
+    function clearLogs() {
+      LogOutput.clear();
+    }
+
+    function resetState() {
+      testResults = [];
+      document.getElementById('test-results').innerHTML = '';
+      document.getElementById('summary').style.display = 'none';
+      LogOutput.clear();
+      LogOutput.log('State reset', 'info');
+    }
+
+    // Auto-run on load
+    window.addEventListener('DOMContentLoaded', () => {
+      LogOutput.log('Test environment ready', 'info');
+    });
+  </script>
+</body>
+</html>

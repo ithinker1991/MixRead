@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Simple Sentence Extraction</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-word {
+            background-color: yellow;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Simple Sentence Extraction</h1>
+
+    <div class="section">
+        <p>This is a simple test. The word <span class="test-word">slack</span> should be found here. We need to ensure proper sentence extraction works correctly.</p>
+
+        <p>Another example with the same word. Don't let the project <span class="test-word">slack</span> behind schedule. This is important for team coordination.</p>
+
+        <p>The team uses Slack for communication. Actually, they use a tool called <span class="test-word">slack</span> every day. It helps with project management.</p>
+    </div>
+
+    <div class="section">
+        <p>Testing with a different word. <span class="test-word">Proper</span> documentation is essential. We must ensure <span class="test-word">proper</span> formatting is maintained.</p>
+
+        <p>She demonstrated proper form during the exercise. This shows the importance of proper technique in physical activities.</p>
+    </div>
+
+    <button onclick="testExtraction()">Test Sentence Extraction</button>
+    <button onclick="clearResult()">Clear</button>
+
+    <div id="result"></div>
+
+    <script>
+        function testExtraction() {
+            const result = document.getElementById('result');
+            result.innerHTML = 'Testing simple sentence extraction...<br><br>';
+
+            // Get all test words
+            const words = document.querySelectorAll('.test-word');
+            const wordGroups = {};
+
+            words.forEach(word => {
+                const text = word.textContent.toLowerCase();
+                if (!wordGroups[text]) {
+                    wordGroups[text] = [];
+                }
+                wordGroups[text].push(word);
+            });
+
+            // Test extraction for each word
+            Object.entries(wordGroups).forEach(([word, elements]) => {
+                result.innerHTML += `<strong>Word: "${word}"</strong><br>`;
+
+                elements.forEach((element, index) => {
+                    result.innerHTML += `Occurrence ${index + 1}:<br>`;
+
+                    // Find paragraph
+                    let paragraph = element.closest('p');
+                    if (!paragraph) {
+                        paragraph = element.closest('div') || element.parentElement;
+                    }
+
+                    if (paragraph) {
+                        // Get text
+                        let text = paragraph.textContent || paragraph.innerText || '';
+                        text = text.replace(/\s+/g, ' ').trim();
+
+                        result.innerHTML += `  Parent: ${paragraph.tagName.toLowerCase()}<br>`;
+                        result.innerHTML += `  Text: "${text.substring(0, 200)}...".<br>`;
+
+                        // Extract sentences using the simplified method
+                        const wordLower = word.toLowerCase();
+                        const textLower = text.toLowerCase();
+                        let pos = textLower.indexOf(wordLower);
+
+                        if (pos >= 0) {
+                            // Find start (previous punctuation)
+                            let start = pos;
+                            while (start > 0 && !text[start - 1].match(/[.!?]/)) {
+                                start--;
+                            }
+                            if (start > 0) start++;
+
+                            // Find end (next punctuation)
+                            let end = pos + word.length;
+                            while (end < text.length && !text[end].match(/[.!?]/)) {
+                                end++;
+                            }
+                            if (end < text.length) end++;
+
+                            // Extract sentence
+                            let sentence = text.substring(start, end).trim();
+                            sentence = sentence.replace(/\s+/g, ' ');
+                            if (sentence.length > 0) {
+                                sentence = sentence.charAt(0).toUpperCase() + sentence.slice(1);
+                            }
+
+                            result.innerHTML += `  ✅ Extracted: "${sentence}"<br>`;
+                        } else {
+                            result.innerHTML += `  ❌ Word not found in text<br>`;
+                        }
+                    } else {
+                        result.innerHTML += `  ❌ No parent element found<br>`;
+                    }
+                    result.innerHTML += '<br>';
+                });
+            });
+        }
+
+        function clearResult() {
+            document.getElementById('result').innerHTML = '';
+        }
+
+        // Auto-run test
+        window.addEventListener('load', () => {
+            setTimeout(testExtraction, 1000);
+        });
+    </script>
+</body>
+</html>

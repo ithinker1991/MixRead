@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MixRead Stemming Diagnostic</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #252526;
+      padding: 20px;
+      border-radius: 5px;
+      border: 1px solid #3e3e42;
+    }
+
+    h1 {
+      color: #4ec9b0;
+      border-bottom: 2px solid #4ec9b0;
+      padding-bottom: 10px;
+      margin-top: 0;
+    }
+
+    h2 {
+      color: #569cd6;
+      margin-top: 20px;
+    }
+
+    .status {
+      padding: 10px;
+      margin: 10px 0;
+      border-left: 4px solid;
+      border-radius: 3px;
+    }
+
+    .status.success {
+      border-color: #4ec9b0;
+      background: #0d3d2a;
+    }
+
+    .status.warning {
+      border-color: #ce9178;
+      background: #3d2a10;
+    }
+
+    .status.error {
+      border-color: #f48771;
+      background: #3d1a1a;
+    }
+
+    .status.info {
+      border-color: #569cd6;
+      background: #1a2d3d;
+    }
+
+    code {
+      background: #1e1e1e;
+      padding: 2px 6px;
+      border-radius: 3px;
+      color: #ce9178;
+    }
+
+    pre {
+      background: #1e1e1e;
+      border: 1px solid #3e3e42;
+      padding: 10px;
+      border-radius: 3px;
+      overflow-x: auto;
+    }
+
+    .log-line {
+      padding: 3px 0;
+      font-size: 13px;
+    }
+
+    .log-success { color: #4ec9b0; }
+    .log-error { color: #f48771; }
+    .log-warn { color: #ce9178; }
+    .log-info { color: #569cd6; }
+    .log-debug { color: #858585; }
+
+    button {
+      background: #569cd6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 3px;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+
+    button:hover {
+      background: #4ec9b0;
+    }
+
+    .article {
+      background: #1e1e1e;
+      padding: 15px;
+      border-radius: 3px;
+      margin: 15px 0;
+      border-left: 4px solid #569cd6;
+    }
+
+    .article p {
+      line-height: 1.6;
+      margin: 10px 0;
+    }
+
+    .timer {
+      color: #858585;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <script src="scripts/stemmer.js"></script>
+
+  <div class="container">
+    <h1>🔬 MixRead Stemming Diagnostic</h1>
+
+    <div id="diagnostics"></div>
+
+    <div style="margin-top: 30px;">
+      <button onclick="runFullDiagnostics()">🔍 Run Full Diagnostic</button>
+      <button onclick="testStemmer()">🧪 Test Stemmer Only</button>
+      <button onclick="checkHighlights()">✨ Check Highlights</button>
+      <button onclick="checkWordDatabase()">🔍 Check Word Database</button>
+      <button onclick="checkKnownWords()">📋 Check Known Words</button>
+      <button onclick="clearLog()">🗑️ Clear Log</button>
+    </div>
+
+    <h2>🔧 User ID Input</h2>
+    <div style="margin: 15px 0;">
+      <label for="userIdInput" style="font-weight: bold;">Enter your User ID:</label>
+      <input type="text" id="userIdInput" placeholder="e.g., mixread-user-1234567890-abc123def" style="width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #ccc; border-radius: 3px; box-sizing: border-box;">
+      <button onclick="saveUserIdAndTest()">Save & Run Diagnostics</button>
+    </div>
+
+    <h2>📋 Test Article</h2>
+    <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #ff9800;">
+      <strong>💡 Tip:</strong> Make sure to set the difficulty level to <strong>A2 or B1</strong> using the MixRead popup to see highlighted words!
+    </div>
+    <div class="article">
+      <p>
+        Whatever skeptics have said can't be done, Elon has gone out and made real.
+        Remember in the 1990s, when we would call strangers and give them our credit-card
+        numbers? Elon dreamed up a little thing called PayPal. His Tesla Motors and
+        SolarCity companies are making a clean, renewable-energy future a reality…his
+        SpaceX [is] reopening space for exploration…it's a paradox that Elon is working
+        to improve our planet at the same time he's building spacecraft to help us
+        leave it.
+      </p>
+    </div>
+
+    <h2>📊 Live Log</h2>
+    <pre id="log-output"></pre>
+  </div>
+
+  <script>
+    // Global state
+    const logs = [];
+    let currentUserId = null;
+
+    function log(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      const line = `[${timestamp}] ${message}`;
+      logs.push({ message: line, type });
+      updateLogDisplay();
+      console.log(`[${type.toUpperCase()}]`, message);
+    }
+
+    function updateLogDisplay() {
+      const output = document.getElementById('log-output');
+      output.innerHTML = logs.map(l =>
+        `<span class="log-${l.type}">${l.message}</span>`
+      ).join('\n');
+      output.scrollTop = output.scrollHeight;
+    }
+
+    function clearLog() {
+      logs.length = 0;
+      updateLogDisplay();
+    }
+
+    // Diagnostics
+    function runFullDiagnostics() {
+      clearLog();
+      log('Starting full diagnostic...', 'info');
+
+      // 1. Check Stemmer
+      testStemmer();
+
+      // 2. Wait for extension
+      setTimeout(() => {
+        log('', 'debug');
+        log('Checking for extension highlights...', 'info');
+        checkHighlights();
+      }, 2000);
+    }
+
+    function testStemmer() {
+      log('', 'debug');
+      log('=== Testing Stemmer ===', 'info');
+
+      if (typeof Stemmer === 'undefined') {
+        log('❌ Stemmer is NOT loaded!', 'error');
+        return false;
+      }
+
+      log('✓ Stemmer loaded successfully', 'success');
+
+      // Test cases
+      const testCases = [
+        ['stranger', 'stranger'],
+        ['strangers', 'stranger'],
+        ['dream', 'dream'],
+        ['dreamed', 'dream'],
+        ['make', 'make'],
+        ['making', 'make'],
+        ['build', 'build'],
+        ['building', 'build'],
+        ['explore', 'explore'],
+        ['exploration', 'explore'],
+      ];
+
+      let passed = 0;
+      testCases.forEach(([word, expected]) => {
+        const result = Stemmer.stem(word);
+        if (result === expected) {
+          log(`✓ "${word}" → "${result}"`, 'success');
+          passed++;
+        } else {
+          log(`❌ "${word}" → "${result}" (expected: "${expected}")`, 'error');
+        }
+      });
+
+      log(`${passed}/${testCases.length} tests passed`, passed === testCases.length ? 'success' : 'warn');
+      return passed === testCases.length;
+    }
+
+    function checkHighlights() {
+      log('', 'debug');
+      log('=== Checking Highlights ===', 'info');
+
+      const highlights = document.querySelectorAll('.mixread-highlight');
+      if (highlights.length === 0) {
+        log('⚠️ No highlighted words found on page', 'warn');
+        log('Possible reasons:', 'info');
+        log('  1. Extension not loaded or not running', 'debug');
+        log('  2. Page difficulty level too high', 'debug');
+        log('  3. Page loaded from file:// instead of http://', 'debug');
+        return false;
+      }
+
+      const highlightedWords = Array.from(highlights).map(h => h.textContent.toLowerCase());
+      const uniqueHighlighted = [...new Set(highlightedWords)];
+
+      log(`✓ Found ${highlights.length} highlighted words (${uniqueHighlighted.length} unique)`, 'success');
+      log(`Highlighted: ${uniqueHighlighted.slice(0, 10).join(', ')}${uniqueHighlighted.length > 10 ? '...' : ''}`, 'info');
+
+      // Now check for variant coverage
+      log('', 'debug');
+      log('=== Variant Coverage Analysis ===', 'info');
+
+      const expectedVariants = {
+        'stranger': ['stranger', 'strangers'],
+        'dream': ['dream', 'dreamed'],
+        'make': ['make', 'making'],
+        'build': ['build', 'building'],
+        'explore': ['explore', 'exploration'],
+      };
+
+      let allPassed = true;
+      Object.entries(expectedVariants).forEach(([stem, variants]) => {
+        const found = variants.filter(v => uniqueHighlighted.includes(v));
+        const missing = variants.filter(v => !uniqueHighlighted.includes(v));
+
+        if (found.length === variants.length) {
+          log(`✓ ${stem}: ALL variants found [${found.join(', ')}]`, 'success');
+        } else if (found.length === 0) {
+          log(`❌ ${stem}: NO variants found [missing: ${missing.join(', ')}]`, 'error');
+          allPassed = false;
+        } else {
+          log(`⚠️  ${stem}: PARTIAL coverage [✓ ${found.join(', ')}] [❌ ${missing.join(', ')}]`, 'warn');
+          allPassed = false;
+        }
+      });
+
+      log('', 'debug');
+      if (allPassed) {
+        log('✅ SUCCESS: All word variants are being highlighted!', 'success');
+        log('Stemming extraction is working correctly.', 'success');
+      } else {
+        log('❌ PROBLEM: Some word variants are NOT being highlighted', 'error');
+        log('This means stemming extraction is NOT working properly.', 'error');
+      }
+
+      return allPassed;
+    }
+
+    function checkWordDatabase() {
+      log('', 'debug');
+      log('=== Checking Word Database ===', 'info');
+
+      const testWords = ['stranger', 'dream', 'make', 'build', 'explore'];
+
+      testWords.forEach(word => {
+        chrome.runtime.sendMessage(
+          {
+            type: "GET_WORD_INFO",
+            word: word
+          },
+          (response) => {
+            if (response?.success) {
+              const info = response.word_info;
+              const found = info.found ? '✓' : '❌';
+              const cefrLevel = info.cefr_level || 'unknown';
+              log(`${found} "${word}" - CEFR: ${cefrLevel} - ${info.found ? 'IN DATABASE' : 'NOT FOUND'}`,
+                  info.found ? 'success' : 'warn');
+            } else {
+              log(`❌ Error checking "${word}": ${response?.error}`, 'error');
+            }
+          }
+        );
+      });
+    }
+
+    function saveUserIdAndTest() {
+      const input = document.getElementById('userIdInput');
+      const userId = input.value.trim();
+
+      if (!userId) {
+        log('❌ Please enter a user ID', 'error');
+        return;
+      }
+
+      currentUserId = userId;
+      localStorage.setItem('diagnostic_user_id', userId);
+      log(`✓ User ID saved: ${userId}`, 'success');
+      log('', 'debug');
+      runFullDiagnostics();
+    }
+
+    async function checkKnownWords() {
+      log('', 'debug');
+      log('=== Checking Known Words ===', 'info');
+
+      if (!currentUserId) {
+        log('❌ User ID not set. Please enter your user ID first.', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch(`http://localhost:8000/users/${encodeURIComponent(currentUserId)}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+
+        const userData = await response.json();
+
+        if (userData.success) {
+          log(`✓ Found user data for user: ${userData.user_id}`, 'success');
+          log(`Known words count: ${userData.known_words?.length || 0}`, 'info');
+          log(`Unknown words count: ${userData.unknown_words?.length || 0}`, 'info');
+
+          // Check specific words
+          const testWords = ['stranger', 'dream', 'make', 'build', 'explore'];
+          testWords.forEach(word => {
+            const isKnown = userData.known_words?.includes(word) ? '✓ KNOWN' : '❌ NOT KNOWN';
+            const isUnknown = userData.unknown_words?.includes(word) ? '✓ UNKNOWN' : '❌ NOT MARKED';
+            log(`  "${word}": ${isKnown} / ${isUnknown}`, 'info');
+          });
+        } else {
+          log('⚠️ Could not retrieve user data', 'warn');
+        }
+      } catch (error) {
+        log(`❌ Error checking known words: ${error.message}`, 'error');
+      }
+    }
+
+    // Auto-run on page load
+    window.addEventListener('load', () => {
+      // Restore user ID from localStorage if available
+      const savedUserId = localStorage.getItem('diagnostic_user_id');
+      if (savedUserId) {
+        currentUserId = savedUserId;
+        document.getElementById('userIdInput').value = savedUserId;
+        log(`✓ Restored user ID: ${savedUserId}`, 'success');
+      }
+
+      setTimeout(() => {
+        testStemmer();
+      }, 500);
+
+      setTimeout(() => {
+        checkHighlights();
+      }, 2500);
+    });
+  </script>
+</body>
+</html>

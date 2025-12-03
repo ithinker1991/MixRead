@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Context Menu Diagnosis</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px;
+      margin: 0;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #252526;
+      padding: 20px;
+      border-radius: 5px;
+    }
+    h1 { color: #4ec9b0; margin-top: 0; }
+    .check {
+      padding: 12px;
+      margin: 10px 0;
+      border-radius: 3px;
+      border-left: 4px solid;
+    }
+    .check.pass { border-color: #4ec9b0; background: #0d3d2a; }
+    .check.fail { border-color: #f48771; background: #3d1a1a; }
+    .check.info { border-color: #569cd6; background: #1a2d3d; }
+    .check.warning { border-color: #ce9178; background: #3d2a10; }
+    button {
+      background: #569cd6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 3px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    button:hover { background: #4ec9b0; }
+    pre {
+      background: #1e1e1e;
+      padding: 10px;
+      border-radius: 3px;
+      overflow: auto;
+      font-size: 11px;
+    }
+    code {
+      background: #1a2d3d;
+      padding: 2px 6px;
+      border-radius: 2px;
+      color: #ce9178;
+    }
+    .section {
+      background: #1e1e1e;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 3px;
+      border-left: 3px solid #569cd6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Context Menu Diagnosis Tool</h1>
+
+    <div class="section">
+      <h2>📋 診斷說明</h2>
+      <p>This tool helps diagnose why right-click context menu doesn't work on specific websites.</p>
+      <p><strong>Target Website:</strong> https://waitbutwhy.com/2015/05/elon-musk-introduction.html</p>
+      <button onclick="runDiagnosis()">🔬 Run Diagnosis in Current Page</button>
+      <button onclick="showInstructions()">📖 Show Console Instructions</button>
+    </div>
+
+    <div id="results"></div>
+
+    <div class="section">
+      <h2>⚡ Quick Test</h2>
+      <p>Try right-clicking on this text to see if the extension menu appears:</p>
+      <p style="background: #1a2d3d; padding: 10px; border-radius: 3px;">
+        This is a test word. Right-click it to check if extension menu works.
+      </p>
+      <p id="test-result"></p>
+    </div>
+  </div>
+
+  <script>
+    const resultsDiv = document.getElementById('results');
+
+    function addCheck(title, status, message) {
+      const div = document.createElement('div');
+      div.className = `check ${status}`;
+      div.innerHTML = `<strong>${title}</strong><br><small>${message}</small>`;
+      resultsDiv.appendChild(div);
+    }
+
+    function showInstructions() {
+      resultsDiv.innerHTML = '';
+
+      const section = document.createElement('div');
+      section.className = 'section';
+      section.innerHTML = `
+        <h2>🔬 How to Diagnose on Target Website</h2>
+
+        <h3>Step 1: Visit the Target Website</h3>
+        <p>Open in a new tab: <a href="https://waitbutwhy.com/2015/05/elon-musk-introduction.html" target="_blank">Wait But Why - Elon Musk</a></p>
+
+        <h3>Step 2: Open DevTools Console (F12)</h3>
+        <p>Press F12 → Console tab</p>
+
+        <h3>Step 3: Run This Diagnostic Script</h3>
+        <pre>// === Context Menu Diagnosis ===
+const diagnosis = {
+  // 1. Check if website has contextmenu event listener
+  hasContextMenu: document.ontextmenu !== null,
+
+  // 2. Check Content Security Policy
+  csp: document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content ||
+       'No CSP meta tag found',
+
+  // 3. Check for website's own context menu handlers
+  documentContextMenuListener: !!document.ontextmenu,
+
+  // 4. Test if we can create DOM elements
+  canCreateElements: (() => {
+    try {
+      const test = document.createElement('div');
+      document.body.appendChild(test);
+      test.remove();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  })(),
+
+  // 5. Check for event suppression
+  eventListeners: {
+    rightClickSuppressed: (() => {
+      let suppressed = false;
+      document.addEventListener('contextmenu', (e) => {
+        if (e.defaultPrevented) suppressed = true;
+      }, true);
+      return suppressed;
+    })()
+  },
+
+  // 6. Test right-click behavior
+  testRightClick: 'Right-click on page to test - check console for events'
+};
+
+console.log('=== CONTEXT MENU DIAGNOSIS ===');
+console.log(diagnosis);
+
+// Test event firing
+document.addEventListener('contextmenu', (e) => {
+  console.log('✓ Contextmenu event fired at:', e.clientX, e.clientY);
+  console.log('  - defaultPrevented:', e.defaultPrevented);
+  console.log('  - target:', e.target);
+  console.log('  - targetTag:', e.target.tagName);
+}, true);
+
+console.log('Try right-clicking on the page - events should appear above');
+        </pre>
+
+        <h3>Step 4: Analyze the Results</h3>
+        <ul>
+          <li><strong>hasContextMenu: true</strong> → Website has its own context menu handler ❌</li>
+          <li><strong>canCreateElements: false</strong> → CSP prevents DOM manipulation ❌</li>
+          <li><strong>CSP contains "script-src"</strong> → Strict security policy ⚠️</li>
+          <li><strong>eventListeners show suppression</strong> → Events blocked ❌</li>
+        </ul>
+
+        <h3>Step 5: Check Network Issues</h3>
+        <pre>// Check if extension can communicate
+chrome.runtime.sendMessage(
+  { type: 'GET_USER_DATA', user_id: 'test' },
+  (response) => {
+    console.log('Extension communication:', response);
+  }
+);
+        </pre>
+      `;
+      resultsDiv.appendChild(section);
+    }
+
+    function runDiagnosis() {
+      resultsDiv.innerHTML = '';
+      addCheck('⚠️ Important', 'info',
+        'This page needs to be run on the target website (waitbutwhy.com) to work properly. Click "Show Console Instructions" for detailed steps.');
+
+      // Try to run diagnosis on current page
+      try {
+        const section = document.createElement('div');
+        section.className = 'section';
+        section.innerHTML = `
+          <h2>🧪 Current Page Diagnosis</h2>
+          <pre id="current-page-results"></pre>
+        `;
+        resultsDiv.appendChild(section);
+
+        const diagnosis = {
+          url: window.location.href,
+          timestamp: new Date().toISOString(),
+
+          // Check context menu handling
+          documentContextMenuListener: !!document.ontextmenu,
+
+          // Check CSP
+          cspMeta: document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content || 'None',
+
+          // Check for known context menu libraries
+          hasContextMenuLib: {
+            contextMenu: !!window.contextMenu,
+            jQuery: !!window.jQuery,
+            bootstrapContextMenu: !!window.$.contextMenu
+          },
+
+          // Try to detect if MixRead extension is loaded
+          hasMixReadLoaded: (() => {
+            try {
+              // Check if MixRead global variables exist
+              return {
+                hasContextMenu: typeof contextMenu !== 'undefined',
+                hasUnknownWordsService: typeof unknownWordsService !== 'undefined',
+                hasLogger: typeof logger !== 'undefined'
+              };
+            } catch (e) {
+              return { error: e.message };
+            }
+          })(),
+
+          // Test creating custom context menu
+          canCreateContextMenu: (() => {
+            try {
+              const test = document.createElement('div');
+              test.className = 'test-mixread-menu';
+              test.style.position = 'fixed';
+              test.style.top = '100px';
+              test.style.left = '100px';
+              test.textContent = 'Test Menu';
+              document.body.appendChild(test);
+
+              const visible = test.offsetParent !== null;
+              test.remove();
+
+              return visible;
+            } catch (e) {
+              return false;
+            }
+          })()
+        };
+
+        document.getElementById('current-page-results').textContent =
+          JSON.stringify(diagnosis, null, 2);
+
+        // Add results
+        if (diagnosis.documentContextMenuListener) {
+          addCheck('⚠️ Website Context Menu', 'warning',
+            'Website has its own contextmenu handler - may conflict with extension');
+        } else {
+          addCheck('✓ No Website Context Menu', 'pass',
+            'Website doesn\'t override contextmenu - good for extension');
+        }
+
+        if (diagnosis.cspMeta.includes('script-src')) {
+          addCheck('⚠️ Strict CSP Detected', 'warning',
+            'Content Security Policy may restrict extension functionality');
+        }
+
+        if (diagnosis.hasMixReadLoaded.hasContextMenu) {
+          addCheck('✓ MixRead Loaded', 'pass',
+            'Extension is loaded on this page');
+        } else {
+          addCheck('❌ MixRead Not Loaded', 'fail',
+            'Extension may not be running on this page');
+        }
+
+      } catch (error) {
+        addCheck('❌ Error', 'fail', error.message);
+      }
+    }
+
+    // Test right-click on this page
+    document.addEventListener('contextmenu', (e) => {
+      if (e.target.textContent.includes('test word')) {
+        e.preventDefault();
+        document.getElementById('test-result').innerHTML =
+          '<span style="color: #4ec9b0;">✓ Right-click detected! Extension may be interfering.</span>';
+      }
+    }, true);
+
+    window.addEventListener('load', () => {
+      addCheck('ℹ️ Ready', 'info',
+        'Click "Show Console Instructions" to diagnose the target website');
+    });
+  </script>
+</body>
+</html>

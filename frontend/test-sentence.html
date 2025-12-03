@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sentence Extraction Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .highlighted {
+            background-color: yellow;
+            font-weight: bold;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px 5px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sentence Extraction Test</h1>
+
+    <div class="test-section">
+        <h3>Paragraph 1 - Multiple sentences</h3>
+        <p>This is a <span data-word="example" class="highlighted">example</span> paragraph with multiple sentences. The first sentence shows the word in context. The second sentence continues the thought. A third sentence completes the paragraph with more details.</p>
+    </div>
+
+    <div class="test-section">
+        <h3>Paragraph 2 - Navigation elements test</h3>
+        <p>Here is a <span data-word="understanding" class="highlighted">understanding</span> sentence that should be clean. The navigation menu above should not interfere with sentence extraction.</p>
+    </div>
+
+    <div class="test-section">
+        <h3>Paragraph 3 - List item test</h3>
+        <ul>
+            <li>First item with <span data-word="difficult" class="highlighted">difficult</span> word</li>
+            <li>Second item for <span data-word="testing" class="highlighted">testing</span> purposes</li>
+        </ul>
+    </div>
+
+    <button onclick="testSentenceExtraction()">Test Sentence Extraction</button>
+    <button onclick="clearResults()">Clear Results</button>
+
+    <div id="result"></div>
+
+    <script>
+        function testSentenceExtraction() {
+            const result = document.getElementById('result');
+            let output = '=== Sentence Extraction Test ===\n\n';
+
+            // Get all highlighted words
+            const highlightedWords = document.querySelectorAll('.highlighted');
+            output += `Found ${highlightedWords.length} highlighted words:\n\n`;
+
+            // Test extraction for each word
+            highlightedWords.forEach((element, index) => {
+                const word = element.dataset.word;
+                output += `Word ${index + 1}: "${word}"\n`;
+
+                // Try different parent elements
+                let paragraph = element.closest('p');
+                let div = element.closest('div');
+                let li = element.closest('li');
+
+                let parent = paragraph || div || li || element.parentElement;
+
+                if (parent) {
+                    // Clone and clean
+                    const clone = parent.cloneNode(true);
+
+                    // Remove unwanted elements
+                    const unwanted = clone.querySelectorAll('script, style, nav, header, footer, aside');
+                    unwanted.forEach(el => el.remove());
+
+                    // Get text content
+                    let text = clone.textContent || clone.innerText || '';
+
+                    // Clean up text
+                    text = text
+                        .replace(/\s+/g, ' ')
+                        .replace(/\n\s*\n/g, '\n')
+                        .trim();
+
+                    output += `  Parent: ${parent.tagName.toLowerCase()}\n`;
+                    output += `  Raw text: "${text.substring(0, 200)}${text.length > 200 ? '...' : ''}"\n`;
+
+                    // Extract sentences
+                    const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+
+                    // Find sentences containing the word
+                    const targetSentences = sentences
+                        .map(s => s.trim())
+                        .filter(s => {
+                            return s.toLowerCase().includes(word.toLowerCase());
+                        });
+
+                    output += `  Total sentences found: ${sentences.length}\n`;
+                    output += `  Target sentences: ${targetSentences.length}\n`;
+
+                    if (targetSentences.length > 0) {
+                        output += '  Sentences containing the word:\n';
+                        targetSentences.forEach((s, i) => {
+                            output += `    ${i + 1}. "${s}"\n`;
+
+                            // Check for issues
+                            if (s.includes('1x') || s.includes('×')) {
+                                output += `    ⚠️  Contains '1x' or special characters!\n`;
+                            }
+                            if (s.length < 10) {
+                                output += `    ⚠️  Very short sentence (${s.length} chars)\n`;
+                            }
+                        });
+                    }
+                } else {
+                    output += `  No parent element found!\n`;
+                }
+
+                output += '\n';
+            });
+
+            result.textContent = output;
+            console.log(output);
+        }
+
+        function clearResults() {
+            document.getElementById('result').textContent = '';
+        }
+
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testSentenceExtraction();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
