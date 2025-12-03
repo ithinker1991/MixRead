@@ -14,6 +14,7 @@ class BatchMarkingPanel {
     this.wordFrequency = {};
     this.groups = null;
     this.showChinese = true; // Default to show Chinese
+    this.messageListener = null; // Handler for new highlighted words
   }
 
   /**
@@ -78,8 +79,8 @@ class BatchMarkingPanel {
       </div>
     `;
 
-    document.body.insertAdjacentHTML('beforeend', panelHTML);
-    this.panelElement = document.querySelector('#mixread-batch-panel');
+    document.body.insertAdjacentHTML("beforeend", panelHTML);
+    this.panelElement = document.querySelector("#mixread-batch-panel");
 
     // Initialize selection state
     this.isSelecting = false;
@@ -88,7 +89,7 @@ class BatchMarkingPanel {
 
     this.attachEventListeners();
     this.attachSelectionListeners();
-    console.log('[BatchMarkingPanel] Panel initialized');
+    console.log("[BatchMarkingPanel] Panel initialized");
   }
 
   /**
@@ -96,56 +97,69 @@ class BatchMarkingPanel {
    */
   attachEventListeners() {
     // Close button
-    this.panelElement.querySelector('.panel-close-btn')
-      .addEventListener('click', () => this.close());
+    this.panelElement
+      .querySelector(".panel-close-btn")
+      .addEventListener("click", () => this.close());
 
     // Quick select buttons
-    document.querySelector('#quick-select-high')
-      .addEventListener('click', () => this.quickSelectByFrequency('high'));
+    document
+      .querySelector("#quick-select-high")
+      .addEventListener("click", () => this.quickSelectByFrequency("high"));
 
-    document.querySelector('#quick-select-medium')
-      .addEventListener('click', () => this.quickSelectByFrequency('medium'));
+    document
+      .querySelector("#quick-select-medium")
+      .addEventListener("click", () => this.quickSelectByFrequency("medium"));
 
-    document.querySelector('#quick-select-low')
-      .addEventListener('click', () => this.quickSelectByFrequency('low'));
+    document
+      .querySelector("#quick-select-low")
+      .addEventListener("click", () => this.quickSelectByFrequency("low"));
 
     // Toolbar buttons
-    document.querySelector('#select-all-btn')
-      .addEventListener('click', () => this.selectAll());
+    document
+      .querySelector("#select-all-btn")
+      .addEventListener("click", () => this.selectAll());
 
-    document.querySelector('#deselect-all-btn')
-      .addEventListener('click', () => this.deselectAll());
+    document
+      .querySelector("#deselect-all-btn")
+      .addEventListener("click", () => this.deselectAll());
 
-    document.querySelector('#clear-all-btn')
-      .addEventListener('click', () => this.clearSelection());
+    document
+      .querySelector("#clear-all-btn")
+      .addEventListener("click", () => this.clearSelection());
 
     // Action buttons
-    document.querySelector('#add-to-library-btn')
-      .addEventListener('click', () => this.handleAddToLibrary());
+    document
+      .querySelector("#add-to-library-btn")
+      .addEventListener("click", () => this.handleAddToLibrary());
 
-    document.querySelector('#mark-known-btn')
-      .addEventListener('click', () => this.handleMarkKnown());
+    document
+      .querySelector("#mark-known-btn")
+      .addEventListener("click", () => this.handleMarkKnown());
 
-    document.querySelector('#mark-unknown-btn')
-      .addEventListener('click', () => this.handleMarkUnknown());
+    document
+      .querySelector("#mark-unknown-btn")
+      .addEventListener("click", () => this.handleMarkUnknown());
 
     // Confirm dialog
-    document.querySelector('#confirm-cancel')
-      .addEventListener('click', () => this.closeConfirmDialog());
+    document
+      .querySelector("#confirm-cancel")
+      .addEventListener("click", () => this.closeConfirmDialog());
 
-    document.querySelector('#confirm-ok')
-      .addEventListener('click', () => this.executeAction());
+    document
+      .querySelector("#confirm-ok")
+      .addEventListener("click", () => this.executeAction());
 
     // Chinese toggle
-    document.querySelector('#show-chinese-toggle')
-      .addEventListener('change', (e) => {
+    document
+      .querySelector("#show-chinese-toggle")
+      .addEventListener("change", (e) => {
         this.showChinese = e.target.checked;
         this.renderContent(); // Re-render with new setting
       });
 
     // Close on outside click
-    this.panelElement.addEventListener('click', (e) => {
-      if (e.target.id === 'mixread-batch-panel') {
+    this.panelElement.addEventListener("click", (e) => {
+      if (e.target.id === "mixread-batch-panel") {
         this.close();
       }
     });
@@ -155,13 +169,13 @@ class BatchMarkingPanel {
    * Attach selection (lasso/rectangle select) listeners
    */
   attachSelectionListeners() {
-    const contentArea = document.querySelector('#panel-content-area');
+    const contentArea = document.querySelector("#panel-content-area");
     if (!contentArea) return;
 
     // Use document-level listeners for better tracking
-    document.addEventListener('mousedown', (e) => this.handleSelectionStart(e));
-    document.addEventListener('mousemove', (e) => this.handleSelectionMove(e));
-    document.addEventListener('mouseup', (e) => this.handleSelectionEnd(e));
+    document.addEventListener("mousedown", (e) => this.handleSelectionStart(e));
+    document.addEventListener("mousemove", (e) => this.handleSelectionMove(e));
+    document.addEventListener("mouseup", (e) => this.handleSelectionEnd(e));
   }
 
   /**
@@ -169,15 +183,20 @@ class BatchMarkingPanel {
    */
   handleSelectionStart(e) {
     // Check if we're inside the panel content area
-    if (!e.target.closest('#panel-content-area') ||
-        e.target.closest('.word-item') ||
-        e.target.type === 'checkbox') {
+    if (
+      !e.target.closest("#panel-content-area") ||
+      e.target.closest(".word-item") ||
+      e.target.type === "checkbox"
+    ) {
       return;
     }
 
     this.isSelecting = true;
     this.selectionStart = { x: e.clientX, y: e.clientY };
-    console.log('[BatchMarkingPanel] Selection started at', this.selectionStart);
+    console.log(
+      "[BatchMarkingPanel] Selection started at",
+      this.selectionStart
+    );
   }
 
   /**
@@ -186,7 +205,7 @@ class BatchMarkingPanel {
   handleSelectionMove(e) {
     if (!this.isSelecting || !this.selectionStart) return;
 
-    const canvas = this.panelElement.querySelector('.selection-canvas');
+    const canvas = this.panelElement.querySelector(".selection-canvas");
 
     // Calculate rectangle
     const startX = this.selectionStart.x;
@@ -204,19 +223,22 @@ class BatchMarkingPanel {
     if (width < 5 || height < 5) return;
 
     // Apply styles
-    canvas.style.left = left + 'px';
-    canvas.style.top = top + 'px';
-    canvas.style.width = width + 'px';
-    canvas.style.height = height + 'px';
-    canvas.classList.add('active');
+    canvas.style.left = left + "px";
+    canvas.style.top = top + "px";
+    canvas.style.width = width + "px";
+    canvas.style.height = height + "px";
+    canvas.classList.add("active");
 
     // Store rectangle
     this.selectionRect = { left, top, width, height };
 
-    console.log('[BatchMarkingPanel] Rectangle:', {
-      left, top, width, height,
+    console.log("[BatchMarkingPanel] Rectangle:", {
+      left,
+      top,
+      width,
+      height,
       start: { x: startX, y: startY },
-      end: { x: endX, y: endY }
+      end: { x: endX, y: endY },
     });
   }
 
@@ -226,8 +248,8 @@ class BatchMarkingPanel {
   handleSelectionEnd(e) {
     if (!this.isSelecting || !this.selectionRect) {
       this.isSelecting = false;
-      const canvas = this.panelElement.querySelector('.selection-canvas');
-      canvas.classList.remove('active');
+      const canvas = this.panelElement.querySelector(".selection-canvas");
+      canvas.classList.remove("active");
       return;
     }
 
@@ -235,38 +257,42 @@ class BatchMarkingPanel {
     this.selectWordsInRect(this.selectionRect);
 
     this.isSelecting = false;
-    const canvas = this.panelElement.querySelector('.selection-canvas');
-    canvas.classList.remove('active');
+    const canvas = this.panelElement.querySelector(".selection-canvas");
+    canvas.classList.remove("active");
 
-    console.log('[BatchMarkingPanel] Selection ended');
+    console.log("[BatchMarkingPanel] Selection ended");
   }
 
   /**
    * Select words within rectangle
    */
   selectWordsInRect(rect) {
-    const checkboxes = this.panelElement.querySelectorAll('.word-checkbox');
+    const checkboxes = this.panelElement.querySelectorAll(".word-checkbox");
     let selectedCount = 0;
 
-    checkboxes.forEach(checkbox => {
-      const label = checkbox.closest('.word-item');
+    checkboxes.forEach((checkbox) => {
+      const label = checkbox.closest(".word-item");
       if (!label) return;
 
       // Get label's position in viewport
       const labelRect = label.getBoundingClientRect();
 
       // Check if label overlaps with selection rectangle
-      if (labelRect.right > rect.left &&
-          labelRect.left < rect.left + rect.width &&
-          labelRect.bottom > rect.top &&
-          labelRect.top < rect.top + rect.height) {
+      if (
+        labelRect.right > rect.left &&
+        labelRect.left < rect.left + rect.width &&
+        labelRect.bottom > rect.top &&
+        labelRect.top < rect.top + rect.height
+      ) {
         checkbox.checked = !checkbox.checked;
         selectedCount++;
       }
     });
 
-    console.log(`[BatchMarkingPanel] Selected ${selectedCount} words in rectangle`);
-    console.log('[BatchMarkingPanel] Rectangle bounds:', rect);
+    console.log(
+      `[BatchMarkingPanel] Selected ${selectedCount} words in rectangle`
+    );
+    console.log("[BatchMarkingPanel] Rectangle bounds:", rect);
   }
 
   /**
@@ -275,19 +301,21 @@ class BatchMarkingPanel {
   quickSelectByFrequency(frequency) {
     if (!this.groups || !this.groups[frequency]) return;
 
-    const wordsInGroup = this.groups[frequency].map(item => item.word);
-    const checkboxes = this.panelElement.querySelectorAll('.word-checkbox');
+    const wordsInGroup = this.groups[frequency].map((item) => item.word);
+    const checkboxes = this.panelElement.querySelectorAll(".word-checkbox");
 
     let selectedCount = 0;
-    checkboxes.forEach(checkbox => {
+    checkboxes.forEach((checkbox) => {
       if (wordsInGroup.includes(checkbox.dataset.word)) {
         checkbox.checked = !checkbox.checked;
         selectedCount++;
       }
     });
 
-    const groupNames = { high: '高频', medium: '中频', low: '低频' };
-    console.log(`[BatchMarkingPanel] Quick selected ${selectedCount} ${groupNames[frequency]} words`);
+    const groupNames = { high: "高频", medium: "中频", low: "低频" };
+    console.log(
+      `[BatchMarkingPanel] Quick selected ${selectedCount} ${groupNames[frequency]} words`
+    );
   }
 
   /**
@@ -297,9 +325,9 @@ class BatchMarkingPanel {
     const wordFrequency = {};
 
     // Get all highlighted elements
-    const highlightedElements = document.querySelectorAll('.mixread-highlight');
+    const highlightedElements = document.querySelectorAll(".mixread-highlight");
 
-    highlightedElements.forEach(element => {
+    highlightedElements.forEach((element) => {
       const word = element.dataset.word || element.textContent;
       const wordLower = word.toLowerCase();
 
@@ -308,8 +336,8 @@ class BatchMarkingPanel {
           count: 0,
           originalWords: new Set(),
           baseWord: wordLower,
-          chinese: element.dataset.chinese || '',
-          definition: element.dataset.definition || ''
+          chinese: element.dataset.chinese || "",
+          definition: element.dataset.definition || "",
         };
       }
 
@@ -318,14 +346,18 @@ class BatchMarkingPanel {
     });
 
     // Load word details from storage if available
-    chrome.storage.local.get(['wordDetails'], (result) => {
+    chrome.storage.local.get(["wordDetails"], (result) => {
       const wordDetails = result.wordDetails || {};
 
       // Enhance word frequency data with storage info
-      Object.keys(wordFrequency).forEach(word => {
+      Object.keys(wordFrequency).forEach((word) => {
         if (wordDetails[word]) {
-          wordFrequency[word].chinese = wordFrequency[word].chinese || wordDetails[word].chinese || '';
-          wordFrequency[word].definition = wordFrequency[word].definition || wordDetails[word].definition || '';
+          wordFrequency[word].chinese =
+            wordFrequency[word].chinese || wordDetails[word].chinese || "";
+          wordFrequency[word].definition =
+            wordFrequency[word].definition ||
+            wordDetails[word].definition ||
+            "";
         }
       });
     });
@@ -338,9 +370,9 @@ class BatchMarkingPanel {
    */
   groupByFrequency(wordFrequency) {
     const groups = {
-      high: [],    // 5+ times
-      medium: [],  // 2-4 times
-      low: []      // 1 time
+      high: [], // 5+ times
+      medium: [], // 2-4 times
+      low: [], // 1 time
     };
 
     Object.entries(wordFrequency).forEach(([word, data]) => {
@@ -349,8 +381,8 @@ class BatchMarkingPanel {
         baseWord: Stemmer.stem(word),
         originalWords: Array.from(data.originalWords),
         count: data.count,
-        chinese: data.chinese || '',
-        definition: data.definition || ''
+        chinese: data.chinese || "",
+        definition: data.definition || "",
       };
 
       if (data.count >= 5) {
@@ -371,11 +403,37 @@ class BatchMarkingPanel {
   }
 
   /**
+   * Get cached contexts for a word from DOM
+   */
+  getCachedContexts(word) {
+    let wordStem = word.toLowerCase();
+    if (typeof Stemmer !== "undefined" && Stemmer.stem) {
+      wordStem = Stemmer.stem(wordStem);
+    }
+
+    const elements = document.querySelectorAll(
+      `.mixread-highlight[data-word-stem="${wordStem}"]`
+    );
+
+    const validElements = Array.from(elements).filter(
+      (el) => !el.closest("#mixread-batch-panel")
+    );
+
+    const contexts = new Set();
+    for (const el of validElements) {
+      if (el.dataset.sentenceContext) {
+        contexts.add(el.dataset.sentenceContext);
+      }
+    }
+    return Array.from(contexts);
+  }
+
+  /**
    * Render panel content with grouped words
    */
   renderContent() {
-    const panelContent = this.panelElement.querySelector('.panel-content');
-    panelContent.innerHTML = '';
+    const panelContent = this.panelElement.querySelector(".panel-content");
+    panelContent.innerHTML = "";
 
     if (!this.groups) {
       panelContent.innerHTML = '<div class="no-words">没有找到高亮单词</div>';
@@ -383,9 +441,9 @@ class BatchMarkingPanel {
     }
 
     const groupConfig = [
-      { key: 'high', label: '🔴 高频词 (5+ 次)', color: '#ff4444' },
-      { key: 'medium', label: '🟡 中频词 (2-4 次)', color: '#ffaa00' },
-      { key: 'low', label: '🟢 低频词 (1 次)', color: '#44aa44' }
+      { key: "high", label: "🔴 高频词 (5+ 次)", color: "#ff4444" },
+      { key: "medium", label: "🟡 中频词 (2-4 次)", color: "#ffaa00" },
+      { key: "low", label: "🟢 低频词 (1 次)", color: "#44aa44" },
     ];
 
     groupConfig.forEach(({ key, label, color }) => {
@@ -394,36 +452,36 @@ class BatchMarkingPanel {
       if (words.length === 0) return; // Skip empty groups
 
       // Create group container
-      const groupDiv = document.createElement('div');
-      groupDiv.className = 'frequency-group';
+      const groupDiv = document.createElement("div");
+      groupDiv.className = "frequency-group";
       groupDiv.style.borderLeftColor = color;
 
       // Group header
-      const headerDiv = document.createElement('div');
-      headerDiv.className = 'group-header';
+      const headerDiv = document.createElement("div");
+      headerDiv.className = "group-header";
       headerDiv.textContent = label;
       groupDiv.appendChild(headerDiv);
 
       // Word list
-      const listDiv = document.createElement('div');
-      listDiv.className = 'word-list';
+      const listDiv = document.createElement("div");
+      listDiv.className = "word-list";
 
       words.forEach(({ word, count, baseWord, originalWords, chinese }) => {
-        const label = document.createElement('label');
-        label.className = 'word-item';
+        const label = document.createElement("label");
+        label.className = "word-item";
 
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.className = 'word-checkbox';
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "word-checkbox";
         checkbox.dataset.word = word;
 
         // Create word container
-        const wordContainer = document.createElement('div');
-        wordContainer.className = 'word-container';
+        const wordContainer = document.createElement("div");
+        wordContainer.className = "word-container";
 
         // Main word (original form if different)
-        const wordMain = document.createElement('span');
-        wordMain.className = 'word-main';
+        const wordMain = document.createElement("span");
+        wordMain.className = "word-main";
 
         if (baseWord && baseWord !== word) {
           wordMain.innerHTML = `${word}<span class="word-base">→ ${baseWord}</span>`;
@@ -433,9 +491,9 @@ class BatchMarkingPanel {
 
         // Additional forms
         if (originalWords.length > 1) {
-          const formsSpan = document.createElement('span');
-          formsSpan.className = 'word-forms';
-          formsSpan.textContent = `[${Array.from(originalWords).join(', ')}]`;
+          const formsSpan = document.createElement("span");
+          formsSpan.className = "word-forms";
+          formsSpan.textContent = `[${Array.from(originalWords).join(", ")}]`;
           wordContainer.appendChild(formsSpan);
         }
 
@@ -443,16 +501,26 @@ class BatchMarkingPanel {
 
         // Chinese (if toggle is on)
         if (this.showChinese && chinese) {
-          const chineseSpan = document.createElement('span');
-          chineseSpan.className = 'word-chinese';
+          const chineseSpan = document.createElement("span");
+          chineseSpan.className = "word-chinese";
           chineseSpan.textContent = chinese;
 
           wordContainer.appendChild(chineseSpan);
         }
 
+        // Context preview
+        const contexts = this.getCachedContexts(word);
+        if (contexts.length > 0) {
+          const previewDiv = document.createElement("div");
+          previewDiv.className = "word-context-preview";
+          previewDiv.textContent = contexts[0];
+          previewDiv.title = contexts.join("\n\n");
+          wordContainer.appendChild(previewDiv);
+        }
+
         // Count
-        const countSpan = document.createElement('span');
-        countSpan.className = 'word-count';
+        const countSpan = document.createElement("span");
+        countSpan.className = "word-count";
         countSpan.textContent = `(${count}×)`;
 
         label.appendChild(checkbox);
@@ -466,10 +534,9 @@ class BatchMarkingPanel {
     });
 
     // Update total count
-    const totalWords = Object.values(this.groups)
-      .flat()
-      .length;
-    const totalWordsElement = this.panelElement.querySelector('#panel-total-words');
+    const totalWords = Object.values(this.groups).flat().length;
+    const totalWordsElement =
+      this.panelElement.querySelector("#panel-total-words");
     if (totalWordsElement) {
       totalWordsElement.textContent = totalWords;
     }
@@ -491,12 +558,15 @@ class BatchMarkingPanel {
     this.renderContent();
 
     // Show panel
-    this.panelElement.classList.add('open');
+    this.panelElement.classList.add("open");
     this.isOpen = true;
 
-    console.log('[BatchMarkingPanel] Panel opened', {
+    // Start listening for new highlighted words from dynamic content
+    this.startListeningForNewWords();
+
+    console.log("[BatchMarkingPanel] Panel opened", {
       totalWords: Object.values(this.groups).flat().length,
-      groups: this.groups
+      groups: this.groups,
     });
   }
 
@@ -505,10 +575,111 @@ class BatchMarkingPanel {
    */
   close() {
     if (this.panelElement) {
-      this.panelElement.classList.remove('open');
+      this.panelElement.classList.remove("open");
     }
     this.isOpen = false;
-    console.log('[BatchMarkingPanel] Panel closed');
+
+    // Stop listening for new highlighted words
+    this.stopListeningForNewWords();
+
+    console.log("[BatchMarkingPanel] Panel closed");
+  }
+
+  /**
+   * Start listening for new highlighted words from dynamic content
+   */
+  startListeningForNewWords() {
+    if (this.messageListener) {
+      return; // Already listening
+    }
+
+    this.messageListener = (request, sender, sendResponse) => {
+      if (request.type === "NEW_WORDS_HIGHLIGHTED" && this.isOpen) {
+        console.log(
+          `[BatchMarkingPanel] Received NEW_WORDS_HIGHLIGHTED with ${Object.keys(request.newWords).length} words`
+        );
+        this.addNewHighlightedWords(request.newWords);
+      }
+    };
+
+    try {
+      chrome.runtime.onMessage.addListener(this.messageListener);
+    } catch (e) {
+      console.warn(
+        "[BatchMarkingPanel] Failed to add message listener:",
+        e.message
+      );
+    }
+  }
+
+  /**
+   * Stop listening for new highlighted words
+   */
+  stopListeningForNewWords() {
+    if (this.messageListener) {
+      try {
+        chrome.runtime.onMessage.removeListener(this.messageListener);
+      } catch (e) {
+        console.warn(
+          "[BatchMarkingPanel] Failed to remove message listener:",
+          e.message
+        );
+      }
+      this.messageListener = null;
+    }
+  }
+
+  /**
+   * Add newly highlighted words to the panel incrementally
+   * This allows the panel to update when feed content loads
+   */
+  addNewHighlightedWords(newWordsMap) {
+    // Filter out words that already exist
+    const addedCount = {};
+    Object.entries(newWordsMap).forEach(([wordLower, wordData]) => {
+      if (!this.wordFrequency[wordLower]) {
+        // New word
+        this.wordFrequency[wordLower] = {
+          count: wordData.count,
+          originalWords: new Set(wordData.originalWords),
+          baseWord: wordLower,
+          chinese: wordData.chinese || "",
+          definition: wordData.definition || "",
+        };
+        addedCount[wordLower] = true;
+      } else {
+        // Existing word - update count and merge original words
+        const oldCount = this.wordFrequency[wordLower].count;
+        this.wordFrequency[wordLower].count += wordData.count;
+        wordData.originalWords.forEach((w) => {
+          this.wordFrequency[wordLower].originalWords.add(w);
+        });
+        console.log(
+          `[BatchMarkingPanel] Updated word "${wordLower}" count from ${oldCount} to ${this.wordFrequency[wordLower].count}`
+        );
+      }
+    });
+
+    // Re-group all words
+    this.groups = this.groupByFrequency(this.wordFrequency);
+
+    // Re-render content
+    this.renderContent();
+
+    // Update stats
+    const totalWords = Object.values(this.groups).flat().length;
+    const statElement = document.querySelector("#panel-total-words");
+    if (statElement) {
+      statElement.textContent = totalWords;
+    }
+
+    const newWordsCount = Object.keys(addedCount).length;
+    const updatedWordsCount =
+      Object.keys(newWordsMap).length - newWordsCount;
+
+    console.log(
+      `[BatchMarkingPanel] Panel updated: +${newWordsCount} new words, ${updatedWordsCount} updated, total ${totalWords}`
+    );
   }
 
   /**
@@ -526,26 +697,28 @@ class BatchMarkingPanel {
    * Get selected words
    */
   getSelectedWords() {
-    const checkboxes = this.panelElement.querySelectorAll('.word-checkbox:checked');
-    return Array.from(checkboxes).map(cb => cb.dataset.word);
+    const checkboxes = this.panelElement.querySelectorAll(
+      ".word-checkbox:checked"
+    );
+    return Array.from(checkboxes).map((cb) => cb.dataset.word);
   }
 
   /**
    * Select all words
    */
   selectAll() {
-    const checkboxes = this.panelElement.querySelectorAll('.word-checkbox');
-    checkboxes.forEach(cb => cb.checked = true);
-    console.log('[BatchMarkingPanel] All words selected');
+    const checkboxes = this.panelElement.querySelectorAll(".word-checkbox");
+    checkboxes.forEach((cb) => (cb.checked = true));
+    console.log("[BatchMarkingPanel] All words selected");
   }
 
   /**
    * Deselect all words
    */
   deselectAll() {
-    const checkboxes = this.panelElement.querySelectorAll('.word-checkbox');
-    checkboxes.forEach(cb => cb.checked = false);
-    console.log('[BatchMarkingPanel] All words deselected');
+    const checkboxes = this.panelElement.querySelectorAll(".word-checkbox");
+    checkboxes.forEach((cb) => (cb.checked = false));
+    console.log("[BatchMarkingPanel] All words deselected");
   }
 
   /**
@@ -562,31 +735,31 @@ class BatchMarkingPanel {
     const selectedWords = this.getSelectedWords();
 
     if (selectedWords.length === 0) {
-      alert('请先选择要添加到单词本的词');
+      alert("请先选择要添加到单词本的词");
       return;
     }
 
     const message = `即将添加 ${selectedWords.length} 个单词到你的单词本，确定吗？`;
-    this.showConfirmDialog(message, 'add-to-library');
+    this.showConfirmDialog(message, "add-to-library");
   }
 
   /**
    * Show confirmation dialog
    */
   showConfirmDialog(message, action) {
-    const dialog = this.panelElement.querySelector('#confirm-dialog');
-    document.querySelector('#confirm-message').textContent = message;
-    dialog.classList.remove('hidden');
+    const dialog = this.panelElement.querySelector("#confirm-dialog");
+    document.querySelector("#confirm-message").textContent = message;
+    dialog.classList.remove("hidden");
     this.pendingAction = action;
-    console.log('[BatchMarkingPanel] Confirm dialog shown:', message);
+    console.log("[BatchMarkingPanel] Confirm dialog shown:", message);
   }
 
   /**
    * Close confirmation dialog
    */
   closeConfirmDialog() {
-    const dialog = this.panelElement.querySelector('#confirm-dialog');
-    dialog.classList.add('hidden');
+    const dialog = this.panelElement.querySelector("#confirm-dialog");
+    dialog.classList.add("hidden");
     this.pendingAction = null;
   }
 
@@ -599,22 +772,22 @@ class BatchMarkingPanel {
     const selectedWords = this.getSelectedWords();
 
     if (selectedWords.length === 0) {
-      alert('请先选择要标记的单词');
+      alert("请先选择要标记的单词");
       this.closeConfirmDialog();
       return;
     }
 
-    console.log('[BatchMarkingPanel] Executing action:', {
+    console.log("[BatchMarkingPanel] Executing action:", {
       action: this.pendingAction,
-      words: selectedWords
+      words: selectedWords,
     });
 
     try {
-      if (this.pendingAction === 'mark-known') {
+      if (this.pendingAction === "mark-known") {
         await this.batchMarkAsKnown(selectedWords);
-      } else if (this.pendingAction === 'mark-unknown') {
+      } else if (this.pendingAction === "mark-unknown") {
         await this.batchMarkAsUnknown(selectedWords);
-      } else if (this.pendingAction === 'add-to-library') {
+      } else if (this.pendingAction === "add-to-library") {
         await this.batchAddToLibrary(selectedWords);
       }
 
@@ -626,10 +799,9 @@ class BatchMarkingPanel {
       if (window.highlightPageWords) {
         window.highlightPageWords();
       }
-
     } catch (error) {
-      console.error('[BatchMarkingPanel] Error executing action:', error);
-      alert('操作失败: ' + error.message);
+      console.error("[BatchMarkingPanel] Error executing action:", error);
+      alert("操作失败: " + error.message);
     }
   }
 
@@ -640,12 +812,12 @@ class BatchMarkingPanel {
     const selectedWords = this.getSelectedWords();
 
     if (selectedWords.length === 0) {
-      alert('请先选择要标记的单词');
+      alert("请先选择要标记的单词");
       return;
     }
 
     const message = `即将标记 ${selectedWords.length} 个单词为"已知"，确定吗？`;
-    this.showConfirmDialog(message, 'mark-known');
+    this.showConfirmDialog(message, "mark-known");
   }
 
   /**
@@ -655,21 +827,21 @@ class BatchMarkingPanel {
     const selectedWords = this.getSelectedWords();
 
     if (selectedWords.length === 0) {
-      alert('请先选择要标记的单词');
+      alert("请先选择要标记的单词");
       return;
     }
 
     const message = `即将标记 ${selectedWords.length} 个单词为"不认识"，确定吗？`;
-    this.showConfirmDialog(message, 'mark-unknown');
+    this.showConfirmDialog(message, "mark-unknown");
   }
 
   /**
    * Batch mark words as known
    */
   async batchMarkAsKnown(words) {
-    console.log('[BatchMarkingPanel] Batch marking as known:', words);
+    console.log("[BatchMarkingPanel] Batch marking as known:", words);
 
-    const promises = words.map(word => {
+    const promises = words.map((word) => {
       const stemmedWord = Stemmer.stem(word);
       return new Promise((resolve) => {
         try {
@@ -684,272 +856,259 @@ class BatchMarkingPanel {
                 (response) => {
                   try {
                     if (chrome.runtime.lastError) {
-                      console.warn(`[BatchMarkingPanel] Extension context error for "${word}":`, chrome.runtime.lastError.message);
+                      console.warn(
+                        `[BatchMarkingPanel] Extension context error for "${word}":`,
+                        chrome.runtime.lastError.message
+                      );
                       // Retry
                       setTimeout(sendMarkAsKnown, 500);
                     } else if (response?.success) {
-                      console.log(`[BatchMarkingPanel] Marked "${word}" as known`);
+                      console.log(
+                        `[BatchMarkingPanel] Marked "${word}" as known`
+                      );
                     } else {
-                      console.warn(`[BatchMarkingPanel] Failed to mark "${word}" as known`, response?.error);
+                      console.warn(
+                        `[BatchMarkingPanel] Failed to mark "${word}" as known`,
+                        response?.error
+                      );
                     }
                     resolve();
                   } catch (e) {
-                    console.error(`[BatchMarkingPanel] Error in callback:`, e.message);
+                    console.error(
+                      `[BatchMarkingPanel] Error in callback:`,
+                      e.message
+                    );
                     resolve();
                   }
                 }
               );
             } catch (e) {
-              console.error(`[BatchMarkingPanel] Failed to send message:`, e.message);
+              console.error(
+                `[BatchMarkingPanel] Failed to send message:`,
+                e.message
+              );
               resolve();
             }
           };
 
           sendMarkAsKnown();
         } catch (error) {
-          console.error(`[BatchMarkingPanel] Error setting up mark as known:`, error.message);
+          console.error(
+            `[BatchMarkingPanel] Error setting up mark as known:`,
+            error.message
+          );
           resolve();
         }
       });
     });
 
     await Promise.all(promises);
-    console.log('[BatchMarkingPanel] Batch mark as known completed');
+    console.log("[BatchMarkingPanel] Batch mark as known completed");
   }
 
   /**
    * Batch mark words as unknown
    */
   async batchMarkAsUnknown(words) {
-    console.log('[BatchMarkingPanel] Batch marking as unknown:', words);
+    console.log("[BatchMarkingPanel] Batch marking as unknown:", words);
 
-    const promises = words.map(word => {
+    const promises = words.map((word) => {
       const stemmedWord = Stemmer.stem(word);
       return this.unknownWordsService.markAsUnknown(stemmedWord);
     });
 
     await Promise.all(promises);
-    console.log('[BatchMarkingPanel] Batch mark as unknown completed');
+    console.log("[BatchMarkingPanel] Batch mark as unknown completed");
   }
 
   /**
    * Batch add words to library (user wants to learn)
    */
   async batchAddToLibrary(words) {
-    console.log('[BatchMarkingPanel] Batch adding to library:', words);
+    console.log("[BatchMarkingPanel] Batch adding to library:", words);
 
     const userId = this.userStore.getUserId();
     if (!userId) {
-      throw new Error('No user ID available');
+      throw new Error("No user ID available");
     }
 
     // Get current page context
     const pageUrl = window.location.href;
     const pageTitle = document.title;
 
-    const promises = words.map(word => {
-      // Get all occurrences of this word to collect different sentences
-      const elements = document.querySelectorAll(`[data-word="${word}"], [data-word="${word.toLowerCase()}"]`);
+    // CRITICAL: Process words SERIALLY to avoid race conditions in backend
+    // When processing in parallel, multiple requests can read/write user data simultaneously
+    // causing some contexts to be lost
+    console.log(
+      `[BatchMarkingPanel] Processing ${words.length} words serially to avoid race conditions`
+    );
 
-      const contexts = Array.from(elements).map(element => {
-        // Get the paragraph containing this word
-        let paragraph = element.closest('p');
-        if (!paragraph) {
-          // If not in a paragraph, try to find the nearest text block
-          paragraph = element.closest('div, article, section, li') || element.parentElement;
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const word of words) {
+      try {
+        console.log(
+          `[BatchMarkingPanel] Processing word ${
+            successCount + failCount + 1
+          }/${words.length}: "${word}"`
+        );
+
+        // Get word stem for querying (use same logic as content.js)
+        let wordStem = word.toLowerCase();
+        if (typeof Stemmer !== "undefined" && Stemmer.stem) {
+          wordStem = Stemmer.stem(wordStem);
         }
 
-        // Get the original text content of the paragraph
-        let text = '';
-        if (paragraph) {
-          text = paragraph.textContent || paragraph.innerText || '';
+        // Query by word stem to find all highlighted instances
+        // CRITICAL: Exclude elements inside the BatchMarkingPanel itself
+        const allElements = document.querySelectorAll(
+          `.mixread-highlight[data-word-stem="${wordStem}"]`
+        );
+        const elements = Array.from(allElements).filter(
+          (el) => !el.closest("#mixread-batch-panel")
+        );
 
-          // CRITICAL: Clean up frequency markers like (1×), (2×), etc. that some websites embed
-          // These appear as "word(1×)" in textContent from certain websites' DOM
-          // This is a common pattern in dictionary/reference websites
-          text = text.replace(/\(\d+×\)/g, '');  // Remove (1×), (2×), (3×), etc.
-          text = text.replace(/→\s*/g, ' ');     // Replace arrows with spaces
+        console.log(
+          `[BatchMarkingPanel] Found ${allElements.length} total elements for "${word}", ${elements.length} after excluding panel`
+        );
 
-          // Clean up whitespace but keep original structure
-          text = text.replace(/\s+/g, ' ').trim();
+        // If word only exists in panel (not in page content), provide fallback context
+        if (elements.length === 0) {
+          console.log(
+            `[BatchMarkingPanel] Word "${word}" not found in page content, using fallback context`
+          );
+          const allContexts = [
+            {
+              page_url: pageUrl,
+              page_title: pageTitle,
+              sentences: [`"${word}" was selected from the word panel.`],
+              timestamp: Date.now(),
+            },
+          ];
+
+          await this.sendWordToLibrary(word, userId, allContexts, true);
+          successCount++;
+          continue; // Skip to next word
         }
 
-        // Simple and direct sentence extraction
-        let sentences = [];
-
-        // Find all occurrences of the word in the text
-        const wordLower = word.toLowerCase();
-        const textLower = text.toLowerCase();
-        const wordPositions = [];
-
-        let pos = textLower.indexOf(wordLower);
-        while (pos !== -1) {
-          wordPositions.push(pos);
-          pos = textLower.indexOf(wordLower, pos + 1);
-        }
-
-        // For each occurrence, extract the sentence around it
-        wordPositions.forEach(wordPos => {
-          // Find start of sentence (first punctuation before the word)
-          let start = wordPos;
-          while (start > 0 && !text[start - 1].match(/[.!?]/)) {
-            start--;
+        // Read contexts from DOM data attributes (cached during highlighting)
+        const sentenceSet = new Set();
+        for (const element of elements) {
+          const cachedContext = element.dataset.sentenceContext;
+          if (cachedContext) {
+            sentenceSet.add(cachedContext);
           }
-          if (start > 0) start++; // Skip the punctuation
-
-          // Find end of sentence (first punctuation after the word)
-          let end = wordPos + word.length;
-          while (end < text.length && !text[end].match(/[.!?]/)) {
-            end++;
-          }
-          if (end < text.length) end++; // Include the punctuation
-
-          // Extract the sentence
-          let sentence = text.substring(start, end).trim();
-
-          // Clean up extra spaces and capitalize
-          sentence = sentence.replace(/\s+/g, ' ');
-          if (sentence.length > 0) {
-            sentence = sentence.charAt(0).toUpperCase() + sentence.slice(1);
-            sentences.push(sentence);
-          }
-        });
-
-        // Remove duplicate sentences
-        sentences = [...new Set(sentences)];
-
-        // Filter and limit sentences
-        let targetSentences = sentences
-          .filter(sentence => {
-            // Basic checks
-            if (sentence.length < 10) return false; // Minimum length
-            if (sentence.split(/\s+/).length < 3) return false; // At least 3 words
-
-            // Skip sentences with excessive special characters (likely code or markup)
-            const specialCharCount = (sentence.match(/[×()[\]{}→]/g) || []).length;
-            if (specialCharCount > 2) return false; // Too many special chars
-
-            // Skip if looks like it's mixing different languages/formats
-            if (sentence.includes('1x') || sentence.includes('→') || sentence.match(/\d+×/)) {
-              return false;
-            }
-
-            // CRITICAL: Skip sentences that contain multiple word-form patterns like "word(1×)"
-            // This indicates the paragraph contains stemming/dictionary information
-            const wordFormPatterns = (sentence.match(/\([0-9×]+\)/g) || []).length;
-            if (wordFormPatterns > 3) {
-              return false;
-            }
-
-            // Skip sentences with non-ASCII characters mixed in (multilingual content)
-            if (/[\u4E00-\u9FFF]/.test(sentence) || /[\u3040-\u309F]/.test(sentence)) {
-              return false;
-            }
-
-            return true;
-          })
-          .slice(0, 3); // Limit to 3 sentences per context
-
-        // Simple fallback if no sentences found
-        if (targetSentences.length === 0) {
-          // Try splitting by punctuation and include the word
-          const allSentences = text.split(/[.!?]/).filter(s => s.trim().length > 0);
-          targetSentences = allSentences.filter(sentence => {
-            const sLower = sentence.toLowerCase();
-            // Check if contains word
-            if (!sLower.includes(word.toLowerCase())) return false;
-            // Check if long enough
-            if (sentence.trim().length < 5) return false;
-
-            // Apply same 6-layer filtering to fallback sentences
-            if (sentence.length < 10) return false;
-            if (sentence.split(/\s+/).length < 3) return false;
-
-            const specialCharCount = (sentence.match(/[×()[\]{}→]/g) || []).length;
-            if (specialCharCount > 2) return false;
-
-            if (sentence.includes('1x') || sentence.includes('→') || sentence.match(/\d+×/)) return false;
-
-            const wordFormPatterns = (sentence.match(/\([0-9×]+\)/g) || []).length;
-            if (wordFormPatterns > 3) return false;
-
-            if (/[\u4E00-\u9FFF]/.test(sentence) || /[\u3040-\u309F]/.test(sentence)) return false;
-
-            return true;
-          }).slice(0, 1).map(s => s.trim() + '.');
         }
 
-        // Final fallback
-        if (targetSentences.length === 0) {
-          targetSentences = [`${word} was found on this page.`];
+        const sentences = Array.from(sentenceSet);
+
+        console.log(
+          `[BatchMarkingPanel] Extracted ${sentences.length} unique contexts from cached data for "${word}"`
+        );
+        if (sentences.length > 0) {
+          console.log(
+            `[BatchMarkingPanel] Sample contexts:`,
+            sentences.slice(0, 2)
+          );
         }
 
-        return {
-          pageUrl: pageUrl,
-          pageTitle: pageTitle,
-          sentences: targetSentences,
-          timestamp: Date.now()
-        };
-      });
+        // Build contexts array
+        const allContexts = [
+          {
+            page_url: pageUrl,
+            page_title: pageTitle,
+            sentences:
+              sentences.length > 0
+                ? sentences
+                : [`"${word}" was encountered on this page.`],
+            timestamp: Date.now(),
+          },
+        ];
 
-      // Get word details from highlighted elements (take first for main info)
-      const element = elements[0];
-      const definition = element?.dataset.definition || '';
-      const chinese = element?.dataset.chinese || '';
-      const cefrLevel = element?.dataset.cefr || '';
+        await this.sendWordToLibrary(word, userId, allContexts, false);
+        successCount++;
+      } catch (error) {
+        console.error(
+          `[BatchMarkingPanel] Error processing word "${word}":`,
+          error.message
+        );
+        failCount++;
+      }
+    }
 
-      // Collect all unique contexts from all occurrences
-      const allContexts = [];
-      contexts.forEach(context => {
-        // Add context if it's not empty
-        if (context.sentences && context.sentences.length > 0) {
-          allContexts.push({
-            page_url: context.pageUrl,
-            page_title: context.pageTitle,
-            sentences: context.sentences,
-            timestamp: context.timestamp
-          });
-        }
-      });
+    console.log(
+      `[BatchMarkingPanel] Batch add to library completed: ${successCount} succeeded, ${failCount} failed`
+    );
+  }
 
+  /**
+   * Helper function to send a word to library
+   * Returns a Promise that resolves when the word is added
+   */
+  sendWordToLibrary(word, userId, contexts, isFallback) {
+    return new Promise((resolve, reject) => {
       try {
         const sendAddToLibrary = () => {
           try {
-            return chrome.runtime.sendMessage(
+            chrome.runtime.sendMessage(
               {
                 type: "ADD_TO_LIBRARY",
                 user_id: userId,
-                word: word, // Send simple word string, not object
-                contexts: allContexts // Send contexts array separately
+                word: word,
+                contexts: contexts,
               },
               (response) => {
                 try {
                   if (chrome.runtime.lastError) {
-                    console.warn(`[BatchMarkingPanel] Extension context error when adding "${word}":`, chrome.runtime.lastError.message);
-                    // Retry after delay
+                    console.warn(
+                      `[BatchMarkingPanel] Extension context error when adding "${word}":`,
+                      chrome.runtime.lastError.message
+                    );
                     setTimeout(sendAddToLibrary, 500);
                   } else if (response?.success) {
-                    console.log(`[BatchMarkingPanel] Added "${word}" to library with ${contexts.length} contexts`);
+                    const msg = isFallback
+                      ? `Added "${word}" with fallback context (word not in page)`
+                      : `Added "${word}" with ${contexts.length} contexts`;
+                    console.log(`[BatchMarkingPanel] ${msg}`);
+                    console.log(
+                      `[BatchMarkingPanel DEBUG] Contexts sent for "${word}":`,
+                      contexts
+                    );
+                    resolve(response);
                   } else {
-                    console.warn(`[BatchMarkingPanel] Failed to add "${word}" to library:`, response?.error);
+                    console.warn(
+                      `[BatchMarkingPanel] Failed to add "${word}" to library:`,
+                      response?.error
+                    );
+                    reject(new Error(response?.error || "Unknown error"));
                   }
                 } catch (e) {
-                  console.error(`[BatchMarkingPanel] Error in callback:`, e.message);
+                  console.error(
+                    `[BatchMarkingPanel] Error in callback:`,
+                    e.message
+                  );
+                  reject(e);
                 }
               }
             );
           } catch (e) {
-            console.error(`[BatchMarkingPanel] Failed to send message:`, e.message);
+            console.error(
+              `[BatchMarkingPanel] Failed to send message:`,
+              e.message
+            );
+            reject(e);
           }
         };
 
         sendAddToLibrary();
       } catch (error) {
-        console.error(`[BatchMarkingPanel] Error setting up add to library:`, error.message);
+        console.error(
+          `[BatchMarkingPanel] Error setting up add to library:`,
+          error.message
+        );
+        reject(error);
       }
     });
-
-    await Promise.all(promises);
-    console.log('[BatchMarkingPanel] Batch add to library completed');
   }
 }

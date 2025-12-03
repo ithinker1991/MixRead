@@ -971,60 +971,63 @@ function addWordToVocabulary(word) {
     }
   }
 
-  // Extract sentences using simple method (find punctuation before/after)
+  // Extract sentences using Intl.Segmenter for robust boundary detection
   let text = paragraph.textContent || paragraph.innerText || "";
 
   // CRITICAL: Clean up frequency markers like (1×), (2×), etc. that some websites embed
-  // These appear as "word(1×)" in textContent from certain websites' DOM
-  // This is a common pattern in dictionary/reference websites
   text = text.replace(/\(\d+×\)/g, ""); // Remove (1×), (2×), (3×), etc.
   text = text.replace(/→\s*/g, " "); // Replace arrows with spaces
-
   text = text.replace(/\s+/g, " ").trim();
 
   let sentences = [];
   const wordLowerVar = word.toLowerCase();
-  const textLower = text.toLowerCase();
 
-  // Find word positions
-  let pos = textLower.indexOf(wordLowerVar);
-  while (pos !== -1) {
-    // Find start of sentence
-    let start = pos;
-    while (start > 0 && !text[start - 1].match(/[.!?]/)) {
-      start--;
+  try {
+    // Use Intl.Segmenter if available (supported in modern Chrome)
+    const segmenter = new Intl.Segmenter("en", { granularity: "sentence" });
+    const segments = segmenter.segment(text);
+
+    for (const segment of segments) {
+      const sentence = segment.segment.trim();
+      if (sentence.toLowerCase().includes(wordLowerVar)) {
+        sentences.push(sentence);
+      }
     }
-    if (start > 0) start++;
-
-    // Find end of sentence
-    let end = pos + word.length;
-    while (end < text.length && !text[end].match(/[.!?]/)) {
-      end++;
-    }
-    if (end < text.length) end++;
-
-    // Extract sentence
-    let sentence = text.substring(start, end).trim();
-    sentence = sentence.replace(/\s+/g, " ");
-    if (sentence.length > 0) {
-      sentence = sentence.charAt(0).toUpperCase() + sentence.slice(1);
-      sentences.push(sentence);
-    }
-
-    pos = textLower.indexOf(wordLowerVar, pos + 1);
+  } catch (e) {
+    console.warn(
+      "[MixRead] Intl.Segmenter not supported or failed, falling back to simple split",
+      e
+    );
+    // Fallback to simple split if Intl.Segmenter fails
+    sentences = text
+      .split(/[.!?]+/)
+      .filter((s) => s.toLowerCase().includes(wordLowerVar));
   }
+
+  // Clean up sentences
+  sentences = sentences.map((s) => {
+    let clean = s.trim();
+    // Ensure it ends with punctuation if it looks like a complete sentence
+    if (clean.length > 0 && !/[.!?]$/.test(clean)) {
+      clean += ".";
+    }
+    return clean;
+  });
 
   // Remove duplicates
   sentences = [...new Set(sentences)];
 
-  // Filter sentences (minimum 10 chars, 3 words, no excessive special chars)
+  // Filter sentences
   sentences = sentences
     .filter((s) => {
+      // Basic length checks
       if (s.length < 10) return false;
+      // Relaxed word count check (2 words might be enough for short exclamations or commands, but 3 is safer)
       if (s.split(/\s+/).length < 3) return false;
 
-      // Skip sentences with excessive special characters (likely code or markup)
-      const specialCharCount = (s.match(/[×()[\]{}→]/g) || []).length;
+      // Relaxed special character check
+      // Allow more special characters, especially parentheses and brackets which are common in examples
+      const specialCharCount = (s.match(/[×→]/g) || []).length; // Only count "bad" special chars
       if (specialCharCount > 2) return false;
 
       // Skip if looks like it's mixing different languages/formats
@@ -1033,13 +1036,13 @@ function addWordToVocabulary(word) {
       }
 
       // CRITICAL: Skip sentences that contain multiple word-form patterns like "word(1×)"
-      // This indicates the paragraph contains stemming/dictionary information
       const wordFormPatterns = (s.match(/\([0-9×]+\)/g) || []).length;
       if (wordFormPatterns > 3) {
         return false;
       }
 
       // Skip sentences with non-ASCII characters mixed in (multilingual content)
+      // But allow common punctuation
       if (/[\u4E00-\u9FFF]/.test(s) || /[\u3040-\u309F]/.test(s)) {
         return false;
       }
@@ -1050,33 +1053,16 @@ function addWordToVocabulary(word) {
 
   // Fallback if no sentences found
   if (sentences.length === 0) {
-    const allSentences = text.split(/[.!?]/).filter((s) => s.trim().length > 0);
-    const matching = allSentences.filter((s) => {
-      const sLower = s.toLowerCase();
-      // Check if contains word
-      if (!sLower.includes(wordLowerVar)) return false;
-      // Check if long enough
-      if (s.trim().length < 5) return false;
-
-      // Apply same 6-layer filtering to fallback sentences
-      if (s.length < 10) return false;
-      if (s.split(/\s+/).length < 3) return false;
-
-      const specialCharCount = (s.match(/[×()[\]{}→]/g) || []).length;
-      if (specialCharCount > 2) return false;
-
-      if (s.includes("1x") || s.includes("→") || s.match(/\d+×/)) return false;
-
-      const wordFormPatterns = (s.match(/\([0-9×]+\)/g) || []).length;
-      if (wordFormPatterns > 3) return false;
-
-      if (/[\u4E00-\u9FFF]/.test(s) || /[\u3040-\u309F]/.test(s)) return false;
-
-      return true;
-    });
-
-    if (matching.length > 0) {
-      sentences = [matching[0].trim() + "."];
+    // If we have the word but no valid sentences passed filter, just return the word context
+    // Try to find a small window around the word
+    const index = text.toLowerCase().indexOf(wordLowerVar);
+    if (index !== -1) {
+      const start = Math.max(0, index - 20);
+      const end = Math.min(text.length, index + word.length + 20);
+      let snippet = text.substring(start, end).trim();
+      if (start > 0) snippet = "..." + snippet;
+      if (end < text.length) snippet = snippet + "...";
+      sentences = [snippet];
     } else {
       sentences = [`${word} was found on this page.`];
     }
