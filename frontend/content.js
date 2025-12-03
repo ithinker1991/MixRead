@@ -800,6 +800,16 @@ function processTextNode(node, wordSet) {
         span.dataset.translation = highlightedWordsMap[wordLower].chinese;
       }
 
+      // Add CEFR level if available
+      if (highlightedWordsMap[wordLower]?.cefr_level) {
+        span.dataset.cefrLevel = highlightedWordsMap[wordLower].cefr_level;
+      }
+
+      // Add definition if available
+      if (highlightedWordsMap[wordLower]?.definition) {
+        span.dataset.definition = highlightedWordsMap[wordLower].definition;
+      }
+
       // Add click handler to show tooltip
       span.addEventListener("click", (e) => {
         console.log("[MixRead] Click event triggered for word:", word);
@@ -1867,6 +1877,7 @@ function notifyPanelOfNewWords(wordDetails) {
           originalWords: [],  // Use array instead of Set for serialization
           chinese: firstElement.dataset.translation || "",
           definition: firstElement.dataset.definition || "",
+          cefrLevel: firstElement.dataset.cefrLevel || "",
         };
       }
 
@@ -1953,10 +1964,12 @@ function setupMutationObserver() {
     }
 
     // Notify sidebar of removed words
-    if (hasRelevantRemoved && removedStems.length > 0 && sidebarPanel) {
-      console.log(`[MixRead] Feed removed ${removedStems.length} words`);
-      sidebarPanel.onWordsRemoved(removedStems);
-    }
+    // DISABLED: Don't remove words from sidebar on infinite scroll feeds like Twitter
+    // Words should persist in sidebar; only remove via explicit user action (mark known, delete)
+    // if (hasRelevantRemoved && removedStems.length > 0 && sidebarPanel) {
+    //   console.log(`[MixRead] Feed removed ${removedStems.length} words`);
+    //   sidebarPanel.onWordsRemoved(removedStems);
+    // }
 
     if (hasRelevantAdded) {
       clearTimeout(mutationTimeout);

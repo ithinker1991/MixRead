@@ -33,6 +33,11 @@ class SidebarPanel {
     this.messageListener = null;
     this.urlChangeListeners = [];
 
+    // Rectangle selection state
+    this.isSelecting = false;
+    this.selectionStart = null;
+    this.selectionRect = null;
+
     // Width preference (user adjustable)
     this.sidebarWidth = '350px';
 
@@ -90,7 +95,22 @@ class SidebarPanel {
           🔥 <span class="stat-high-freq">0</span> 高频 | ❄️ <span class="stat-low-freq">0</span> 低频
         </div>
 
+        <div class="sidebar-toolbar">
+          <button class="toolbar-btn" id="select-all-btn" title="全选">全选</button>
+          <button class="toolbar-btn" id="deselect-all-btn" title="反选">反选</button>
+          <button class="toolbar-btn" id="clear-selection-btn" title="清空">清空</button>
+        </div>
+
         <div class="sidebar-content"></div>
+
+        <!-- Rectangle selection canvas for drag-to-select -->
+        <div class="sidebar-selection-canvas"></div>
+
+        <div class="sidebar-actions">
+          <button class="action-btn mark-known-btn" id="mark-known-btn" disabled title="将选中的词标记为已知">✓ Mark as Known</button>
+          <button class="action-btn add-library-btn" id="add-library-btn" disabled title="将选中的词添加到学习库">⭐ Add to Library</button>
+          <button class="action-btn mark-unknown-btn" id="mark-unknown-btn" disabled title="将选中的词标记为未知">× Mark as Unknown</button>
+        </div>
 
         <div class="sidebar-footer">
           <button class="sidebar-refresh-btn">🔄 刷新</button>
@@ -119,6 +139,32 @@ class SidebarPanel {
     // Refresh button
     this.sidebarElement.querySelector('.sidebar-refresh-btn')
       ?.addEventListener('click', () => this.refresh());
+
+    // Toolbar buttons
+    this.sidebarElement.querySelector('#select-all-btn')
+      ?.addEventListener('click', () => this.selectAllCheckboxes());
+
+    this.sidebarElement.querySelector('#deselect-all-btn')
+      ?.addEventListener('click', () => this.deselectAllCheckboxes());
+
+    this.sidebarElement.querySelector('#clear-selection-btn')
+      ?.addEventListener('click', () => this.deselectAllCheckboxes());
+
+    // Action buttons
+    this.sidebarElement.querySelector('#mark-known-btn')
+      ?.addEventListener('click', () => this.markSelectedAsKnown());
+
+    this.sidebarElement.querySelector('#add-library-btn')
+      ?.addEventListener('click', () => this.addSelectedToLibrary());
+
+    this.sidebarElement.querySelector('#mark-unknown-btn')
+      ?.addEventListener('click', () => this.markSelectedAsUnknown());
+
+    // Rectangle selection listeners
+    this.attachSelectionListeners();
+
+    // Prevent page scroll when hovering sidebar
+    this.attachScrollHandlers();
 
     // Start listening for new highlighted words
     this.startListeningForNewWords();
@@ -153,6 +199,487 @@ class SidebarPanel {
     });
 
     console.log('[SidebarPanel] Unload handler registered');
+  }
+
+  /**
+   * Attach scroll handlers to prevent page scroll when hovering sidebar
+   */
+  attachScrollHandlers() {
+    if (!this.sidebarElement) return;
+
+    const contentArea = this.sidebarElement.querySelector('.sidebar-content');
+    if (!contentArea) return;
+
+    // Handle wheel events on sidebar content to prevent page scroll
+    contentArea.addEventListener('wheel', (e) => {
+      const element = e.target.closest('.sidebar-content');
+      if (!element) return;
+
+      // Check if content can scroll in the direction of wheel movement
+      const canScrollDown = element.scrollHeight > element.scrollTop + element.clientHeight;
+      const canScrollUp = element.scrollTop > 0;
+      const isScrollingDown = e.deltaY > 0;
+      const isScrollingUp = e.deltaY < 0;
+
+      // Only prevent default scroll if:
+      // 1. We're scrolling down and content can scroll down
+      // 2. We're scrolling up and content can scroll up
+      const shouldPreventDefault =
+        (isScrollingDown && canScrollDown) ||
+        (isScrollingUp && canScrollUp);
+
+      if (shouldPreventDefault) {
+        // Allow sidebar to scroll naturally
+        return;
+      }
+
+      // If we're at the top/bottom and trying to scroll further,
+      // prevent default to avoid page scroll
+      if (!canScrollDown && isScrollingDown) {
+        e.preventDefault();
+      } else if (!canScrollUp && isScrollingUp) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    // Prevent page scroll when hovering over other sidebar areas
+    this.sidebarElement.addEventListener('wheel', (e) => {
+      if (e.target.closest('.sidebar-content')) {
+        // Already handled above
+        return;
+      }
+      // For non-content areas, always prevent default
+      e.preventDefault();
+    }, { passive: false });
+
+    console.log('[SidebarPanel] Scroll handlers attached');
+  }
+
+  /**
+   * Attach rectangle selection (drag-to-select) listeners
+   */
+  attachSelectionListeners() {
+    // Ensure we have content area before attaching listeners
+    if (!this.contentArea) {
+      console.warn('[SidebarPanel] contentArea not ready for selection listeners');
+      return;
+    }
+
+    // Use document-level listeners for better tracking
+    document.addEventListener('mousedown', (e) => this.handleSelectionStart(e));
+    document.addEventListener('mousemove', (e) => this.handleSelectionMove(e));
+    document.addEventListener('mouseup', (e) => this.handleSelectionEnd(e));
+
+    console.log('[SidebarPanel] Rectangle selection listeners attached');
+  }
+
+  /**
+   * Handle rectangle selection start
+   */
+  handleSelectionStart(e) {
+    // Check if we're inside the sidebar content area (but not on a checkbox or word item)
+    const contentArea = this.contentArea;
+    if (!contentArea || !contentArea.contains(e.target)) {
+      return;
+    }
+
+    // Don't start selection if clicking on checkboxes or buttons
+    if (
+      e.target.closest('.word-checkbox') ||
+      e.target.closest('button') ||
+      e.target.closest('.word-item')?.querySelector('.word-checkbox').contains(e.target)
+    ) {
+      return;
+    }
+
+    this.isSelecting = true;
+    this.selectionStart = { x: e.clientX, y: e.clientY };
+    console.log('[SidebarPanel] Selection started at', this.selectionStart);
+  }
+
+  /**
+   * Handle rectangle selection move
+   */
+  handleSelectionMove(e) {
+    if (!this.isSelecting || !this.selectionStart) return;
+
+    const canvas = this.sidebarElement?.querySelector('.sidebar-selection-canvas');
+    if (!canvas) return;
+
+    // Calculate rectangle
+    const startX = this.selectionStart.x;
+    const startY = this.selectionStart.y;
+    const endX = e.clientX;
+    const endY = e.clientY;
+
+    // Position and size
+    const left = Math.min(startX, endX);
+    const top = Math.min(startY, endY);
+    const width = Math.abs(endX - startX);
+    const height = Math.abs(endY - startY);
+
+    // Only show if minimum size (5px)
+    if (width < 5 || height < 5) {
+      canvas.classList.remove('active');
+      return;
+    }
+
+    // Apply styles
+    canvas.style.left = left + 'px';
+    canvas.style.top = top + 'px';
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    canvas.classList.add('active');
+
+    // Store rectangle
+    this.selectionRect = { left, top, width, height };
+  }
+
+  /**
+   * Handle rectangle selection end
+   */
+  handleSelectionEnd(e) {
+    if (!this.isSelecting || !this.selectionRect) {
+      this.isSelecting = false;
+      const canvas = this.sidebarElement?.querySelector('.sidebar-selection-canvas');
+      if (canvas) canvas.classList.remove('active');
+      return;
+    }
+
+    // Select words in rectangle
+    this.selectWordsInRect(this.selectionRect);
+
+    this.isSelecting = false;
+    const canvas = this.sidebarElement?.querySelector('.sidebar-selection-canvas');
+    if (canvas) canvas.classList.remove('active');
+
+    console.log('[SidebarPanel] Selection ended');
+  }
+
+  /**
+   * Select words within rectangle
+   */
+  selectWordsInRect(rect) {
+    const checkboxes = this.contentArea?.querySelectorAll('.word-checkbox');
+    let selectedCount = 0;
+
+    if (!checkboxes) return;
+
+    checkboxes.forEach((checkbox) => {
+      const wordItem = checkbox.closest('.word-item');
+      if (!wordItem) return;
+
+      // Get word item's position in viewport
+      const itemRect = wordItem.getBoundingClientRect();
+
+      // Check if word item overlaps with selection rectangle
+      if (
+        itemRect.right > rect.left &&
+        itemRect.left < rect.left + rect.width &&
+        itemRect.bottom > rect.top &&
+        itemRect.top < rect.top + rect.height
+      ) {
+        checkbox.checked = !checkbox.checked;
+        selectedCount++;
+      }
+    });
+
+    // Update action buttons state after selection
+    this.updateActionButtonsState();
+
+    console.log(`[SidebarPanel] Selected/deselected ${selectedCount} words in rectangle`);
+  }
+
+  /**
+   * Select all checkboxes in sidebar
+   */
+  selectAllCheckboxes() {
+    const checkboxes = this.contentArea?.querySelectorAll('.word-checkbox');
+    if (checkboxes) {
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+      });
+      this.updateActionButtonsState();
+      console.log('[SidebarPanel] All checkboxes selected');
+    }
+  }
+
+  /**
+   * Deselect all checkboxes in sidebar
+   */
+  deselectAllCheckboxes() {
+    const checkboxes = this.contentArea?.querySelectorAll('.word-checkbox');
+    if (checkboxes) {
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+      });
+      this.updateActionButtonsState();
+      console.log('[SidebarPanel] All checkboxes deselected');
+    }
+  }
+
+  /**
+   * Get list of selected word stems
+   */
+  getSelectedWords() {
+    const checkboxes = this.contentArea?.querySelectorAll('.word-checkbox:checked');
+    const selectedWords = [];
+    if (checkboxes) {
+      checkboxes.forEach(checkbox => {
+        const word = checkbox.dataset.word;
+        if (word) {
+          selectedWords.push(word);
+        }
+      });
+    }
+    return selectedWords;
+  }
+
+  /**
+   * Update action buttons enabled/disabled state based on selection
+   */
+  updateActionButtonsState() {
+    const selectedWords = this.getSelectedWords();
+    const hasSelection = selectedWords.length > 0;
+
+    const markKnownBtn = this.sidebarElement?.querySelector('#mark-known-btn');
+    const addLibraryBtn = this.sidebarElement?.querySelector('#add-library-btn');
+    const markUnknownBtn = this.sidebarElement?.querySelector('#mark-unknown-btn');
+
+    if (markKnownBtn) markKnownBtn.disabled = !hasSelection;
+    if (addLibraryBtn) addLibraryBtn.disabled = !hasSelection;
+    if (markUnknownBtn) markUnknownBtn.disabled = !hasSelection;
+  }
+
+  /**
+   * Mark selected words as known
+   */
+  async markSelectedAsKnown() {
+    const selectedWords = this.getSelectedWords();
+    if (selectedWords.length === 0) {
+      console.warn('[SidebarPanel] No words selected');
+      return;
+    }
+
+    try {
+      console.log('[SidebarPanel] Marking as known:', selectedWords);
+
+      // Update local state
+      selectedWords.forEach(word => {
+        if (this.wordState[word]) {
+          this.wordState[word].isKnown = true;
+        }
+      });
+
+      // Call API to mark words as known
+      if (typeof unknownWordsService !== 'undefined' && unknownWordsService.markWordsAsKnown) {
+        const userId = userStore?.getUserId();
+        if (userId) {
+          await unknownWordsService.markWordsAsKnown(userId, selectedWords);
+        }
+      }
+
+      // Update UI
+      this.renderWordList();
+      this.deselectAllCheckboxes();
+      console.log('[SidebarPanel] Successfully marked as known:', selectedWords);
+    } catch (e) {
+      console.error('[SidebarPanel] Error marking as known:', e);
+    }
+  }
+
+  /**
+   * Add selected words to library
+   */
+  async addSelectedToLibrary() {
+    const selectedWords = this.getSelectedWords();
+    if (selectedWords.length === 0) {
+      console.warn('[SidebarPanel] No words selected');
+      return;
+    }
+
+    try {
+      console.log('[SidebarPanel] Adding to library:', selectedWords);
+
+      // Update local state
+      selectedWords.forEach(word => {
+        if (this.wordState[word]) {
+          this.wordState[word].isLibrary = true;
+        }
+      });
+
+      // Get current page context
+      const pageUrl = window.location.href;
+      const pageTitle = document.title;
+
+      // Send each word to library via background.js
+      const userId = userStore?.getUserId();
+      if (!userId) {
+        console.warn('[SidebarPanel] No user ID available');
+        return;
+      }
+
+      // Process words serially to avoid race conditions
+      for (const word of selectedWords) {
+        await this.sendWordToLibrary(word, userId, pageUrl, pageTitle);
+      }
+
+      // Update UI
+      this.renderWordList();
+      this.deselectAllCheckboxes();
+      console.log('[SidebarPanel] Successfully added to library:', selectedWords);
+    } catch (e) {
+      console.error('[SidebarPanel] Error adding to library:', e);
+    }
+  }
+
+  /**
+   * Send a word to library via background.js
+   * @param {string} word - Word to add to library
+   * @param {string} userId - User ID
+   * @param {string} pageUrl - Current page URL
+   * @param {string} pageTitle - Current page title
+   */
+  sendWordToLibrary(word, userId, pageUrl, pageTitle) {
+    return new Promise((resolve, reject) => {
+      try {
+        const sendAddToLibrary = () => {
+          try {
+            // Extract real sentence contexts from highlighted elements
+            let wordStem = word.toLowerCase();
+
+            // Use Stemmer to get word stem (same logic as in content.js)
+            if (typeof Stemmer !== "undefined" && Stemmer.stem) {
+              wordStem = Stemmer.stem(wordStem);
+            }
+
+            const sentenceSet = new Set();
+
+            // Find all highlighted elements with this word stem
+            const allElements = document.querySelectorAll(
+              `.mixread-highlight[data-word-stem="${wordStem}"]`
+            );
+
+            console.log(`[SidebarPanel] Found ${allElements.length} highlighted elements for "${word}"`);
+
+            // Extract cached sentence contexts from data attributes
+            allElements.forEach((element) => {
+              const cachedContext = element.dataset.sentenceContext;
+              if (cachedContext) {
+                sentenceSet.add(cachedContext);
+              }
+            });
+
+            const sentences = Array.from(sentenceSet);
+            console.log(`[SidebarPanel] Extracted ${sentences.length} unique sentence contexts for "${word}"`);
+
+            if (sentences.length > 0) {
+              console.log(`[SidebarPanel] Sample sentences:`, sentences.slice(0, 2));
+            }
+
+            // Create contexts array with extracted sentences or fallback
+            const contexts = [{
+              page_url: pageUrl,
+              page_title: pageTitle,
+              sentences: sentences.length > 0
+                ? sentences
+                : [`Encountered "${word}" while reading.`],
+              timestamp: Date.now(),
+            }];
+
+            chrome.runtime.sendMessage(
+              {
+                type: "ADD_TO_LIBRARY",
+                user_id: userId,
+                word: word,
+                contexts: contexts,
+              },
+              (response) => {
+                try {
+                  if (chrome.runtime.lastError) {
+                    console.warn(
+                      `[SidebarPanel] Extension context error when adding "${word}":`,
+                      chrome.runtime.lastError.message
+                    );
+                    setTimeout(sendAddToLibrary, 500);
+                  } else if (response?.success) {
+                    const msg = sentences.length > 0
+                      ? `Added "${word}" with ${sentences.length} sentence(s)`
+                      : `Added "${word}" with fallback context`;
+                    console.log(`[SidebarPanel] ${msg}`);
+                    console.log(`[SidebarPanel DEBUG] Contexts sent for "${word}":`, contexts);
+                    resolve(response);
+                  } else {
+                    console.warn(
+                      `[SidebarPanel] Failed to add "${word}" to library:`,
+                      response?.error
+                    );
+                    reject(new Error(response?.error || "Unknown error"));
+                  }
+                } catch (e) {
+                  console.error(
+                    `[SidebarPanel] Error in callback:`,
+                    e.message
+                  );
+                  reject(e);
+                }
+              }
+            );
+          } catch (e) {
+            console.error(
+              `[SidebarPanel] Failed to send message:`,
+              e.message
+            );
+            reject(e);
+          }
+        };
+
+        sendAddToLibrary();
+      } catch (error) {
+        console.error(
+          `[SidebarPanel] Error setting up add to library:`,
+          error.message
+        );
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Mark selected words as unknown
+   */
+  async markSelectedAsUnknown() {
+    const selectedWords = this.getSelectedWords();
+    if (selectedWords.length === 0) {
+      console.warn('[SidebarPanel] No words selected');
+      return;
+    }
+
+    try {
+      console.log('[SidebarPanel] Marking as unknown:', selectedWords);
+
+      // Update local state
+      selectedWords.forEach(word => {
+        if (this.wordState[word]) {
+          this.wordState[word].isKnown = false;
+        }
+      });
+
+      // Call API to mark words as unknown
+      if (typeof unknownWordsService !== 'undefined' && unknownWordsService.markWordsAsUnknown) {
+        const userId = userStore?.getUserId();
+        if (userId) {
+          await unknownWordsService.markWordsAsUnknown(userId, selectedWords);
+        }
+      }
+
+      // Update UI
+      this.renderWordList();
+      this.deselectAllCheckboxes();
+      console.log('[SidebarPanel] Successfully marked as unknown:', selectedWords);
+    } catch (e) {
+      console.error('[SidebarPanel] Error marking as unknown:', e);
+    }
   }
 
   /**
@@ -363,6 +890,7 @@ class SidebarPanel {
           originalWords: new Set(data.originalWords || [word]),
           chinese: data.chinese || '',
           definition: data.definition || '',
+          cefrLevel: data.cefrLevel || '',
           baseWord: normalizedWord,
           isKnown: false,
           isLibrary: false
@@ -511,6 +1039,7 @@ class SidebarPanel {
     const totalCount = words.reduce((sum, [, data]) => sum + data.count, 0);
     const uniqueCount = words.length;
     const highFreqCount = words.filter(([, data]) => data.count >= 3).length;
+    const mediumFreqCount = words.filter(([, data]) => data.count === 2).length;
     const lowFreqCount = words.filter(([, data]) => data.count === 1).length;
 
     // Update stats
@@ -524,17 +1053,65 @@ class SidebarPanel {
     // Update frequency stats
     if (this.frequencyStatsElement) {
       this.frequencyStatsElement.innerHTML = `
-        🔥 <span class="stat-high-freq">${highFreqCount}</span> 高频 | ❄️ <span class="stat-low-freq">${lowFreqCount}</span> 低频
+        🔥 <span class="stat-high-freq">${highFreqCount}</span> 高频 | 📊 <span class="stat-medium-freq">${mediumFreqCount}</span> 中频 | ❄️ <span class="stat-low-freq">${lowFreqCount}</span> 低频
       `;
     }
 
-    // Render each word
+    // Separate words by frequency
+    const highFreq = words.filter(([, data]) => data.count >= 3);
+    const mediumFreq = words.filter(([, data]) => data.count === 2);
+    const lowFreq = words.filter(([, data]) => data.count === 1);
+
+    // Render high frequency section
+    if (highFreq.length > 0) {
+      this.renderFrequencyGroup('🔥 High Frequency', highFreq);
+    }
+
+    // Render medium frequency section
+    if (mediumFreq.length > 0) {
+      this.renderFrequencyGroup('📊 Medium Frequency', mediumFreq);
+    }
+
+    // Render low frequency section
+    if (lowFreq.length > 0) {
+      this.renderFrequencyGroup('❄️ Low Frequency', lowFreq);
+    }
+
+    // If no words, show empty state
+    if (words.length === 0) {
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'sidebar-empty';
+      emptyDiv.innerHTML = '<p>No words highlighted yet</p>';
+      this.contentArea.appendChild(emptyDiv);
+    }
+
+    console.log(`[SidebarPanel] Rendered ${words.length} words (${highFreqCount} high, ${mediumFreqCount} medium, ${lowFreqCount} low freq)`);
+  }
+
+  /**
+   * Render a frequency group with header
+   */
+  renderFrequencyGroup(title, words) {
+    // Create group container
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'frequency-group';
+
+    // Create group header
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'frequency-group-header';
+    headerDiv.textContent = title;
+    groupDiv.appendChild(headerDiv);
+
+    // Create group content
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'frequency-group-content';
     words.forEach(([word, data]) => {
       const wordItem = this.createWordItem(word, data);
-      this.contentArea.appendChild(wordItem);
+      contentDiv.appendChild(wordItem);
     });
+    groupDiv.appendChild(contentDiv);
 
-    console.log(`[SidebarPanel] Rendered ${words.length} words (${highFreqCount} high-freq, ${lowFreqCount} low-freq)`);
+    this.contentArea.appendChild(groupDiv);
   }
 
   /**
@@ -557,6 +1134,16 @@ class SidebarPanel {
       ? `${normalizedWord}* (${variantsCount})`
       : normalizedWord;
 
+    // Extract example sentences for this word
+    const sentences = this.extractWordSentences(normalizedWord);
+    const sentencesHTML = sentences.length > 0
+      ? `<div class="word-sentences">
+           ${sentences.slice(0, 2).map(sentence =>
+             `<div class="sentence-example">"${sentence}"</div>`
+           ).join('')}
+         </div>`
+      : '';
+
     div.innerHTML = `
       <div class="word-main">
         <input type="checkbox" class="word-checkbox" data-word="${normalizedWord}">
@@ -564,9 +1151,11 @@ class SidebarPanel {
         <span class="word-count">[${data.count}]</span>
       </div>
       <div class="word-labels">
+        ${data.cefrLevel ? `<span class="label cefr" title="CEFR Level">${data.cefrLevel}</span>` : ''}
         ${data.isKnown ? '<span class="label known" title="已标记为已知">✓ Known</span>' : ''}
         ${data.isLibrary ? '<span class="label library" title="已添加到学习库">⭐ Library</span>' : ''}
       </div>
+      ${sentencesHTML}
       <button class="jump-btn" data-word="${normalizedWord}" title="快速跳转">🔍</button>
     `;
 
@@ -577,7 +1166,48 @@ class SidebarPanel {
       this.jumpToWord(normalizedWord);
     });
 
+    // Checkbox change event - update action buttons state
+    const checkbox = div.querySelector('.word-checkbox');
+    checkbox?.addEventListener('change', () => {
+      this.updateActionButtonsState();
+    });
+
     return div;
+  }
+
+  /**
+   * Extract example sentences for a word from highlighted elements
+   * @param {string} word - The normalized word
+   * @returns {string[]} Array of unique sentences
+   */
+  extractWordSentences(word) {
+    try {
+      // Get word stem using same logic as in sendWordToLibrary
+      let wordStem = word.toLowerCase();
+      if (typeof Stemmer !== "undefined" && Stemmer.stem) {
+        wordStem = Stemmer.stem(wordStem);
+      }
+
+      const sentenceSet = new Set();
+
+      // Find all highlighted elements with this word stem
+      const allElements = document.querySelectorAll(
+        `.mixread-highlight[data-word-stem="${wordStem}"]`
+      );
+
+      // Extract cached sentence contexts from data attributes
+      allElements.forEach((element) => {
+        const cachedContext = element.dataset.sentenceContext;
+        if (cachedContext) {
+          sentenceSet.add(cachedContext);
+        }
+      });
+
+      return Array.from(sentenceSet);
+    } catch (error) {
+      console.error(`[SidebarPanel] Error extracting sentences for "${word}":`, error);
+      return [];
+    }
   }
 
   /**
@@ -598,15 +1228,15 @@ class SidebarPanel {
    * Refresh word list (manual)
    */
   async refresh() {
-    console.log('[SidebarPanel] Manual refresh');
+    console.log('[SidebarPanel] Manual refresh - re-highlighting page');
 
-    // Re-scan current page
-    this.wordState = {};
-    await this.loadPageData();
-
-    // Trigger a re-highlight (will send NEW_WORDS_HIGHLIGHTED event)
+    // Just trigger a re-highlight without clearing word state
+    // This will discover any new words on dynamically loaded content
     if (typeof highlightPageWords === 'function') {
       highlightPageWords();
+      console.log('[SidebarPanel] Page re-highlighted');
+    } else {
+      console.warn('[SidebarPanel] highlightPageWords function not found');
     }
   }
 
