@@ -22,6 +22,7 @@ class SidebarPanel {
     // State
     this.isOpen = false;         // Internal state (always listening)
     this.isVisible = false;      // UI visibility (user preference)
+    this.isInitialized = false;  // Track initialization completion
     this.wordState = {};         // {normalizedWord → {count, originalWords, ...}}
     this.currentUrl = null;
     this.currentCacheKey = null;
@@ -48,9 +49,11 @@ class SidebarPanel {
       await this.loadPageData();
       await this.loadVisibilityPreference();
       this.isOpen = true;
+      this.isInitialized = true;  // Mark initialization as complete
       console.log('[SidebarPanel] Initialization complete');
     } catch (e) {
       console.error('[SidebarPanel] Init error:', e);
+      this.isInitialized = true;  // Mark as initialized even on error to prevent retry loops
     }
   }
 
@@ -114,6 +117,34 @@ class SidebarPanel {
 
     // Monitor URL changes
     this.setupURLChangeListener();
+
+    // Save cache on page unload
+    this.setupUnloadHandler();
+  }
+
+  /**
+   * Setup page unload handler to save cache before leaving
+   */
+  setupUnloadHandler() {
+    window.addEventListener('beforeunload', async () => {
+      if (this.currentCacheKey && Object.keys(this.wordState).length > 0) {
+        try {
+          const userId = userStore?.getUserId();
+          if (userId) {
+            // Synchronously save to avoid delays (non-blocking)
+            this.cacheManager.setToCache(
+              this.currentCacheKey,
+              this.wordState,
+              userId
+            ).catch(e => console.warn('[SidebarPanel] Unload cache save error:', e));
+          }
+        } catch (e) {
+          console.warn('[SidebarPanel] Unload handler error:', e);
+        }
+      }
+    });
+
+    console.log('[SidebarPanel] Unload handler registered');
   }
 
   /**
@@ -161,6 +192,12 @@ class SidebarPanel {
    * Handle URL changes (for SPA)
    */
   setupURLChangeListener() {
+    // Guard against multiple calls
+    if (window.__mixreadUrlListenerSetup) {
+      console.log('[SidebarPanel] URL change listener already installed (skipping duplicate)');
+      return;
+    }
+
     // Listen for popstate (back/forward buttons)
     window.addEventListener('popstate', () => {
       this.onURLChange();
@@ -181,6 +218,9 @@ class SidebarPanel {
       setTimeout(() => this.onURLChange(), 50);
       return undefined;
     };
+
+    // Mark as initialized to prevent duplicate setup
+    window.__mixreadUrlListenerSetup = true;
 
     console.log('[SidebarPanel] URL change listener installed');
   }
@@ -266,6 +306,19 @@ class SidebarPanel {
       return;
     }
 
+    // Wait for initialization to complete if not yet ready
+    if (!this.isInitialized) {
+      console.log('[SidebarPanel] Waiting for sidebar initialization before processing words');
+      let attempts = 0;
+      while (!this.isInitialized && attempts < 50) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+      if (!this.isInitialized) {
+        console.warn('[SidebarPanel] Sidebar initialization timeout, proceeding anyway');
+      }
+    }
+
     console.log(`[SidebarPanel] Adding ${Object.keys(newWordsData).length} new words`);
 
     // Process each word and merge into wordState
@@ -317,6 +370,19 @@ class SidebarPanel {
   async onWordsRemoved(wordStems) {
     if (!wordStems || wordStems.length === 0) {
       return;
+    }
+
+    // Wait for initialization to complete if not yet ready
+    if (!this.isInitialized) {
+      console.log('[SidebarPanel] Waiting for sidebar initialization before processing removal');
+      let attempts = 0;
+      while (!this.isInitialized && attempts < 50) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+      if (!this.isInitialized) {
+        console.warn('[SidebarPanel] Sidebar initialization timeout, proceeding with removal anyway');
+      }
     }
 
     console.log(`[SidebarPanel] Removing ${wordStems.length} words from cache`);

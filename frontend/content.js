@@ -241,6 +241,8 @@ async function initializeModules() {
     wordCacheManager = new WordCacheManager();
     console.log("[MixRead] WordCacheManager created");
     sidebarPanel = new SidebarPanel(wordCacheManager);
+    // Note: SidebarPanel.init() is async but completes asynchronously
+    // The sidebar will be ready shortly; notifyPanelOfNewWords checks if sidebarPanel exists
     console.log("[MixRead] SidebarPanel created");
 
     // 10. Check if current page should be excluded
@@ -1825,19 +1827,28 @@ function notifyPanelOfNewWords(wordDetails) {
     if (elements.length > 0) {
       const firstElement = elements[0];
       const word = firstElement.dataset.word || stem;
-      const wordLower = word.toLowerCase();
 
-      if (!newWordsMap[wordLower]) {
-        newWordsMap[wordLower] = {
+      // Normalize word consistently (must match sidebar-panel.js normalizeWord logic)
+      let normalizedWord = word.toLowerCase();
+      if (typeof Stemmer !== 'undefined' && Stemmer.stem) {
+        try {
+          normalizedWord = Stemmer.stem(normalizedWord);
+        } catch (e) {
+          console.warn('[MixRead] Stemming error:', e);
+        }
+      }
+
+      if (!newWordsMap[normalizedWord]) {
+        newWordsMap[normalizedWord] = {
           count: elements.length,
           originalWords: new Set(),
-          chinese: firstElement.dataset.chinese || "",
+          chinese: firstElement.dataset.translation || "",
           definition: firstElement.dataset.definition || "",
         };
       }
 
       elements.forEach((el) => {
-        newWordsMap[wordLower].originalWords.add(
+        newWordsMap[normalizedWord].originalWords.add(
           el.dataset.word || el.textContent
         );
       });

@@ -172,11 +172,11 @@ class WordCacheManager {
 
     // Clear storage - need to get all keys and filter
     try {
-      // Get all storage keys (workaround: iterate known keys)
       const prefix = `cache_${userId}_`;
 
-      // In chrome.storage, we need to clear by prefix
-      // Get all items and filter
+      // Note: StorageManager.getItems() retrieves all items
+      // In real usage, this might be slow for large storage
+      // but necessary to find and clear all user-specific cache entries
       const allItems = await StorageManager.getItems();
       const keysToRemove = Object.keys(allItems)
         .filter(key => key.startsWith(prefix));
