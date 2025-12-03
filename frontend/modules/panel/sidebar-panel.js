@@ -176,7 +176,14 @@ class SidebarPanel {
 
       if (cachedWordState && Object.keys(cachedWordState).length > 0) {
         console.log(`[SidebarPanel] Restored from cache: ${Object.keys(cachedWordState).length} words`);
-        this.wordState = { ...cachedWordState };
+        // Restore from cache and convert originalWords back to Set
+        this.wordState = {};
+        Object.entries(cachedWordState).forEach(([key, data]) => {
+          this.wordState[key] = {
+            ...data,
+            originalWords: new Set(data.originalWords || [])
+          };
+        });
         this.renderWordList();
         return;
       }
@@ -339,10 +346,25 @@ class SidebarPanel {
       } else {
         // Existing word - merge
         this.wordState[normalizedWord].count += (data.count || 0);
+
+        // Ensure originalWords is always a Set
+        if (!Set.prototype.isPrototypeOf(this.wordState[normalizedWord].originalWords)) {
+          this.wordState[normalizedWord].originalWords = new Set(
+            this.wordState[normalizedWord].originalWords || []
+          );
+        }
+
         if (data.originalWords) {
-          data.originalWords.forEach(w => {
-            this.wordState[normalizedWord].originalWords.add(w);
-          });
+          // Handle both Set and Array input
+          if (Set.prototype.isPrototypeOf(data.originalWords)) {
+            data.originalWords.forEach(w => {
+              this.wordState[normalizedWord].originalWords.add(w);
+            });
+          } else if (Array.isArray(data.originalWords)) {
+            data.originalWords.forEach(w => {
+              this.wordState[normalizedWord].originalWords.add(w);
+            });
+          }
         }
       }
     });
