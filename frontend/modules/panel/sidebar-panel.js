@@ -632,13 +632,14 @@ class SidebarPanel {
   async loadVisibilityPreference() {
     try {
       const saved = await StorageManager.getItem('sidebar_visible');
-      // Default to true (open) - changed from false for better UX
-      this.isVisible = saved === false ? false : true;
+      // Only hide if explicitly set to false
+      // Default to true (open) for all other cases (null, undefined, etc.)
+      this.isVisible = saved !== false ? true : false;
       this.sidebarElement.style.display = this.isVisible ? 'flex' : 'none';
-      console.log('[SidebarPanel] Loaded visibility preference:', this.isVisible);
+      console.log('[SidebarPanel] Loaded visibility preference:', this.isVisible, '(saved:', saved, ')');
     } catch (e) {
       console.warn('[SidebarPanel] Failed to load visibility preference:', e);
-      this.isVisible = true;  // Default to open
+      this.isVisible = true;  // Default to open on error
     }
   }
 
