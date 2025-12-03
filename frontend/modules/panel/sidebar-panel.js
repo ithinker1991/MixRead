@@ -67,6 +67,8 @@ class SidebarPanel {
       this.sidebarElement = document.getElementById('mixread-sidebar');
       this.contentArea = this.sidebarElement.querySelector('.sidebar-content');
       this.statsElement = this.sidebarElement.querySelector('.sidebar-stats');
+      this.frequencyStatsElement = this.sidebarElement.querySelector('.sidebar-frequency-stats');
+      console.log('[SidebarPanel] Reusing existing sidebar DOM');
       return;
     }
 
