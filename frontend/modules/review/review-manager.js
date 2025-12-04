@@ -71,10 +71,22 @@ class ReviewManager {
                 throw new Error(data.error || 'Failed to start session');
             }
 
+            // Debug: Log the response structure
+            console.log('[Review Debug] Response structure:', {
+                hasData: 'data' in data,
+                hasSessionId: 'session_id' in data,
+                sessionIdValue: data.session_id,
+                dataKeys: Object.keys(data)
+            });
+
             // Store session data
             // Handle both response formats: with and without data wrapper
             this.session = data.data || data;
             this.sessionId = data.session_id || (data.data && data.data.session_id);
+
+            // Debug: Log what we stored
+            console.log('[Review Debug] Stored session ID:', this.sessionId);
+            console.log('[Review Debug] Session keys:', this.session ? Object.keys(this.session) : 'No session');
             this.currentCardIndex = 0;
             this.isRunning = true;
             this.isPaused = false;
