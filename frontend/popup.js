@@ -890,9 +890,7 @@ function renderBlacklist() {
       removeBtn.style.cssText =
         "background: #dc3545; color: white; border: none; border-radius: 3px; padding: 2px 6px; cursor: pointer; font-size: 11px;";
       removeBtn.addEventListener("click", () => {
-        if (confirm(`Remove ${domain} from blacklist?`)) {
-          removeDomainFromBlacklist(domain);
-        }
+        removeDomainFromBlacklist(domain);
       });
 
       li.appendChild(domainSpan);
