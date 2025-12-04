@@ -127,6 +127,21 @@ Avoid over-abstraction. Build incrementally with each phase having happy path te
 - Reusable word detection algorithms
 - Extensible difficulty level system
 
+### Documentation Organization
+
+- **Default rule**: Use a single document for each core feature
+- **When to use folder**: Only if the feature documentation exceeds ~2000 lines
+- **Structure**:
+  ```
+  docs/features/
+    ├── feature1/
+    │   └── README.md (single main document)
+    └── feature2/
+      ├── README.md
+      └── additional-doc.md (only if necessary)
+  ```
+- Keep documentation focused on current implementation, not speculative future features
+
 ## Key Implementation Decisions
 
 ### Word Difficulty Detection Strategy
