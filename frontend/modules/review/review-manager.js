@@ -221,14 +221,10 @@ class ReviewManager {
             console.log(`[Review] Submitting answer: quality=${quality}, time=${responseTime}ms`);
 
             const response = await fetch(
-                `${this.apiBaseUrl}/users/${this.userId}/review/answer`,
+                `${this.apiBaseUrl}/users/${this.userId}/review/answer?session_id=${this.sessionId}&quality=${quality}`,
                 {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        session_id: this.sessionId,
-                        quality: quality
-                    })
+                    headers: {'Content-Type': 'application/json'}
                 }
             );
 
