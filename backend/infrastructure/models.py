@@ -4,7 +4,7 @@ SQLAlchemy ORM Models
 Maps domain concepts to database tables
 """
 
-from sqlalchemy import Column, String, DateTime, Text, Integer, Enum as SQLEnum, ForeignKey, Index, Boolean
+from sqlalchemy import Column, String, DateTime, Text, Integer, Enum as SQLEnum, ForeignKey, Index, Boolean, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import json
@@ -87,9 +87,19 @@ class VocabularyEntryModel(Base):
     last_reviewed = Column(DateTime, nullable=True)
     attempt_count = Column(Integer, default=0)
 
+    # SRS (Spaced Repetition System) fields
+    review_interval = Column(Integer, default=0)  # hours until next review
+    ease_factor = Column(Float, default=2.5)     # SM-2 difficulty multiplier
+    next_review = Column(DateTime, nullable=True, index=True)  # when to review next
+    total_reviews = Column(Integer, default=0)    # total number of reviews
+    correct_reviews = Column(Integer, default=0)  # number of correct answers
+    review_streak = Column(Integer, default=0)    # consecutive correct answers
+    last_review_quality = Column(Integer, nullable=True)  # quality score 0-5
+
     # Add unique constraint on user_id + word
     __table_args__ = (
         Index("ix_user_word_vocabulary", "user_id", "word", unique=True),
+        Index("ix_user_next_review", "user_id", "next_review"),  # for finding due reviews
     )
 
     # Relationship

@@ -649,3 +649,72 @@ class DomainManagementPolicyRepository:
             if self.remove_domain(user_id, domain, policy_type):
                 count += 1
         return count
+
+
+class VocabularyRepository:
+    """
+    Vocabulary Entry Repository - handles vocabulary word persistence
+    
+    Provides data access for both domain model and SRS operations.
+    """
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_by_id(self, entry_id: str) -> Optional[VocabularyEntryModel]:
+        """Get a vocabulary entry by ID"""
+        return self.db.query(VocabularyEntryModel).filter(
+            VocabularyEntryModel.id == entry_id
+        ).first()
+
+    def get_by_word(self, user_id: str, word: str) -> Optional[VocabularyEntryModel]:
+        """Get a vocabulary entry by user and word"""
+        return self.db.query(VocabularyEntryModel).filter(
+            VocabularyEntryModel.user_id == user_id,
+            VocabularyEntryModel.word == word.lower()
+        ).first()
+
+    def get_by_status(self, status, limit: int = 20) -> List[VocabularyEntryModel]:
+        """Get entries by status"""
+        from domain.models import VocabularyStatus
+        return self.db.query(VocabularyEntryModel).filter(
+            VocabularyEntryModel.status == status
+        ).limit(limit).all()
+
+    def get_due_for_review(self, limit: int = 20) -> List[VocabularyEntryModel]:
+        """Get entries that are due for review (next_review <= now)"""
+        return self.db.query(VocabularyEntryModel).filter(
+            VocabularyEntryModel.next_review.isnot(None),
+            VocabularyEntryModel.next_review <= datetime.now()
+        ).order_by(VocabularyEntryModel.next_review).limit(limit).all()
+
+    def get_new_words(self, limit: int = 5) -> List[VocabularyEntryModel]:
+        """Get new words (total_reviews == 0)"""
+        return self.db.query(VocabularyEntryModel).filter(
+            VocabularyEntryModel.total_reviews == 0
+        ).order_by(VocabularyEntryModel.added_at.desc()).limit(limit).all()
+
+    def update(self, model: VocabularyEntryModel) -> VocabularyEntryModel:
+        """Update a vocabulary entry"""
+        self.db.merge(model)
+        self.db.commit()
+        return model
+
+    def create(self, user_id: str, word: str) -> VocabularyEntryModel:
+        """Create a new vocabulary entry"""
+        model = VocabularyEntryModel(
+            user_id=user_id,
+            word=word.lower(),
+            added_at=datetime.now()
+        )
+        self.db.add(model)
+        self.db.commit()
+        self.db.refresh(model)
+        return model
+
+    def delete(self, entry_id: str):
+        """Delete a vocabulary entry"""
+        entry = self.get_by_id(entry_id)
+        if entry:
+            self.db.delete(entry)
+            self.db.commit()

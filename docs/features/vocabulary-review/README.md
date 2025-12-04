@@ -9,17 +9,20 @@ The Vocabulary Review system extends MixRead's existing vocabulary management wi
 ### Existing Infrastructure
 
 #### **Data Models** (from `backend/domain/models.py`)
+
 - ✅ `VocabularyEntry` with status tracking (LEARNING/REVIEWING/MASTERED)
 - ✅ `LibraryEntry` with context preservation
 - ✅ Basic metadata: `attempt_count`, `last_reviewed`
 - ✅ CEFR levels and frequency rankings
 
 #### **API Endpoints** (from `backend/api/routes.py`)
+
 - ✅ Full CRUD operations for vocabulary
 - ✅ Known/unknown words management
 - ✅ Library with context support
 
 #### **Frontend Components**
+
 - ✅ Library viewer with bulk operations
 - ✅ Vocabulary statistics dashboard
 - ✅ Real-time word highlighting system
@@ -27,6 +30,7 @@ The Vocabulary Review system extends MixRead's existing vocabulary management wi
 ### Implementation Gaps
 
 #### **Missing SRS Components**
+
 - ❌ Spaced repetition scheduling algorithm
 - ❌ Review queue management
 - ❌ Flashcard UI components
@@ -34,6 +38,7 @@ The Vocabulary Review system extends MixRead's existing vocabulary management wi
 - ❌ Automated review reminders
 
 #### **Required Extensions**
+
 - Extend `VocabularyEntry` with SRS fields (`next_review`, `ease_factor`, etc.)
 - Add review session endpoints
 - Create flashcard review interface
@@ -257,93 +262,94 @@ async def get_review_schedule(user_id: str, days: int = 7):
 ```html
 <!-- review-session.html -->
 <div class="review-container">
-    <!-- Progress Bar -->
-    <div class="review-header">
-        <div class="progress-section">
-            <span class="progress-count">
-                <span id="current-card">1</span> / <span id="total-cards">20</span>
-            </span>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progress-fill"></div>
-            </div>
-        </div>
-        <div class="review-controls">
-            <button id="pause-btn" class="btn-secondary">Pause</button>
-            <button id="quit-btn" class="btn-danger">Quit</button>
-        </div>
+  <!-- Progress Bar -->
+  <div class="review-header">
+    <div class="progress-section">
+      <span class="progress-count">
+        <span id="current-card">1</span> / <span id="total-cards">20</span>
+      </span>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
     </div>
-
-    <!-- Flashcard Container -->
-    <div class="flashcard-container">
-        <div class="flashcard" id="flashcard">
-            <!-- Card Front -->
-            <div class="card-side card-front" id="card-front">
-                <div class="card-type-indicator">Word → Definition</div>
-                <div class="card-content">
-                    <h1 class="word-text" id="word-text">serendipity</h1>
-                    <div class="word-hints" id="word-hints" style="display: none">
-                        <span class="hint">CEFR: C1</span>
-                        <span class="hint">Pronunciation: /ˌserənˈdɪpɪti/</span>
-                    </div>
-                </div>
-                <button class="show-answer-btn" id="show-answer">
-                    Show Answer <kbd>Space</kbd>
-                </button>
-            </div>
-
-            <!-- Card Back -->
-            <div class="card-side card-back" id="card-back" style="display: none">
-                <div class="card-content">
-                    <h2 class="word-text" id="back-word">serendipity</h2>
-                    <div class="definition" id="definition">
-                        The occurrence of events by chance in a happy way
-                    </div>
-                    <div class="example" id="example">
-                        <strong>Example:</strong> A fortunate stroke of serendipity brought the two friends together.
-                    </div>
-                </div>
-
-                <!-- Review Buttons -->
-                <div class="review-buttons">
-                    <h3>How well did you know this?</h3>
-                    <div class="button-group">
-                        <button class="review-btn again" data-quality="0">
-                            <span class="btn-label">Again</span>
-                            <span class="btn-hint">(< 1 day)</span>
-                        </button>
-                        <button class="review-btn hard" data-quality="1">
-                            <span class="btn-label">Hard</span>
-                            <span class="btn-hint">(3 days)</span>
-                        </button>
-                        <button class="review-btn good" data-quality="3">
-                            <span class="btn-label">Good</span>
-                            <span class="btn-hint">(1 week)</span>
-                        </button>
-                        <button class="review-btn easy" data-quality="5">
-                            <span class="btn-label">Easy</span>
-                            <span class="btn-hint">(2 weeks)</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="review-controls">
+      <button id="pause-btn" class="btn-secondary">Pause</button>
+      <button id="quit-btn" class="btn-danger">Quit</button>
     </div>
+  </div>
 
-    <!-- Session Stats -->
-    <div class="session-stats" id="session-stats">
-        <div class="stat">
-            <span class="stat-label">Correct</span>
-            <span class="stat-value" id="correct-count">0</span>
+  <!-- Flashcard Container -->
+  <div class="flashcard-container">
+    <div class="flashcard" id="flashcard">
+      <!-- Card Front -->
+      <div class="card-side card-front" id="card-front">
+        <div class="card-type-indicator">Word → Definition</div>
+        <div class="card-content">
+          <h1 class="word-text" id="word-text">serendipity</h1>
+          <div class="word-hints" id="word-hints" style="display: none">
+            <span class="hint">CEFR: C1</span>
+            <span class="hint">Pronunciation: /ˌserənˈdɪpɪti/</span>
+          </div>
         </div>
-        <div class="stat">
-            <span class="stat-label">Streak</span>
-            <span class="stat-value" id="streak-count">0</span>
+        <button class="show-answer-btn" id="show-answer">
+          Show Answer <kbd>Space</kbd>
+        </button>
+      </div>
+
+      <!-- Card Back -->
+      <div class="card-side card-back" id="card-back" style="display: none">
+        <div class="card-content">
+          <h2 class="word-text" id="back-word">serendipity</h2>
+          <div class="definition" id="definition">
+            The occurrence of events by chance in a happy way
+          </div>
+          <div class="example" id="example">
+            <strong>Example:</strong> A fortunate stroke of serendipity brought
+            the two friends together.
+          </div>
         </div>
-        <div class="stat">
-            <span class="stat-label">Time</span>
-            <span class="stat-value" id="time-elapsed">0:00</span>
+
+        <!-- Review Buttons -->
+        <div class="review-buttons">
+          <h3>How well did you know this?</h3>
+          <div class="button-group">
+            <button class="review-btn again" data-quality="0">
+              <span class="btn-label">Again</span>
+              <span class="btn-hint">(< 1 day)</span>
+            </button>
+            <button class="review-btn hard" data-quality="1">
+              <span class="btn-label">Hard</span>
+              <span class="btn-hint">(3 days)</span>
+            </button>
+            <button class="review-btn good" data-quality="3">
+              <span class="btn-label">Good</span>
+              <span class="btn-hint">(1 week)</span>
+            </button>
+            <button class="review-btn easy" data-quality="5">
+              <span class="btn-label">Easy</span>
+              <span class="btn-hint">(2 weeks)</span>
+            </button>
+          </div>
         </div>
+      </div>
     </div>
+  </div>
+
+  <!-- Session Stats -->
+  <div class="session-stats" id="session-stats">
+    <div class="stat">
+      <span class="stat-label">Correct</span>
+      <span class="stat-value" id="correct-count">0</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Streak</span>
+      <span class="stat-value" id="streak-count">0</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Time</span>
+      <span class="stat-value" id="time-elapsed">0:00</span>
+    </div>
+  </div>
 </div>
 ```
 
@@ -352,179 +358,191 @@ async def get_review_schedule(user_id: str, days: int = 7):
 ```javascript
 // review-manager.js
 class ReviewManager {
-    constructor() {
-        this.session = null;
-        this.currentCardIndex = 0;
-        this.cardStartTime = null;
-        this.sessionStats = {
-            startTime: Date.now(),
-            cardsReviewed: 0,
-            correctAnswers: 0,
-            streak: 0,
-            maxStreak: 0,
-            qualityDistribution: {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
-        };
-        this.timer = null;
-        this.initializeEventListeners();
+  constructor() {
+    this.session = null;
+    this.currentCardIndex = 0;
+    this.cardStartTime = null;
+    this.sessionStats = {
+      startTime: Date.now(),
+      cardsReviewed: 0,
+      correctAnswers: 0,
+      streak: 0,
+      maxStreak: 0,
+      qualityDistribution: { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    };
+    this.timer = null;
+    this.initializeEventListeners();
+  }
+
+  async startReviewSession(sessionType = "mixed") {
+    try {
+      const response = await api.post(`/users/${userId}/review/session`, {
+        session_type: sessionType,
+      });
+      this.session = response.data;
+
+      if (this.session.total_cards === 0) {
+        this.showNoCardsMessage();
+        return;
+      }
+
+      this.currentCardIndex = 0;
+      this.showCard(this.session.cards[0]);
+      this.startTimer();
+      this.updateProgressBar();
+    } catch (error) {
+      console.error("Failed to start review session:", error);
+      showError("Unable to start review session");
+    }
+  }
+
+  showCard(card) {
+    this.cardStartTime = Date.now();
+
+    // Reset card state
+    document.getElementById("card-back").style.display = "none";
+    document.getElementById("card-front").style.display = "block";
+
+    // Display card content
+    if (card.card_type === "WORD_TO_MEANING") {
+      document.getElementById("word-text").textContent = card.word;
+      document.getElementById("back-word").textContent = card.word;
+      document.getElementById("definition").textContent = card.definition;
+      document.getElementById("example").textContent = card.example;
     }
 
-    async startReviewSession(sessionType = 'mixed') {
-        try {
-            const response = await api.post(`/users/${userId}/review/session`, {session_type: sessionType});
-            this.session = response.data;
+    // Update position
+    document.getElementById("current-card").textContent =
+      this.currentCardIndex + 1;
+  }
 
-            if (this.session.total_cards === 0) {
-                this.showNoCardsMessage();
-                return;
-            }
+  async submitAnswer(quality) {
+    const responseTime = Date.now() - this.cardStartTime;
+    const currentCard = this.session.cards[this.currentCardIndex];
 
-            this.currentCardIndex = 0;
-            this.showCard(this.session.cards[0]);
-            this.startTimer();
-            this.updateProgressBar();
+    try {
+      await api.post(`/users/${userId}/review/answer`, {
+        card_id: currentCard.id,
+        quality: quality,
+        response_time: responseTime,
+      });
 
-        } catch (error) {
-            console.error('Failed to start review session:', error);
-            showError('Unable to start review session');
-        }
+      // Update stats
+      this.sessionStats.cardsReviewed++;
+      this.sessionStats.qualityDistribution[quality]++;
+
+      if (quality >= 3) {
+        this.sessionStats.correctAnswers++;
+        this.sessionStats.streak++;
+        this.sessionStats.maxStreak = Math.max(
+          this.sessionStats.maxStreak,
+          this.sessionStats.streak
+        );
+      } else {
+        this.sessionStats.streak = 0;
+      }
+
+      this.updateSessionStats();
+
+      // Move to next card
+      this.nextCard();
+    } catch (error) {
+      console.error("Failed to submit answer:", error);
+      showError("Failed to save your answer");
     }
+  }
 
-    showCard(card) {
-        this.cardStartTime = Date.now();
+  nextCard() {
+    this.currentCardIndex++;
 
-        // Reset card state
-        document.getElementById('card-back').style.display = 'none';
-        document.getElementById('card-front').style.display = 'block';
-
-        // Display card content
-        if (card.card_type === 'WORD_TO_MEANING') {
-            document.getElementById('word-text').textContent = card.word;
-            document.getElementById('back-word').textContent = card.word;
-            document.getElementById('definition').textContent = card.definition;
-            document.getElementById('example').textContent = card.example;
-        }
-
-        // Update position
-        document.getElementById('current-card').textContent = this.currentCardIndex + 1;
+    if (this.currentCardIndex >= this.session.cards.length) {
+      this.endSession();
+    } else {
+      this.showCard(this.session.cards[this.currentCardIndex]);
+      this.updateProgressBar();
     }
+  }
 
-    async submitAnswer(quality) {
-        const responseTime = Date.now() - this.cardStartTime;
-        const currentCard = this.session.cards[this.currentCardIndex];
+  updateProgressBar() {
+    const progress =
+      ((this.currentCardIndex + 1) / this.session.cards.length) * 100;
+    document.getElementById("progress-fill").style.width = `${progress}%`;
+  }
 
-        try {
-            await api.post(`/users/${userId}/review/answer`, {
-                card_id: currentCard.id,
-                quality: quality,
-                response_time: responseTime
-            });
+  updateSessionStats() {
+    document.getElementById("correct-count").textContent =
+      this.sessionStats.correctAnswers;
+    document.getElementById("streak-count").textContent =
+      this.sessionStats.streak;
+  }
 
-            // Update stats
-            this.sessionStats.cardsReviewed++;
-            this.sessionStats.qualityDistribution[quality]++;
+  startTimer() {
+    this.timer = setInterval(() => {
+      const elapsed = Date.now() - this.sessionStats.startTime;
+      const minutes = Math.floor(elapsed / 60000);
+      const seconds = Math.floor((elapsed % 60000) / 1000);
+      document.getElementById(
+        "time-elapsed"
+      ).textContent = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+    }, 1000);
+  }
 
-            if (quality >= 3) {
-                this.sessionStats.correctAnswers++;
-                this.sessionStats.streak++;
-                this.sessionStats.maxStreak = Math.max(this.sessionStats.maxStreak, this.sessionStats.streak);
-            } else {
-                this.sessionStats.streak = 0;
-            }
+  async endSession() {
+    clearInterval(this.timer);
 
-            this.updateSessionStats();
+    // Show completion screen with stats
+    this.showCompletionScreen();
 
-            // Move to next card
-            this.nextCard();
-
-        } catch (error) {
-            console.error('Failed to submit answer:', error);
-            showError('Failed to save your answer');
-        }
+    // Record session completion
+    try {
+      await api.post(`/users/${userId}/review/session-complete`, {
+        stats: this.sessionStats,
+        duration: Date.now() - this.sessionStats.startTime,
+      });
+    } catch (error) {
+      console.error("Failed to complete session:", error);
     }
+  }
 
-    nextCard() {
-        this.currentCardIndex++;
+  initializeEventListeners() {
+    // Show answer button
+    document.getElementById("show-answer").addEventListener("click", () => {
+      this.showAnswer();
+    });
 
-        if (this.currentCardIndex >= this.session.cards.length) {
-            this.endSession();
-        } else {
-            this.showCard(this.session.cards[this.currentCardIndex]);
-            this.updateProgressBar();
-        }
-    }
+    // Keyboard shortcuts
+    document.addEventListener("keydown", (e) => {
+      if (
+        e.code === "Space" &&
+        document.getElementById("card-front").style.display !== "none"
+      ) {
+        e.preventDefault();
+        this.showAnswer();
+      } else if (e.code === "Digit1") {
+        this.submitAnswer(0); // Again
+      } else if (e.code === "Digit2") {
+        this.submitAnswer(1); // Hard
+      } else if (e.code === "Digit3") {
+        this.submitAnswer(3); // Good
+      } else if (e.code === "Digit4") {
+        this.submitAnswer(5); // Easy
+      }
+    });
 
-    updateProgressBar() {
-        const progress = ((this.currentCardIndex + 1) / this.session.cards.length) * 100;
-        document.getElementById('progress-fill').style.width = `${progress}%`;
-    }
+    // Review buttons
+    document.querySelectorAll(".review-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const quality = parseInt(btn.dataset.quality);
+        this.submitAnswer(quality);
+      });
+    });
+  }
 
-    updateSessionStats() {
-        document.getElementById('correct-count').textContent = this.sessionStats.correctAnswers;
-        document.getElementById('streak-count').textContent = this.sessionStats.streak;
-    }
-
-    startTimer() {
-        this.timer = setInterval(() => {
-            const elapsed = Date.now() - this.sessionStats.startTime;
-            const minutes = Math.floor(elapsed / 60000);
-            const seconds = Math.floor((elapsed % 60000) / 1000);
-            document.getElementById('time-elapsed').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        }, 1000);
-    }
-
-    async endSession() {
-        clearInterval(this.timer);
-
-        // Show completion screen with stats
-        this.showCompletionScreen();
-
-        // Record session completion
-        try {
-            await api.post(`/users/${userId}/review/session-complete`, {
-                stats: this.sessionStats,
-                duration: Date.now() - this.sessionStats.startTime
-            });
-        } catch (error) {
-            console.error('Failed to complete session:', error);
-        }
-    }
-
-    initializeEventListeners() {
-        // Show answer button
-        document.getElementById('show-answer').addEventListener('click', () => {
-            this.showAnswer();
-        });
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' && document.getElementById('card-front').style.display !== 'none') {
-                e.preventDefault();
-                this.showAnswer();
-            } else if (e.code === 'Digit1') {
-                this.submitAnswer(0); // Again
-            } else if (e.code === 'Digit2') {
-                this.submitAnswer(1); // Hard
-            } else if (e.code === 'Digit3') {
-                this.submitAnswer(3); // Good
-            } else if (e.code === 'Digit4') {
-                this.submitAnswer(5); // Easy
-            }
-        });
-
-        // Review buttons
-        document.querySelectorAll('.review-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const quality = parseInt(btn.dataset.quality);
-                this.submitAnswer(quality);
-            });
-        });
-    }
-
-    showAnswer() {
-        document.getElementById('card-front').style.display = 'none';
-        document.getElementById('card-back').style.display = 'block';
-        document.getElementById('word-hints').style.display = 'block';
-    }
+  showAnswer() {
+    document.getElementById("card-front").style.display = "none";
+    document.getElementById("card-back").style.display = "block";
+    document.getElementById("word-hints").style.display = "block";
+  }
 }
 ```
 
@@ -581,11 +599,13 @@ class ReviewAnalytics:
 ### Phase 1: Basic Flashcards (1-2 weeks)
 
 **Goals**:
+
 - Implement basic card flip functionality
 - Manual review sessions (no SRS yet)
 - Integration with existing vocabulary
 
 **Tasks**:
+
 1. ✅ Extend VocabularyEntry model with SRS fields
 2. ⬜ Create review session endpoints
 3. ⬜ Build basic flashcard UI
@@ -594,6 +614,7 @@ class ReviewAnalytics:
 6. ⬜ Basic review statistics
 
 **Acceptance Criteria**:
+
 - Users can start a review session from Library page
 - Cards flip to show definition
 - Answers are recorded
@@ -602,11 +623,13 @@ class ReviewAnalytics:
 ### Phase 2: Spaced Repetition (2-3 weeks)
 
 **Goals**:
+
 - Implement SM-2 algorithm
 - Automatic scheduling
 - Review queue management
 
 **Tasks**:
+
 1. ⬜ Implement SpacedRepetitionScheduler
 2. ⬜ Create ReviewQueueService
 3. ⬜ Add due date calculation
@@ -615,6 +638,7 @@ class ReviewAnalytics:
 6. ⬜ Add review session analytics
 
 **Acceptance Criteria**:
+
 - Cards appear for review at appropriate intervals
 - Incorrect answers reset intervals
 - Easy answers increase intervals more
@@ -623,11 +647,13 @@ class ReviewAnalytics:
 ### Phase 3: Advanced Features (Ongoing)
 
 **Goals**:
+
 - Multiple card types
 - Advanced analytics
 - Personalized learning paths
 
 **Tasks**:
+
 1. ⬜ Implement different card types (fill-in-the-blank, multiple choice)
 2. ⬜ Add memory curve visualization
 3. ⬜ Implement adaptive difficulty
@@ -640,16 +666,19 @@ class ReviewAnalytics:
 ### With Existing Features
 
 1. **Library Integration**
+
    - Add "Start Review" button in Library page
    - Show review status indicators next to words
    - Filter words by review status (due, new, mastered)
 
 2. **Extension Popup Integration**
+
    - Display due review count
    - Quick access to start review session
    - Daily review reminder notifications
 
 3. **Word Context Integration**
+
    - Use original context from Library entries
    - Show example sentences from where words were collected
    - Link back to source articles for context refresh
@@ -660,6 +689,8 @@ class ReviewAnalytics:
    - Show retention rate trends
 
 ### Data Migration Strategy
+
+> [!IMPORTANT] > **Critical Step**: You MUST run the migration script before enabling the review feature in production. Existing vocabulary entries lack the necessary SRS fields (`next_review`, `ease_factor`, etc.), which will cause the review system to crash or behave unpredictably.
 
 ```python
 # Migration script for existing vocabulary
@@ -691,11 +722,13 @@ async def migrate_existing_vocabulary():
 ## Performance Considerations
 
 ### Batch Operations
+
 - Process reviews in batches to reduce database calls
 - Cache upcoming review schedules
 - Preload next card while reviewing current one
 
 ### Optimization Strategies
+
 - Use Redis for fast review queue operations
 - Implement lazy loading for review statistics
 - Compress session data for faster transmission
@@ -703,17 +736,20 @@ async def migrate_existing_vocabulary():
 ## User Experience Guidelines
 
 ### Onboarding
+
 1. Explain SRS concept simply
 2. Set realistic expectations ("5-10 minutes daily")
 3. Provide tutorial for first review session
 
 ### Session Design
+
 - Default to mixed sessions (review + new)
 - Allow session customization
 - Provide breaks for longer sessions
 - Show progress and motivation
 
 ### Flexibility
+
 - Allow resuming paused sessions
 - Support skipping difficult cards
 - Provide emergency cram mode before exams
@@ -722,18 +758,21 @@ async def migrate_existing_vocabulary():
 ## Success Metrics
 
 ### Engagement
+
 - Daily active reviewers
 - Average session duration
 - Retention rate after 7 days
 - Weekly review consistency
 
 ### Learning Effectiveness
+
 - Long-term retention rate (30+ days)
 - Words mastered per week
 - Review accuracy improvement
 - Reduction in unknown words during reading
 
 ### User Satisfaction
+
 - Net Promoter Score (NPS)
 - Feature adoption rate
 - Support requests related to review system
@@ -742,18 +781,21 @@ async def migrate_existing_vocabulary():
 ## Future Enhancements
 
 ### Advanced SRS Features
+
 1. **Adaptive SRS**: Adjust algorithm based on individual performance
 2. **Contextual Reviews**: Prioritize words encountered recently
 3. **Group Reviews**: Review related words together (themes, topics)
 4. **Forced Choice**: Multiple choice format for variety
 
 ### Gamification
+
 1. **Streaks**: Consecutive review days
 2. **Leaderboards**: Compare progress with peers
 3. **Challenges**: Weekly/monthly vocabulary goals
 4. **Achievements**: Unlock badges for milestones
 
 ### AI Enhancements
+
 1. **Personalized Examples**: Generate examples based on user interests
 2. **Difficulty Prediction**: Predict which words will be difficult
 3. **Optimal Timing**: AI-optimized review timing
@@ -762,18 +804,21 @@ async def migrate_existing_vocabulary():
 ## Technical Dependencies
 
 ### Backend
+
 - FastAPI for REST APIs
 - SQLAlchemy for database operations
 - Redis for caching and queues
 - Celery for background tasks (reminders, analytics)
 
 ### Frontend
+
 - Vanilla JavaScript with ES6 modules
 - CSS animations for card transitions
 - Chrome storage API for offline mode
 - Service worker for background sync
 
 ### Database
+
 - PostgreSQL for primary storage
 - Indexes on (user_id, next_review) for efficient queries
 - Partitioning for large user bases
@@ -782,12 +827,14 @@ async def migrate_existing_vocabulary():
 ## Security Considerations
 
 ### Data Privacy
+
 - Review history considered sensitive
 - Option to delete review history
 - Export personal data on request
 - Secure API endpoints with authentication
 
 ### Rate Limiting
+
 - Limit review API calls per user
 - Prevent session hijacking
 - Validate review quality submissions
@@ -796,24 +843,28 @@ async def migrate_existing_vocabulary():
 ## Testing Strategy
 
 ### Unit Tests
+
 - SRS algorithm correctness
 - Review queue logic
 - API endpoint responses
 - Data model validations
 
 ### Integration Tests
+
 - End-to-end review flow
 - Database transaction handling
 - Frontend-backend communication
 - Offline synchronization
 
 ### Performance Tests
+
 - Large vocabulary handling
 - Concurrent review sessions
 - Database query optimization
 - UI responsiveness
 
 ### User Acceptance Tests
+
 - Session completion rates
 - Feature discoverability
 - Intuitiveness of controls
@@ -822,18 +873,21 @@ async def migrate_existing_vocabulary():
 ## Rollout Plan
 
 ### Alpha Testing (Internal)
+
 - Feature-complete implementation
 - Small user group (5-10 people)
 - Daily usage monitoring
 - Bug fixing and iteration
 
 ### Beta Testing (Power Users)
+
 - Expanded user group (50-100 users)
 - Feature feedback collection
 - Performance optimization
 - Documentation improvement
 
 ### Full Launch
+
 - Feature announcement
 - User education (tutorials, videos)
 - Gradual rollout to all users

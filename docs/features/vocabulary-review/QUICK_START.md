@@ -1,8 +1,8 @@
 # 快速启动：实现第一个复习会话
 
-本文档展示如何基于可复用的SRS核心库快速实现MixRead的复习功能。
+本文档展示如何基于可复用的 SRS 核心库快速实现 MixRead 的复习功能。
 
-## 第一步：实现核心库接口（2小时）
+## 第一步：实现核心库接口（2 小时）
 
 ### 1.1 定义通用接口
 
@@ -78,7 +78,7 @@ class ReviewResult:
         }
 ```
 
-### 1.2 实现SRS调度器
+### 1.2 实现 SRS 调度器
 
 ```python
 # backend/srs_core/scheduler.py
@@ -317,7 +317,7 @@ class ReviewSession:
         }
 ```
 
-## 第二步：实现MixRead适配层（1小时）
+## 第二步：实现 MixRead 适配层（1 小时）
 
 ```python
 # backend/vocabulary_review/adapter.py
@@ -451,7 +451,7 @@ class VocabularyReviewProvider(ReviewProvider):
             )
 ```
 
-## 第三步：API端点（1小时）
+## 第三步：API 端点（1 小时）
 
 ```python
 # backend/vocabulary_review/api.py
@@ -461,7 +461,9 @@ from .adapter import VocabularyReviewProvider
 from infrastructure.repositories import VocabularyRepository
 
 router = APIRouter(prefix="/users/{user_id}/review", tags=["review"])
-session_store = {}  # 简单的内存存储，生产环境应使用Redis
+# ⚠️ 注意：这里使用内存存储仅用于演示/MVP
+# 生产环境必须使用 Redis 或数据库，否则服务重启后会话将丢失
+session_store = {}
 
 @router.post("/session")
 async def start_review_session(user_id: str, session_type: str = "mixed"):
@@ -567,124 +569,147 @@ async def get_review_stats(user_id: str, period: str = "week"):
     pass
 ```
 
-## 第四步：前端集成（2小时）
+## 第四步：前端集成（2 小时）
 
 ```javascript
 // frontend/modules/review/review-manager.js
 class ReviewManager {
-    constructor(userId) {
-        this.userId = userId;
-        this.sessionId = null;
-        this.session = null;
-        this.cardIndex = 0;
+  constructor(userId) {
+    this.userId = userId;
+    this.sessionId = localStorage.getItem(`review_session_${userId}`);
+    this.session = null;
+    this.cardIndex = 0;
+    this.isSubmitting = false; // 防止重复提交
+  }
+
+  async startSession(sessionType = "mixed") {
+    try {
+      const response = await fetch(`/users/${this.userId}/review/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_type: sessionType }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to start session");
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to start session");
+      }
+
+      this.sessionId = data.session_id;
+      // 持久化 session ID，防止弹窗关闭后丢失
+      localStorage.setItem(`review_session_${this.userId}`, this.sessionId);
+
+      this.session = data;
+
+      this.displayCard(data.first_card);
+      this.updateProgress(data.progress);
+
+      return this.session;
+    } catch (error) {
+      console.error("Failed to start review session:", error);
+      throw error;
+    }
+  }
+
+  async submitAnswer(quality) {
+    if (!this.sessionId) {
+      // 尝试恢复会话
+      this.sessionId = localStorage.getItem(`review_session_${this.userId}`);
+      if (!this.sessionId) {
+        throw new Error("No active session");
+      }
     }
 
-    async startSession(sessionType = 'mixed') {
-        try {
-            const response = await fetch(`/users/${this.userId}/review/session`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({session_type: sessionType})
-            });
+    if (this.isSubmitting) return; // 防抖
+    this.isSubmitting = true;
 
-            const data = await response.json();
+    try {
+      const response = await fetch(`/users/${this.userId}/review/answer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: this.sessionId,
+          quality: quality,
+        }),
+      });
 
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to start session');
-            }
+      const data = await response.json();
 
-            this.sessionId = data.session_id;
-            this.session = data;
+      if (!data.success) {
+        throw new Error(data.error || "Failed to submit answer");
+      }
 
-            this.displayCard(data.first_card);
-            this.updateProgress(data.progress);
+      // 显示结果
+      this.showResult(data.result);
 
-            return this.session;
+      // 检查是否完成
+      if (data.session_complete) {
+        this.sessionEnded(data.session_summary);
+        return;
+      }
 
-        } catch (error) {
-            console.error('Failed to start review session:', error);
-            throw error;
-        }
+      // 显示下一张卡片
+      if (data.next_card) {
+        this.displayCard(data.next_card);
+        this.updateProgress(data.progress);
+      }
+    } catch (error) {
+      console.error("Failed to submit answer:", error);
+      throw error;
+    } finally {
+      this.isSubmitting = false;
     }
+  }
 
-    async submitAnswer(quality) {
-        if (!this.sessionId) {
-            throw new Error('No active session');
-        }
+  displayCard(card) {
+    // 更新UI显示卡片
+    document.getElementById("word").textContent = card.front;
+    document.getElementById("definition").textContent = card.back.definition;
+    document.getElementById("example").textContent = card.back.example;
+  }
 
-        try {
-            const response = await fetch(`/users/${this.userId}/review/answer`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    session_id: this.sessionId,
-                    quality: quality
-                })
-            });
+  showResult(result) {
+    // 显示反馈
+    console.log(
+      `Answer recorded: quality=${result.quality}, next_review=${result.next_review_time}`
+    );
+  }
 
-            const data = await response.json();
+  updateProgress(progress) {
+    document.getElementById("progress-current").textContent = progress.current;
+    document.getElementById("progress-total").textContent = progress.total;
+    document.getElementById("accuracy").textContent =
+      (progress.accuracy * 100).toFixed(0) + "%";
+  }
 
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to submit answer');
-            }
-
-            // 显示结果
-            this.showResult(data.result);
-
-            // 检查是否完成
-            if (data.session_complete) {
-                this.sessionEnded(data.session_summary);
-                return;
-            }
-
-            // 显示下一张卡片
-            if (data.next_card) {
-                this.displayCard(data.next_card);
-                this.updateProgress(data.progress);
-            }
-
-        } catch (error) {
-            console.error('Failed to submit answer:', error);
-            throw error;
-        }
-    }
-
-    displayCard(card) {
-        // 更新UI显示卡片
-        document.getElementById('word').textContent = card.front;
-        document.getElementById('definition').textContent = card.back.definition;
-        document.getElementById('example').textContent = card.back.example;
-    }
-
-    showResult(result) {
-        // 显示反馈
-        console.log(`Answer recorded: quality=${result.quality}, next_review=${result.next_review_time}`);
-    }
-
-    updateProgress(progress) {
-        document.getElementById('progress-current').textContent = progress.current;
-        document.getElementById('progress-total').textContent = progress.total;
-        document.getElementById('accuracy').textContent = (progress.accuracy * 100).toFixed(0) + '%';
-    }
-
-    sessionEnded(summary) {
-        console.log('Session ended:', summary);
-        // 显示完成页面
-    }
+  sessionEnded(summary) {
+    console.log("Session ended:", summary);
+    // 清理本地存储
+    localStorage.removeItem(`review_session_${this.userId}`);
+    this.sessionId = null;
+    // 显示完成页面
+  }
 }
 
 // 使用示例
-const reviewManager = new ReviewManager('user123');
+const reviewManager = new ReviewManager("user123");
 
-document.getElementById('start-review-btn').addEventListener('click', async () => {
-    await reviewManager.startSession('mixed');
-});
+document
+  .getElementById("start-review-btn")
+  .addEventListener("click", async () => {
+    await reviewManager.startSession("mixed");
+  });
 
-document.querySelectorAll('.quality-btn').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-        const quality = parseInt(e.target.dataset.quality);
-        await reviewManager.submitAnswer(quality);
-    });
+document.querySelectorAll(".quality-btn").forEach((btn) => {
+  btn.addEventListener("click", async (e) => {
+    const quality = parseInt(e.target.dataset.quality);
+    await reviewManager.submitAnswer(quality);
+  });
 });
 ```
 
@@ -720,13 +745,14 @@ python -m backend.main
 
 ## 下一步
 
-1. ✅ 实现核心库（2小时）
-2. ✅ 实现适配层（1小时）
-3. ✅ API端点（1小时）
-4. ✅ 前端集成（2小时）
-5. ⬜ 添加测试用例（1小时）
-6. ⬜ 前端美化和UX优化（2小时）
-7. ⬜ 文档完善（1小时）
-8. ⬜ 用户测试和迭代（持续）
+1. ✅ 实现核心库（2 小时）
+2. ✅ 实现适配层（1 小时）
+3. ✅ API 端点（1 小时）
+4. ✅ 前端集成（2 小时）
+5. ⬜ **运行数据迁移**（重要！参考 README.md 的 Data Migration Strategy）
+6. ⬜ 添加测试用例（1 小时）
+7. ⬜ 前端美化和 UX 优化（2 小时）
+8. ⬜ 文档完善（1 小时）
+9. ⬜ 用户测试和迭代（持续）
 
-预计总投入：**8-10小时完成MVP**，已包括所有必要的架构设计使其可从其他项目复用。
+预计总投入：**8-10 小时完成 MVP**，已包括所有必要的架构设计使其可从其他项目复用。
