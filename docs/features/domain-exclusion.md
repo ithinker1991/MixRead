@@ -774,6 +774,202 @@ async function initializeExtension() {
 
 ---
 
+## 5.5 Phase 1 (P1) Implementation Summary - 已完成 ✅
+
+### P1.1: Default Blacklist Initialization (后端) ✅ 已实现
+
+**完成情况**:
+- ✅ 定义 DEFAULT_BLACKLIST 常数 (13个预设域名)
+- ✅ 实现新用户自动导入默认黑名单
+- ✅ 防止重复导入（用户再次查询时不重复）
+- ✅ 7 个单元测试全部通过
+- ✅ 支持的域名类别：
+  - 开发环境 (localhost, 127.0.0.1)
+  - 学习工具 (quizlet.com, anki.deskew.com)
+  - 社交媒体 (facebook, twitter, reddit, instagram, tiktok)
+  - 视频平台 (youtube.com)
+  - 隐私敏感 (mail.google.com, github.com)
+  - 编程平台 (stackoverflow.com)
+
+**实现位置**:
+- `backend/infrastructure/repositories.py`: DEFAULT_BLACKLIST 定义 + _import_default_blacklist() 方法
+- `backend/test_default_blacklist.py`: 7 个单元测试
+- `backend/test_p1_integration.py`: 7 个集成测试
+
+**测试结果**:
+```
+✅ test_p1_1_new_user_initialization_happy_path - 新用户自动获得13个默认项
+✅ test_p1_2_quick_add_domain_happy_path - 快速添加域名
+✅ test_p1_2_quick_add_path_happy_path - 快速添加路径
+✅ test_p1_multiple_users_independent_blacklists - 多用户独立黑名单
+✅ test_p1_default_domains_cover_key_categories - 覆盖所有关键类别
+✅ test_p1_no_duplicates_on_user_reload - 防止重复导入
+✅ test_p1_all_default_domains_have_valid_data - 所有数据验证
+```
+
+### P1.2: Quick Add UI (前端) ✅ 已实现
+
+**完成情况**:
+- ✅ 在 popup.html 添加快速操作部分
+- ✅ 显示当前页面域名
+- ✅ 一键快速排除域名按钮
+- ✅ 一键快速排除路径按钮
+- ✅ 彩色状态消息反馈 (success/error/loading/info)
+- ✅ 添加后自动刷新页面
+- ✅ 15 个前端功能测试全部通过
+
+**实现位置**:
+- `frontend/popup.html`: 快速操作 UI 部分 (行 170-214)
+- `frontend/popup.js`: 快速操作逻辑 (行 977-1163)
+  - `initializeQuickActions()`: 初始化，显示当前域名
+  - `handleQuickExcludeDomain()`: 快速排除域名
+  - `handleQuickExcludePath()`: 快速排除路径
+  - `updateQuickActionStatus()`: 状态消息显示
+- `frontend/test_p1_quick_actions.js`: 15 个前端测试
+
+**用户流程改进**:
+```
+之前 (3步):
+1. 打开 Popup
+2. 切换到 Domains Tab
+3. 手动输入域名
+
+现在 (1步 - P1.2):
+1. 在快速操作中点击 "Exclude Domain" 按钮
+2. 页面自动刷新应用
+```
+
+**测试结果**:
+```
+✅ Extract domain with port from URL
+✅ Extract path from URL
+✅ Combine domain and path for quick exclude
+✅ Status message styling colors are defined
+✅ All required status message types exist
+✅ URL parsing handles special characters
+✅ Invalid URLs throw appropriate errors
+✅ Port numbers in URLs are handled correctly
+✅ Domain comparison should handle case variations
+✅ Correctly separate domain from path with ports
+✅ Status message element can be created and styled
+✅ Quick actions initialization uses setTimeout
+✅ All required button IDs are standard
+✅ Expected Chrome tabs API structure
+✅ Success messages include domain name
+
+🎉 All 15 P1.2 Quick Actions tests passed!
+```
+
+### P1.3: Comprehensive Testing ✅ 已完成
+
+**测试文件**:
+1. `backend/test_default_blacklist.py` - 7 个单元测试
+   - 新用户自动获得默认黑名单
+   - 所有默认域名都存在
+   - 所有项都是启用的
+   - 所有项都有描述
+   - 不重复导入
+   - 验证特定重要域名
+   - 验证正确数量
+
+2. `backend/test_p1_integration.py` - 7 个集成测试
+   - P1.1 新用户初始化
+   - P1.2 快速添加域名
+   - P1.2 快速添加路径
+   - 多用户独立黑名单
+   - 默认域名覆盖关键类别
+   - 用户重加载时无重复
+   - 所有默认域名有效数据
+
+3. `frontend/test_p1_quick_actions.js` - 15 个前端测试
+   - URL 解析（带/不带端口）
+   - 路径提取
+   - 域名/路径组合
+   - 状态消息样式
+   - 特殊字符处理
+   - 端口号处理
+   - 大小写处理
+   - 按钮 ID 标准
+   - 成功消息
+
+**测试命令**:
+```bash
+# 后端测试
+python -m pytest backend/test_default_blacklist.py -v -s
+python -m pytest backend/test_p1_integration.py -v -s
+
+# 前端测试
+node frontend/test_p1_quick_actions.js
+
+# 全部通过 ✅
+14/14 后端测试通过
+15/15 前端测试通过
+总计: 29/29 测试通过
+```
+
+### P1 功能验收清单
+
+- [x] **P1.1 后端**
+  - [x] 定义 DEFAULT_BLACKLIST
+  - [x] 新用户自动导入
+  - [x] 防止重复
+  - [x] 数据库记录正确
+  - [x] 7 个单元测试通过
+
+- [x] **P1.2 前端**
+  - [x] Popup UI 添加快速操作
+  - [x] 提取当前页面域名
+  - [x] 一键快速排除
+  - [x] 添加后自动刷新
+  - [x] 状态消息反馈
+  - [x] 15 个功能测试通过
+
+- [x] **P1.3 测试**
+  - [x] 后端单元测试 (7 个)
+  - [x] 后端集成测试 (7 个)
+  - [x] 前端功能测试 (15 个)
+  - [x] 总计 29 个测试全部通过
+
+### P1 预期成果
+
+✅ **新用户自动获得 13 个默认黑名单项**
+- 开发环境、社交媒体、学习工具、隐私敏感网站全覆盖
+- 节省新用户的手动配置时间
+
+✅ **用户体验从 3 步 → 1 步**
+- 快速操作按钮在 Popup 的醒目位置
+- 一键排除当前页面
+- 自动刷新立即应用
+
+✅ **稳定的测试覆盖**
+- 后端：14 个测试验证数据初始化、无重复、数据有效性
+- 前端：15 个测试验证 URL 解析、域名/路径提取、UI 交互
+- 集成测试验证端到端流程
+
+### P2 后续计划 (Not in P1)
+
+以下功能已在文档中规划，但 **不在 P1 中实现**（按优先级排序）：
+
+1. **上下文菜单** (Context Menu)
+   - 右键快速排除/恢复
+   - 仅针对当前页面
+
+2. **多级匹配策略** (P2.1)
+   - 精确匹配 (exact)
+   - 子域名匹配 (subdomain)
+   - 路径级别匹配 (path)
+
+3. **预设管理对话框** (P2.2)
+   - 批量导入预设
+   - 首次使用向导
+
+4. **Admin 平台** (未来独立项目)
+   - 管理员定义全局预设
+   - 用户统计分析
+   - 审计日志
+
+---
+
 ## 6. Testing Strategy (测试策略)
 
 ### 单元测试

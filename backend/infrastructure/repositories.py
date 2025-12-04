@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
 from datetime import datetime
+import logging
 
 from domain.models import User, VocabularyEntry, LibraryEntry
 from infrastructure.models import (
@@ -18,6 +19,37 @@ from infrastructure.models import (
     DomainManagementPolicy,
     DomainPolicyType,
 )
+
+logger = logging.getLogger(__name__)
+
+# ========== Default Blacklist Definition (Hardcoded) ==========
+# These domains will be automatically added to new users' blacklist
+DEFAULT_BLACKLIST = [
+    # Development environments
+    {"domain": "localhost", "description": "Local development server"},
+    {"domain": "127.0.0.1", "description": "Local loopback (127.0.0.1)"},
+
+    # Learning tools (distracting from English reading)
+    {"domain": "quizlet.com", "description": "Flashcard platform - disable when studying"},
+    {"domain": "anki.deskew.com", "description": "Anki web - disable during review"},
+
+    # Social media (distraction)
+    {"domain": "facebook.com", "description": "Social media - distraction"},
+    {"domain": "twitter.com", "description": "Social media - distraction"},
+    {"domain": "reddit.com", "description": "Social media - distraction"},
+    {"domain": "instagram.com", "description": "Social media - distraction"},
+    {"domain": "tiktok.com", "description": "Social media - distraction"},
+
+    # Video platforms (distraction)
+    {"domain": "youtube.com", "description": "Video platform - distraction"},
+
+    # Privacy/Financial sensitive sites
+    {"domain": "mail.google.com", "description": "Gmail - privacy sensitive"},
+
+    # Development platforms
+    {"domain": "github.com", "description": "Development platform"},
+    {"domain": "stackoverflow.com", "description": "Programming Q&A - distraction"},
+]
 
 
 class UserRepository:
@@ -49,6 +81,10 @@ class UserRepository:
             self.db.add(user_model)
             self.db.commit()
             self.db.refresh(user_model)
+
+            # Import default blacklist for new user
+            self._import_default_blacklist(user_id)
+            logger.info(f"✅ Created new user {user_id} with default blacklist")
 
         # Convert to domain model
         return self._model_to_domain(user_model)
@@ -292,6 +328,46 @@ class UserRepository:
             user.library[library_model.word.lower()] = entry
 
         return user
+
+    def _import_default_blacklist(self, user_id: str):
+        """
+        Import default blacklist items for new user
+
+        Args:
+            user_id: User ID
+        """
+        try:
+            imported_count = 0
+            for item in DEFAULT_BLACKLIST:
+                try:
+                    # Check if domain already exists for this user
+                    existing = self.db.query(DomainManagementPolicy).filter(
+                        DomainManagementPolicy.user_id == user_id,
+                        DomainManagementPolicy.domain == item["domain"],
+                        DomainManagementPolicy.policy_type == DomainPolicyType.BLACKLIST
+                    ).first()
+
+                    if existing:
+                        continue  # Already exists, skip
+
+                    # Create new blacklist policy
+                    policy = DomainManagementPolicy(
+                        user_id=user_id,
+                        domain=item["domain"],
+                        policy_type=DomainPolicyType.BLACKLIST,
+                        description=item.get("description"),
+                        is_active=True
+                    )
+                    self.db.add(policy)
+                    imported_count += 1
+                except Exception as e:
+                    logger.error(f"❌ Failed to import blacklist item {item['domain']}: {e}")
+
+            self.db.commit()
+            logger.info(f"✅ Imported {imported_count} default blacklist items for user {user_id}")
+        except Exception as e:
+            logger.error(f"❌ Failed to import default blacklist: {e}")
+            self.db.rollback()
 
 
 class DomainManagementPolicyRepository:

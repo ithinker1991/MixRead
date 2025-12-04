@@ -973,3 +973,191 @@ function notifyTabsOfPolicyChange() {
     });
   });
 }
+
+// ===== Quick Actions for Domain Blacklist (P1.2) =====
+
+/**
+ * Initialize quick actions for current page domain
+ */
+function initializeQuickActions() {
+  console.log("[Popup] Initializing quick actions...");
+
+  // Get current tab information
+  chrome.tabs.query(
+    {
+      active: true,
+      currentWindow: true,
+    },
+    async (tabs) => {
+      if (!tabs || tabs.length === 0) {
+        console.warn("[Popup] No active tab found");
+        return;
+      }
+
+      const tab = tabs[0];
+      if (!tab.url) {
+        console.warn("[Popup] Tab has no URL");
+        updateQuickActionStatus(
+          "Cannot get current page URL",
+          "error"
+        );
+        return;
+      }
+
+      try {
+        // Extract domain and path
+        const url = new URL(tab.url);
+        const domain = url.host; // Includes port number
+        const path = url.pathname;
+
+        console.log(
+          "[Popup] Current page - domain:",
+          domain,
+          "path:",
+          path
+        );
+
+        // Display domain
+        document.getElementById("current-page-domain").textContent = domain;
+
+        // Bind button events
+        document.getElementById("btn-quick-exclude-domain").onclick =
+          async () => {
+            await handleQuickExcludeDomain(domain, tab);
+          };
+
+        document.getElementById("btn-quick-exclude-path").onclick =
+          async () => {
+            await handleQuickExcludePath(domain, path, tab);
+          };
+
+        console.log("[Popup] Quick actions initialized for domain:", domain);
+      } catch (error) {
+        console.error("[Popup] Error initializing quick actions:", error);
+        updateQuickActionStatus("Invalid page URL", "error");
+      }
+    }
+  );
+}
+
+/**
+ * Handle quick exclude domain button click
+ */
+async function handleQuickExcludeDomain(domain, tab) {
+  console.log("[Popup] Quick exclude domain:", domain);
+
+  if (!domainPolicyStore) {
+    updateQuickActionStatus("Store not ready", "error");
+    return;
+  }
+
+  if (!currentUser) {
+    updateQuickActionStatus("User not logged in", "error");
+    return;
+  }
+
+  try {
+    updateQuickActionStatus("Adding domain to blacklist...", "loading");
+
+    const success = await domainPolicyStore.addBlacklistDomain(
+      currentUser,
+      domain,
+      "Added from quick actions"
+    );
+
+    if (success) {
+      updateQuickActionStatus(
+        `✅ Added "${domain}" to blacklist`,
+        "success"
+      );
+
+      // Reload tab after 1.5 seconds
+      setTimeout(() => {
+        chrome.tabs.reload(tab.id);
+        window.close();
+      }, 1500);
+    } else {
+      updateQuickActionStatus("Failed to add domain", "error");
+    }
+  } catch (error) {
+    console.error("[Popup] Error excluding domain:", error);
+    updateQuickActionStatus(`Error: ${error.message}`, "error");
+  }
+}
+
+/**
+ * Handle quick exclude path button click
+ */
+async function handleQuickExcludePath(domain, path, tab) {
+  console.log("[Popup] Quick exclude path:", domain + path);
+
+  if (!domainPolicyStore) {
+    updateQuickActionStatus("Store not ready", "error");
+    return;
+  }
+
+  if (!currentUser) {
+    updateQuickActionStatus("User not logged in", "error");
+    return;
+  }
+
+  try {
+    const domainWithPath = domain + path;
+
+    updateQuickActionStatus("Adding path to blacklist...", "loading");
+
+    const success = await domainPolicyStore.addBlacklistDomain(
+      currentUser,
+      domainWithPath,
+      "Added path from quick actions"
+    );
+
+    if (success) {
+      updateQuickActionStatus(
+        `✅ Added "${domainWithPath}" to blacklist`,
+        "success"
+      );
+
+      // Reload tab after 1.5 seconds
+      setTimeout(() => {
+        chrome.tabs.reload(tab.id);
+        window.close();
+      }, 1500);
+    } else {
+      updateQuickActionStatus("Failed to add path", "error");
+    }
+  } catch (error) {
+    console.error("[Popup] Error excluding path:", error);
+    updateQuickActionStatus(`Error: ${error.message}`, "error");
+  }
+}
+
+/**
+ * Display status message in quick actions area
+ */
+function updateQuickActionStatus(message, type = "info") {
+  const statusEl = document.getElementById("quick-action-status");
+  statusEl.textContent = message;
+  statusEl.style.display = "block";
+
+  // Set styles based on type
+  const colorMap = {
+    success: { bg: "#d4edda", color: "#155724", border: "#c3e6cb" },
+    error: { bg: "#f8d7da", color: "#721c24", border: "#f5c6cb" },
+    loading: { bg: "#d1ecf1", color: "#0c5460", border: "#bee5eb" },
+    info: { bg: "#d7e8ef", color: "#0c5460", border: "#b8daff" },
+  };
+
+  const style = colorMap[type] || colorMap["info"];
+  statusEl.style.background = style.bg;
+  statusEl.style.color = style.color;
+  statusEl.style.borderColor = style.border;
+
+  console.log(`[Popup] Quick action status: ${type} - ${message}`);
+}
+
+// Initialize quick actions when popup loads
+// Wait a bit for domainPolicyStore to be ready
+setTimeout(() => {
+  initializeQuickActions();
+}, 500);
