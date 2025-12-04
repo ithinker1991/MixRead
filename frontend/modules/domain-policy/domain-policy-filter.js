@@ -22,16 +22,19 @@ class DomainPolicyFilter {
   }
 
   /**
-   * Extract domain from URL
+   * Extract domain from URL (preserves port if present)
    * @param {string} url - Full URL
-   * @returns {string} Domain name or empty string if invalid
+   * @returns {string} Domain name with port (if applicable)
    */
   static extractDomain(url) {
     if (!url) return "";
 
     try {
       const urlObj = new URL(url);
-      return urlObj.hostname;
+      // IMPORTANT: Use url.host instead of url.hostname to preserve port numbers
+      // url.hostname: "localhost" (port stripped)
+      // url.host: "localhost:8002" (port included)
+      return urlObj.host;
     } catch (error) {
       logger.warn("[DomainFilter] Invalid URL:", url);
       return "";

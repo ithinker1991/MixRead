@@ -253,10 +253,29 @@ async function initializeModules() {
     console.log("[MixRead] SidebarPanel created");
 
     // 10. Check if current page should be excluded
+    console.log(
+      "[MixRead] Checking if current domain should be excluded...",
+      "URL:",
+      window.location.href,
+      "Hostname:",
+      window.location.hostname
+    );
+    console.log("[MixRead] DomainPolicyStore state:", {
+      isInitialized: domainPolicyStore.isInitialized,
+      blacklistLength: domainPolicyStore.blacklist.length,
+      blacklist: domainPolicyStore.blacklist,
+    });
+
     shouldExcludeCurrentPage = DomainPolicyFilter.shouldExcludeCurrentPage(
       window.location.href,
       domainPolicyStore
     );
+
+    console.log(
+      "[MixRead] Domain exclusion check result:",
+      shouldExcludeCurrentPage
+    );
+
     if (shouldExcludeCurrentPage) {
       console.log(
         "[MixRead] ⚠️ Current domain is in blacklist - highlighting disabled"

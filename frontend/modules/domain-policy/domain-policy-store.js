@@ -55,11 +55,15 @@ class DomainPolicyStore {
    */
   async initialize(userId) {
     if (this.isInitialized) {
+      console.log("[DomainPolicy] Already initialized, skipping");
       logger.log("[DomainPolicy] Already initialized, skipping");
       return true;
     }
 
     try {
+      console.log("[DomainPolicy] Initializing domain policies...");
+      console.log(`[DomainPolicy] User ID: ${userId}`);
+      console.log("[DomainPolicy] Fetching blacklist from API...");
       logger.log("[DomainPolicy] Initializing domain policies...");
 
       // Load blacklist from backend
@@ -67,11 +71,19 @@ class DomainPolicyStore {
         `/users/${userId}/domain-policies/blacklist`
       );
 
+      console.log("[DomainPolicy] Blacklist API response:", blacklistResult);
+
       if (blacklistResult.success) {
         this.blacklist = blacklistResult.blacklist_domains || [];
+        console.log(
+          `[DomainPolicy] ✅ Loaded ${this.blacklist.length} blacklist domains:`,
+          this.blacklist
+        );
         logger.log(
           `[DomainPolicy] Loaded ${this.blacklist.length} blacklist domains`
         );
+      } else {
+        console.warn("[DomainPolicy] Blacklist API returned success=false", blacklistResult);
       }
 
       // Load whitelist from backend
@@ -79,17 +91,32 @@ class DomainPolicyStore {
         `/users/${userId}/domain-policies/whitelist`
       );
 
+      console.log("[DomainPolicy] Whitelist API response:", whitelistResult);
+
       if (whitelistResult.success) {
         this.whitelist = whitelistResult.whitelist_domains || [];
+        console.log(
+          `[DomainPolicy] ✅ Loaded ${this.whitelist.length} whitelist domains:`,
+          this.whitelist
+        );
         logger.log(
           `[DomainPolicy] Loaded ${this.whitelist.length} whitelist domains`
         );
+      } else {
+        console.warn("[DomainPolicy] Whitelist API returned success=false", whitelistResult);
       }
 
       this.isInitialized = true;
+      console.log("[DomainPolicy] ✅ Initialization completed successfully");
       this.notify();
       return true;
     } catch (error) {
+      console.error("[DomainPolicy] ❌ Initialization failed with error:", error);
+      console.error("[DomainPolicy] Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       logger.error("[DomainPolicy] Initialization failed", error);
       // Continue anyway with empty lists
       this.isInitialized = true;
@@ -117,17 +144,35 @@ class DomainPolicyStore {
     if (!domain) return false;
 
     // Extract domain from URL if needed
-    const domainName = this.extractDomain(domain);
+    const domainName = this.extractDomain(domain).toLowerCase();
 
-    // Check if domain is in blacklist
-    return this.blacklist.includes(domainName);
+    // Check if domain is in blacklist (case-insensitive)
+    const isExcluded = this.blacklist.some(
+      (blacklistedDomain) => blacklistedDomain.toLowerCase() === domainName
+    );
+
+    // Debug logging
+    if (this.blacklist.length === 0) {
+      console.warn(
+        `[DomainPolicy] ⚠️ Blacklist is empty! Checking "${domainName}" against empty list`
+      );
+    } else {
+      console.log(
+        `[DomainPolicy] Checking domain "${domainName}" against blacklist:`,
+        this.blacklist,
+        `→ Result: ${isExcluded ? "EXCLUDED" : "NOT EXCLUDED"}`
+      );
+    }
+
+    return isExcluded;
   }
 
   /**
-   * Extract domain from URL
+   * Extract domain from URL (preserves port if present)
    * Example: "https://github.com/user/repo" => "github.com"
+   * Example: "http://localhost:8002/page" => "localhost:8002"
    * @param {string} urlOrDomain - URL or domain string
-   * @returns {string} Domain name
+   * @returns {string} Domain name with port (if applicable)
    */
   extractDomain(urlOrDomain) {
     if (!urlOrDomain) return "";
@@ -136,7 +181,9 @@ class DomainPolicyStore {
       // If it's a full URL, extract domain
       if (urlOrDomain.includes("://")) {
         const url = new URL(urlOrDomain);
-        return url.hostname;
+        // Include port in domain if it exists
+        // url.host includes both hostname and port
+        return url.host;
       }
       // Otherwise assume it's already a domain
       return urlOrDomain.toLowerCase();
