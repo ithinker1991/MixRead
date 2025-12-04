@@ -54,6 +54,48 @@ def print_info(text: str):
     """Print info message"""
     print(f"ℹ️  {text}")
 
+def setup_test_data():
+    """Ensure test vocabulary is set up"""
+    try:
+        from infrastructure.database import SessionLocal
+        from infrastructure.models import VocabularyEntryModel
+        from datetime import datetime
+
+        db = SessionLocal()
+        try:
+            # Check if we have test data
+            count = db.query(VocabularyEntryModel).filter_by(user_id=USER_ID).count()
+
+            if count < 20:
+                # Add test words
+                test_words = [
+                    'serendipity', 'ephemeral', 'quintessential',
+                    'ubiquitous', 'eloquent', 'melancholy',
+                    'pragmatic', 'nuance', 'ambiguous', 'diligent',
+                    'perspicacious', 'ebullient', 'recalcitrant',
+                    'pellucid', 'ostracize', 'perspicacity',
+                    'obfuscate', 'vindicate', 'magnanimous', 'sanguine'
+                ]
+
+                existing_words = {
+                    row[0] for row in db.query(VocabularyEntryModel.word).filter_by(user_id=USER_ID).all()
+                }
+
+                for word in test_words:
+                    if word not in existing_words:
+                        entry = VocabularyEntryModel(
+                            user_id=USER_ID,
+                            word=word
+                        )
+                        db.add(entry)
+
+                db.commit()
+        finally:
+            db.close()
+
+    except Exception as e:
+        print_warning(f"Could not setup test data: {e}")
+
 def check_backend_connection() -> bool:
     """Check if backend is running"""
     print_header("Step 1: 检查后端连接")
@@ -225,9 +267,47 @@ def test_session_types() -> bool:
 
     return success_count >= 1
 
+def reset_test_vocabulary():
+    """Reset test vocabulary for next test batch"""
+    try:
+        # Reset test vocabulary by deleting and re-adding entries for test_user
+        from infrastructure.database import SessionLocal
+        from infrastructure.models import VocabularyEntryModel
+
+        db = SessionLocal()
+        try:
+            # Delete all vocabulary entries for test_user
+            db.query(VocabularyEntryModel).filter_by(user_id=USER_ID).delete()
+            db.commit()
+
+            # Add fresh test words
+            test_words = [
+                'serendipity', 'ephemeral', 'quintessential',
+                'ubiquitous', 'eloquent'
+            ]
+
+            for word in test_words:
+                entry = VocabularyEntryModel(
+                    user_id=USER_ID,
+                    word=word
+                )
+                db.add(entry)
+
+            db.commit()
+        finally:
+            db.close()
+
+        time.sleep(0.5)
+    except Exception as e:
+        print_warning(f"Could not reset test vocabulary: {e}")
+        time.sleep(0.5)
+
 def test_quality_scores() -> bool:
     """Test all quality scores (0-5)"""
     print_header("Step 5: 测试所有质量评分 (0-5)")
+
+    # Reset vocabulary for fresh test data
+    reset_test_vocabulary()
 
     session = test_session_creation_silent()
     if not session:
@@ -325,6 +405,9 @@ def main():
     """Run all tests"""
     print(f"\n{'🧪 MixRead Review System - API 集成测试'.center(70)}")
     print(f"{'='*70}\n")
+
+    # Setup test data first
+    setup_test_data()
 
     # Check backend connection
     if not check_backend_connection():
