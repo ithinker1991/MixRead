@@ -98,11 +98,18 @@ def test_session_creation() -> Optional[Dict]:
             print_error(f"API 错误: {data.get('error', '未知错误')}")
             return None
 
-        session = data["data"]
+        # Handle both response formats
+        if "data" in data:
+            session = data["data"]
+        else:
+            session = data
+
         print_success("会话创建成功")
         print_info(f"  • Session ID: {session['session_id'][:8]}...")
         print_info(f"  • Total Cards: {session['total_cards']}")
-        print_info(f"  • First Card: {session['first_card']['front']}")
+        first_card = session.get('first_card', {})
+        card_word = first_card.get('content', {}).get('word') or first_card.get('front', 'N/A')
+        print_info(f"  • First Card: {card_word}")
         print_info(f"  • Progress: {session['progress']['current']} / {session['progress']['total']}")
 
         return session
@@ -133,12 +140,9 @@ def test_answer_submission(session: Dict) -> Optional[Dict]:
         for quality, label in quality_scores:
             print_info(f"测试质量评分 {quality}: {label}...")
 
+            # Use query parameters for answer endpoint
             response = requests.post(
-                f"{BASE_URL}/users/{USER_ID}/review/answer",
-                json={
-                    "session_id": session_id,
-                    "quality": quality
-                },
+                f"{BASE_URL}/users/{USER_ID}/review/answer?session_id={session_id}&quality={quality}",
                 timeout=TIMEOUT
             )
 
@@ -153,21 +157,30 @@ def test_answer_submission(session: Dict) -> Optional[Dict]:
                 print_error(f"  API 错误: {data.get('error')}")
                 continue
 
-            result = data["data"]["result"]
+            # Handle both response formats
+            if "result" in data:
+                result = data["result"]
+            else:
+                result = data.get("data", {}).get("result", {})
+
             print_success(f"  质量 {quality} ({label})")
-            print_info(f"    • 新间隔: {result['new_interval']} 小时")
-            print_info(f"    • 新难度因子: {result['new_ease']:.2f}")
-            print_info(f"    • 下次复习: {result['next_review_time'][:10]}")
+            print_info(f"    • 新间隔: {result.get('new_interval', 'N/A')} 小时")
+            print_info(f"    • 新难度因子: {result.get('new_ease', 0):.2f}")
+
+            next_review = result.get('next_review_time', '')
+            if next_review:
+                print_info(f"    • 下次复习: {next_review[:10]}")
 
             # Check if session is complete
-            if data["data"].get("session_complete"):
+            is_complete = data.get("session_complete") or (data.get("data", {}).get("session_complete") if "data" in data else False)
+            if is_complete:
                 print_success("会话已完成")
-                return data["data"].get("session_summary")
+                return data.get("session_summary") or data.get("data", {}).get("session_summary")
 
             # Add small delay between requests
             time.sleep(0.2)
 
-        return data["data"] if 'data' in data else None
+        return data.get("session_summary") or (data.get("data", {}).get("session_summary") if "data" in data else None)
 
     except Exception as e:
         print_error(f"异常: {e}")
@@ -197,7 +210,11 @@ def test_session_types() -> bool:
 
             data = response.json()
             if data.get("success"):
-                total = data["data"]["total_cards"]
+                # Handle both response formats
+                if "total_cards" in data:
+                    total = data["total_cards"]
+                else:
+                    total = data.get("data", {}).get("total_cards", 0)
                 print_success(f"会话类型 '{session_type}': {total} 张卡片")
                 success_count += 1
             else:
@@ -230,12 +247,9 @@ def test_quality_scores() -> bool:
         }
 
         try:
+            # Use query parameters for answer endpoint
             response = requests.post(
-                f"{BASE_URL}/users/{USER_ID}/review/answer",
-                json={
-                    "session_id": session["session_id"],
-                    "quality": quality
-                },
+                f"{BASE_URL}/users/{USER_ID}/review/answer?session_id={session['session_id']}&quality={quality}",
                 timeout=TIMEOUT
             )
 
@@ -245,7 +259,8 @@ def test_quality_scores() -> bool:
                     print_success(f"质量 {quality}: {quality_labels[quality]}")
                     success_count += 1
 
-                    if data["data"].get("session_complete"):
+                    is_complete = data.get("session_complete") or (data.get("data", {}).get("session_complete") if "data" in data else False)
+                    if is_complete:
                         break
 
                     time.sleep(0.1)
@@ -267,7 +282,11 @@ def test_session_creation_silent() -> Optional[Dict]:
         if response.status_code == 200:
             data = response.json()
             if data.get("success"):
-                return data["data"]
+                # Handle both response formats
+                if "session_id" in data:
+                    return data
+                else:
+                    return data.get("data")
 
     except Exception:
         pass
