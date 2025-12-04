@@ -25,6 +25,7 @@ from infrastructure.database import get_db, init_db
 from infrastructure.repositories import UserRepository
 from application.services import UserApplicationService, HighlightApplicationService
 from api.routes import router as user_router
+from api.review import router as review_router
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -267,6 +268,9 @@ async def batch_word_info(request: WordBatch):
 
 # Include user routes (known_words, unknown_words, vocabulary)
 app.include_router(user_router)
+
+# Include review routes (SRS-based flashcard review system)
+app.include_router(review_router)
 
 # Root endpoint
 @app.get("/")
