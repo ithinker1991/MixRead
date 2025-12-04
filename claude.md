@@ -61,7 +61,7 @@ The project follows a strict phased approach focused on MVP first, then iteratio
 - Multi-skill support (speaking, listening, writing)
 - Complete language learning ecosystem
 
-## Architecture Overview
+## zhe'gezhegeArchitecture Overview
 
 ### Client (Chrome Extension)
 
