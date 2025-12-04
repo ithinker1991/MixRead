@@ -72,23 +72,24 @@ class ReviewManager {
             }
 
             // Store session data
-            this.session = data.data;
-            this.sessionId = data.data.session_id;
+            // Handle both response formats: with and without data wrapper
+            this.session = data.data || data;
+            this.sessionId = data.session_id || (data.data && data.data.session_id);
             this.currentCardIndex = 0;
             this.isRunning = true;
             this.isPaused = false;
 
-            console.log(`[Review] Session started: ${this.sessionId}, cards: ${data.data.total_cards}`);
+            console.log(`[Review] Session started: ${this.sessionId}, cards: ${this.session.total_cards}`);
 
             // Initialize event listeners
             this.initializeEventListeners();
 
             // Display first card
-            this.displayCard(data.data.first_card);
-            this.updateProgress(data.data.progress);
+            await this.displayCard(this.session.first_card);
+            this.updateProgress(this.session.progress);
             this.startTimer();
 
-            return data.data;
+            return this.session;
 
         } catch (error) {
             console.error('[Review] Failed to start session:', error);
@@ -99,9 +100,9 @@ class ReviewManager {
 
     /**
      * Display a flashcard
-     * @param {object} card - Card object with id, front, back
+     * @param {object} card - Card object with id, content
      */
-    displayCard(card) {
+    async displayCard(card) {
         const frontContent = document.getElementById('card-front-content');
         const frontHints = document.getElementById('card-hints');
         const cardFront = document.getElementById('card-front');
@@ -116,23 +117,46 @@ class ReviewManager {
         if (cardFront) cardFront.style.display = 'block';
         if (cardBack) cardBack.style.display = 'none';
 
+        // Get the word
+        const word = card.content?.word || card.front || 'Unknown';
+
         // Display word and hints
-        document.getElementById('word-text').textContent = card.front;
+        document.getElementById('word-text').textContent = word;
         document.getElementById('card-type').textContent = 'Word → Definition';
 
         // Display back side (definition, example, etc)
         if (document.getElementById('back-word')) {
-            document.getElementById('back-word').textContent = card.front;
+            document.getElementById('back-word').textContent = word;
         }
-        if (document.getElementById('definition') && card.back.definition) {
-            document.getElementById('definition').textContent = card.back.definition;
-        }
-        if (document.getElementById('example') && card.back.example) {
-            document.getElementById('example').innerHTML =
-                `<strong>Example:</strong> ${card.back.example}`;
-        }
-        if (document.getElementById('cefr') && card.back.cefr) {
-            document.getElementById('cefr').textContent = `CEFR: ${card.back.cefr}`;
+
+        // Fetch definition and other info
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/word/${word}`);
+            if (response.ok) {
+                const wordData = await response.json();
+
+                if (document.getElementById('definition')) {
+                    if (wordData.definition) {
+                        document.getElementById('definition').textContent = wordData.definition;
+                    } else {
+                        document.getElementById('definition').textContent = 'No definition available';
+                    }
+                }
+
+                if (document.getElementById('example') && wordData.example) {
+                    document.getElementById('example').innerHTML =
+                        `<strong>Example:</strong> ${wordData.example}`;
+                }
+
+                if (document.getElementById('cefr') && wordData.cefr_level) {
+                    document.getElementById('cefr').textContent = `CEFR: ${wordData.cefr_level}`;
+                }
+            }
+        } catch (error) {
+            console.error('[Review] Failed to fetch word definition:', error);
+            if (document.getElementById('definition')) {
+                document.getElementById('definition').textContent = 'Failed to load definition';
+            }
         }
 
         // Record when card was displayed
@@ -233,7 +257,7 @@ class ReviewManager {
             }
 
             // Move to next card
-            this.nextCard(data.next_card, data.progress);
+            await this.nextCard(data.next_card, data.progress);
 
         } catch (error) {
             console.error('[Review] Failed to submit answer:', error);
@@ -246,7 +270,7 @@ class ReviewManager {
      * @param {object} nextCard - Next card data
      * @param {object} progress - Session progress data
      */
-    nextCard(nextCard, progress) {
+    async nextCard(nextCard, progress) {
         if (!nextCard) {
             console.log('[Review] No next card, session ending');
             this.endSession();
@@ -254,7 +278,7 @@ class ReviewManager {
         }
 
         this.currentCardIndex++;
-        this.displayCard(nextCard);
+        await this.displayCard(nextCard);
         this.updateProgress(progress);
     }
 
