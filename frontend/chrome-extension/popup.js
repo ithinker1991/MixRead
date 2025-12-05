@@ -1171,9 +1171,9 @@ if (btnStartReview) {
   btnStartReview.addEventListener('click', () => {
     console.log('[Popup] Starting review session');
 
-    // Get current user from storage
-    ChromeAPI.storage.get(['userId', 'currentUser'], (result) => {
-      const userId = result.currentUser || result.userId || 'test_user';
+    // Get current user from storage (testUserId first for testing)
+    ChromeAPI.storage.get(['testUserId', 'userId', 'currentUser'], (result) => {
+      const userId = result.testUserId || result.currentUser || result.userId || 'test_user';
       console.log('[Popup] Starting review for user:', userId);
 
       // Use MixReadNavigation to open review page
@@ -1195,9 +1195,9 @@ if (btnViewLibrary) {
   btnViewLibrary.addEventListener('click', () => {
     console.log('[Popup] Opening library page');
 
-    // Get current user from storage
-    ChromeAPI.storage.get(['userId', 'currentUser'], (result) => {
-      const userId = result.currentUser || result.userId || 'test_user';
+    // Get current user from storage (testUserId first for testing)
+    ChromeAPI.storage.get(['testUserId', 'userId', 'currentUser'], (result) => {
+      const userId = result.testUserId || result.currentUser || result.userId || 'test_user';
       console.log('[Popup] Opening library for user:', userId);
 
       // Use MixReadNavigation to open library page
@@ -1211,4 +1211,129 @@ if (btnViewLibrary) {
       }
     });
   });
+}
+
+/**
+ * User ID Management for Testing
+ * Allow users to manually set user_id for testing without full auth system
+ */
+
+const userIdInput = document.getElementById('user-id-input');
+const setUserBtn = document.getElementById('set-user-btn');
+const userIdDisplay = document.getElementById('user-id-display');
+const recentUsersContainer = document.getElementById('recent-users');
+
+// Initialize user ID input
+function initializeUserIdInput() {
+  console.log('[Popup] Initializing user ID input');
+
+  // Load current user ID
+  ChromeAPI.storage.get(['testUserId', 'recentUserIds'], (result) => {
+    const currentUserId = result.testUserId || 'test_user';
+    const recentUserIds = result.recentUserIds || [];
+
+    // Set current user display
+    userIdDisplay.textContent = currentUserId;
+    userIdInput.value = currentUserId;
+
+    // Display recent users as buttons
+    if (recentUserIds.length > 0) {
+      recentUsersContainer.innerHTML = recentUserIds
+        .slice(0, 5) // Show last 5
+        .map(
+          (userId) =>
+            `<button style="
+              font-size: 9px;
+              padding: 2px 6px;
+              background: #e8f5e9;
+              color: #2e7d32;
+              border: 1px solid #2e7d32;
+              border-radius: 3px;
+              cursor: pointer;
+            ">${userId}</button>`
+        )
+        .join('');
+
+      // Add click handlers to recent user buttons
+      recentUsersContainer.querySelectorAll('button').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          setUserIdAndNavigate(btn.textContent);
+        });
+      });
+    }
+  });
+}
+
+// Set user ID
+function setUserIdAndNavigate(userId) {
+  if (!userId || userId.trim().length === 0) {
+    alert('Please enter a valid user ID');
+    return;
+  }
+
+  userId = userId.trim();
+  console.log('[Popup] Setting user ID:', userId);
+
+  // Get recent user IDs
+  ChromeAPI.storage.get(['recentUserIds'], (result) => {
+    let recentUserIds = result.recentUserIds || [];
+
+    // Add to recent if not already there
+    if (!recentUserIds.includes(userId)) {
+      recentUserIds.unshift(userId);
+      recentUserIds = recentUserIds.slice(0, 10); // Keep last 10
+    }
+
+    // Save to storage
+    ChromeAPI.storage.set(
+      {
+        testUserId: userId,
+        recentUserIds: recentUserIds
+      },
+      () => {
+        // Update display
+        userIdDisplay.textContent = userId;
+        userIdInput.value = userId;
+
+        // Refresh recent users
+        initializeUserIdInput();
+
+        console.log('[Popup] User ID set:', userId);
+        alert(`✅ User ID set to: ${userId}\n\nYou can now use the quick entry buttons to open review/library pages.`);
+      }
+    );
+  });
+}
+
+// Set button click handler
+if (setUserBtn) {
+  setUserBtn.addEventListener('click', () => {
+    setUserIdAndNavigate(userIdInput.value);
+  });
+}
+
+// Allow Enter key to set user ID
+if (userIdInput) {
+  userIdInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      setUserIdAndNavigate(userIdInput.value);
+    }
+  });
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('[Popup] DOM ready, initializing user ID input');
+  setTimeout(() => {
+    initializeUserIdInput();
+  }, 500);
+});
+
+// Also initialize immediately in case DOM is already ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeUserIdInput);
+} else {
+  setTimeout(() => {
+    initializeUserIdInput();
+  }, 100);
 }
