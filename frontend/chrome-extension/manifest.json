@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "MixRead",
+  "version": "0.1.1",
+  "description": "Improve your English reading with intelligent word highlighting and definitions",
+  "permissions": [
+    "storage",
+    "scripting",
+    "contextMenus",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "https://api.dictionaryapi.dev/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "content/scripts/logger.js",
+        "content/scripts/storage.js",
+        "shared/api-client.js",
+        "shared/navigation.js",
+        "content/scripts/stemmer.js",
+        "content/modules/user/user-store.js",
+        "content/modules/unknown-words/unknown-words-store.js",
+        "content/modules/unknown-words/unknown-words-service.js",
+        "content/modules/domain-policy/domain-policy-store.js",
+        "content/modules/domain-policy/domain-policy-filter.js",
+        "content/modules/domain-policy/preset-dialog.js",
+        "content/modules/highlight/context-menu.js",
+        "content/modules/highlight/highlight-filter.js",
+        "content/modules/panel/batch-marking-panel.js",
+        "content/modules/panel/word-cache-manager.js",
+        "content/modules/panel/sidebar-panel.js",
+        "content/content.js"
+      ],
+      "css": [
+        "content/content.css",
+        "content/modules/panel/batch-marking-panel.css",
+        "content/modules/panel/sidebar-panel.css",
+        "content/modules/domain-policy/preset-dialog.css"
+      ]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "MixRead"
+  },
+  "icons": {
+    "16": "images/icon-16.png",
+    "48": "images/icon-48.png",
+    "128": "images/icon-128.png"
+  }
+}
