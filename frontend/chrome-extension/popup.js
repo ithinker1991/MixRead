@@ -1218,31 +1218,43 @@ if (btnViewLibrary) {
  * Allow users to manually set user_id for testing without full auth system
  */
 
-const userIdInput = document.getElementById('user-id-input');
-const setUserBtn = document.getElementById('set-user-btn');
-const userIdDisplay = document.getElementById('user-id-display');
-const recentUsersContainer = document.getElementById('recent-users');
+function setupUserIdManagement() {
+  console.log('[Popup] Setting up user ID management');
 
-// Initialize user ID input
-function initializeUserIdInput() {
-  console.log('[Popup] Initializing user ID input');
+  const userIdInput = document.getElementById('user-id-input');
+  const setUserBtn = document.getElementById('set-user-btn');
+  const userIdDisplay = document.getElementById('user-id-display');
+  const recentUsersContainer = document.getElementById('recent-users');
 
-  // Load current user ID
-  ChromeAPI.storage.get(['testUserId', 'recentUserIds'], (result) => {
-    const currentUserId = result.testUserId || 'test_user';
-    const recentUserIds = result.recentUserIds || [];
+  if (!userIdInput || !setUserBtn) {
+    console.warn('[Popup] User ID elements not found');
+    return;
+  }
 
-    // Set current user display
-    userIdDisplay.textContent = currentUserId;
-    userIdInput.value = currentUserId;
+  console.log('[Popup] User ID elements found, initializing handlers');
 
-    // Display recent users as buttons
-    if (recentUserIds.length > 0) {
-      recentUsersContainer.innerHTML = recentUserIds
-        .slice(0, 5) // Show last 5
-        .map(
-          (userId) =>
-            `<button style="
+  // Initialize user ID input
+  function initializeUserIdInput() {
+    console.log('[Popup] Loading user ID from storage');
+
+    ChromeAPI.storage.get(['testUserId', 'recentUserIds'], (result) => {
+      try {
+        const currentUserId = result.testUserId || 'test_user';
+        const recentUserIds = result.recentUserIds || [];
+
+        // Set current user display
+        userIdDisplay.textContent = currentUserId;
+        userIdInput.value = currentUserId;
+
+        console.log('[Popup] Current user ID:', currentUserId);
+
+        // Display recent users as buttons
+        if (recentUserIds.length > 0) {
+          recentUsersContainer.innerHTML = recentUserIds
+            .slice(0, 5)
+            .map(
+              (userId) =>
+                `<button class="recent-user-btn" data-user-id="${userId}" style="
               font-size: 9px;
               padding: 2px 6px;
               background: #e8f5e9;
@@ -1251,89 +1263,87 @@ function initializeUserIdInput() {
               border-radius: 3px;
               cursor: pointer;
             ">${userId}</button>`
-        )
-        .join('');
+            )
+            .join('');
 
-      // Add click handlers to recent user buttons
-      recentUsersContainer.querySelectorAll('button').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          setUserIdAndNavigate(btn.textContent);
-        });
-      });
-    }
-  });
-}
-
-// Set user ID
-function setUserIdAndNavigate(userId) {
-  if (!userId || userId.trim().length === 0) {
-    alert('Please enter a valid user ID');
-    return;
+          // Add click handlers to recent user buttons
+          recentUsersContainer.querySelectorAll('.recent-user-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+              const userId = btn.getAttribute('data-user-id');
+              console.log('[Popup] Clicked recent user:', userId);
+              setUserIdAndNavigate(userId);
+            });
+          });
+        }
+      } catch (e) {
+        console.error('[Popup] Error initializing user ID:', e);
+      }
+    });
   }
 
-  userId = userId.trim();
-  console.log('[Popup] Setting user ID:', userId);
-
-  // Get recent user IDs
-  ChromeAPI.storage.get(['recentUserIds'], (result) => {
-    let recentUserIds = result.recentUserIds || [];
-
-    // Add to recent if not already there
-    if (!recentUserIds.includes(userId)) {
-      recentUserIds.unshift(userId);
-      recentUserIds = recentUserIds.slice(0, 10); // Keep last 10
+  // Set user ID function
+  function setUserIdAndNavigate(userId) {
+    if (!userId || userId.trim().length === 0) {
+      alert('Please enter a valid user ID');
+      return;
     }
 
-    // Save to storage
-    ChromeAPI.storage.set(
-      {
-        testUserId: userId,
-        recentUserIds: recentUserIds
-      },
-      () => {
-        // Update display
-        userIdDisplay.textContent = userId;
-        userIdInput.value = userId;
+    userId = userId.trim();
+    console.log('[Popup] Setting user ID to:', userId);
 
-        // Refresh recent users
-        initializeUserIdInput();
+    ChromeAPI.storage.get(['recentUserIds'], (result) => {
+      try {
+        let recentUserIds = result.recentUserIds || [];
 
-        console.log('[Popup] User ID set:', userId);
-        alert(`✅ User ID set to: ${userId}\n\nYou can now use the quick entry buttons to open review/library pages.`);
+        if (!recentUserIds.includes(userId)) {
+          recentUserIds.unshift(userId);
+          recentUserIds = recentUserIds.slice(0, 10);
+        }
+
+        ChromeAPI.storage.set(
+          {
+            testUserId: userId,
+            recentUserIds: recentUserIds
+          },
+          () => {
+            userIdDisplay.textContent = userId;
+            userIdInput.value = userId;
+            initializeUserIdInput();
+            console.log('[Popup] User ID successfully set:', userId);
+            alert(`✅ User ID set to: ${userId}\n\nYou can now use the quick entry buttons.`);
+          }
+        );
+      } catch (e) {
+        console.error('[Popup] Error setting user ID:', e);
       }
-    );
-  });
-}
+    });
+  }
 
-// Set button click handler
-if (setUserBtn) {
+  // Attach event listeners
+  console.log('[Popup] Attaching event listeners');
+
   setUserBtn.addEventListener('click', () => {
+    console.log('[Popup] Set button clicked');
     setUserIdAndNavigate(userIdInput.value);
   });
-}
 
-// Allow Enter key to set user ID
-if (userIdInput) {
   userIdInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
+      console.log('[Popup] Enter pressed in input');
       setUserIdAndNavigate(userIdInput.value);
     }
   });
+
+  // Initialize on load
+  console.log('[Popup] Initial load of user ID');
+  initializeUserIdInput();
 }
 
-// Initialize on load
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('[Popup] DOM ready, initializing user ID input');
-  setTimeout(() => {
-    initializeUserIdInput();
-  }, 500);
-});
-
-// Also initialize immediately in case DOM is already ready
+// Run setup when DOM is ready
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeUserIdInput);
+  document.addEventListener('DOMContentLoaded', setupUserIdManagement);
+  console.log('[Popup] Waiting for DOMContentLoaded');
 } else {
-  setTimeout(() => {
-    initializeUserIdInput();
-  }, 100);
+  console.log('[Popup] DOM already loaded');
+  setTimeout(setupUserIdManagement, 100);
 }
