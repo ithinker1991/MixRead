@@ -87,7 +87,7 @@ async def start_review_session(
     """
     try:
         # Create provider and session
-        vocab_repo = VocabularyRepository(db)
+        vocab_repo = VocabularyRepository(db, user_id)
         provider = VocabularyReviewProvider(vocab_repo)
 
         session = ReviewSession(provider)
@@ -186,6 +186,71 @@ async def submit_review_answer(
         return {
             "success": True,
             "result": result.to_dict(),
+            "next_card": next_card.to_dict() if next_card else None,
+            "progress": session.get_progress(),
+            "session_complete": False,
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/mark-known")
+async def mark_word_as_known(
+    user_id: str,
+    session_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Mark the current word as already known (mastered)
+    This removes the word from review queue permanently.
+
+    Args:
+        user_id: User ID
+        session_id: Session ID
+
+    Returns:
+        Success status and next card
+    """
+    if session_id not in active_sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    try:
+        session = active_sessions[session_id]
+        current_card = session.get_current_card()
+
+        if not current_card:
+            raise HTTPException(status_code=400, detail="No current card")
+
+        # Mark as mastered in database
+        vocab_repo = VocabularyRepository(db, user_id)
+        model = vocab_repo.get_by_id(current_card.item.item_id)
+
+        if model:
+            model.status = VocabularyStatus.MASTERED
+            model.next_review = None  # Never review again
+            model.review_interval = 999999  # Very large interval
+            vocab_repo.update(model)
+
+        # Skip to next card
+        session.current_index += 1
+
+        # Check if session is complete
+        if session.is_complete():
+            summary = session.end_session()
+            del active_sessions[session_id]
+
+            return {
+                "success": True,
+                "session_complete": True,
+                "session_summary": summary,
+            }
+
+        # Get next card
+        next_card = session.next_card()
+
+        return {
+            "success": True,
             "next_card": next_card.to_dict() if next_card else None,
             "progress": session.get_progress(),
             "session_complete": False,

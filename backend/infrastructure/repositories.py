@@ -658,13 +658,18 @@ class VocabularyRepository:
     Provides data access for both domain model and SRS operations.
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: str):
         self.db = db
+        self.user_id = user_id
 
     def get_by_id(self, entry_id: str) -> Optional[VocabularyEntryModel]:
         """Get a vocabulary entry by ID"""
+        try:
+            int_id = int(entry_id)
+        except (ValueError, TypeError):
+            return None
         return self.db.query(VocabularyEntryModel).filter(
-            VocabularyEntryModel.id == entry_id
+            VocabularyEntryModel.id == int_id
         ).first()
 
     def get_by_word(self, user_id: str, word: str) -> Optional[VocabularyEntryModel]:
@@ -675,22 +680,25 @@ class VocabularyRepository:
         ).first()
 
     def get_by_status(self, status, limit: int = 20) -> List[VocabularyEntryModel]:
-        """Get entries by status"""
+        """Get entries by status for this user"""
         from domain.models import VocabularyStatus
         return self.db.query(VocabularyEntryModel).filter(
+            VocabularyEntryModel.user_id == self.user_id,
             VocabularyEntryModel.status == status
         ).limit(limit).all()
 
     def get_due_for_review(self, limit: int = 20) -> List[VocabularyEntryModel]:
-        """Get entries that are due for review (next_review <= now)"""
+        """Get entries that are due for review (next_review <= now) for this user"""
         return self.db.query(VocabularyEntryModel).filter(
+            VocabularyEntryModel.user_id == self.user_id,
             VocabularyEntryModel.next_review.isnot(None),
             VocabularyEntryModel.next_review <= datetime.now()
         ).order_by(VocabularyEntryModel.next_review).limit(limit).all()
 
     def get_new_words(self, limit: int = 5) -> List[VocabularyEntryModel]:
-        """Get new words (total_reviews == 0)"""
+        """Get new words (total_reviews == 0) for this user"""
         return self.db.query(VocabularyEntryModel).filter(
+            VocabularyEntryModel.user_id == self.user_id,
             VocabularyEntryModel.total_reviews == 0
         ).order_by(VocabularyEntryModel.added_at.desc()).limit(limit).all()
 

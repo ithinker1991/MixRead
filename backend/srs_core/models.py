@@ -162,10 +162,10 @@ class SessionStats:
             self.streak = 0
 
     def get_accuracy(self) -> float:
-        """Get accuracy percentage (0-100)"""
+        """Get accuracy as decimal (0-1)"""
         if self.cards_reviewed == 0:
             return 0
-        return (self.correct_count / self.cards_reviewed) * 100
+        return self.correct_count / self.cards_reviewed
 
     def to_dict(self) -> Dict:
         """Convert to dictionary"""
