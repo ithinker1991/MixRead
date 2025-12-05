@@ -1189,8 +1189,7 @@ if (btnStartReview) {
   });
 }
 
-// Update Library button to use new navigation
-const btnViewLibrary = document.getElementById('btn-view-library');
+// Update Library button to use new navigation (use existing btnViewLibrary from line 177)
 if (btnViewLibrary) {
   btnViewLibrary.addEventListener('click', () => {
     console.log('[Popup] Opening library page');
