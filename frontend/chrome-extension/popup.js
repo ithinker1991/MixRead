@@ -1319,19 +1319,39 @@ function setupUserIdManagement() {
   }
 
   // Attach event listeners
-  console.log('[Popup] Attaching event listeners');
+  console.log('[Popup] Attaching event listeners to setUserBtn:', setUserBtn);
 
-  setUserBtn.addEventListener('click', () => {
-    console.log('[Popup] Set button clicked');
-    setUserIdAndNavigate(userIdInput.value);
-  });
+  if (!setUserBtn) {
+    console.error('[Popup] ERROR: setUserBtn is null!');
+    return;
+  }
 
-  userIdInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      console.log('[Popup] Enter pressed in input');
+  setUserBtn.addEventListener('click', (event) => {
+    console.log('[Popup] ===== Set button clicked =====');
+    console.log('[Popup] Event:', event);
+    console.log('[Popup] userIdInput.value:', userIdInput.value);
+    try {
       setUserIdAndNavigate(userIdInput.value);
+    } catch (err) {
+      console.error('[Popup] Error in setUserIdAndNavigate:', err);
     }
   });
+
+  console.log('[Popup] Set button click listener attached');
+
+  userIdInput.addEventListener('keypress', (e) => {
+    console.log('[Popup] Key pressed in input:', e.key);
+    if (e.key === 'Enter') {
+      console.log('[Popup] Enter pressed in input, value:', userIdInput.value);
+      try {
+        setUserIdAndNavigate(userIdInput.value);
+      } catch (err) {
+        console.error('[Popup] Error in keypress handler:', err);
+      }
+    }
+  });
+
+  console.log('[Popup] Keypress listener attached');
 
   // Initialize on load
   console.log('[Popup] Initial load of user ID');
@@ -1339,10 +1359,27 @@ function setupUserIdManagement() {
 }
 
 // Run setup when DOM is ready
+console.log('[Popup] popup.js loaded, document.readyState:', document.readyState);
+console.log('[Popup] user-id-input element:', document.getElementById('user-id-input'));
+console.log('[Popup] set-user-btn element:', document.getElementById('set-user-btn'));
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', setupUserIdManagement);
   console.log('[Popup] Waiting for DOMContentLoaded');
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('[Popup] DOMContentLoaded fired');
+    setupUserIdManagement();
+  });
 } else {
-  console.log('[Popup] DOM already loaded');
-  setTimeout(setupUserIdManagement, 100);
+  console.log('[Popup] DOM already loaded, running setupUserIdManagement');
+  setTimeout(() => {
+    console.log('[Popup] Timeout callback: calling setupUserIdManagement');
+    setupUserIdManagement();
+  }, 100);
 }
+
+// Additional logging
+window.addEventListener('load', () => {
+  console.log('[Popup] window load event fired');
+});
+
+console.log('[Popup] Script initialization complete');
