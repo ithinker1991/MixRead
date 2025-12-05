@@ -177,11 +177,10 @@ const btnToggleSidebar = document.getElementById("btn-toggle-sidebar");
 const btnViewLibrary = document.getElementById("btn-view-library");
 const libraryCountDisplay = document.getElementById("library-count");
 
-// User management elements
-const userSelector = document.getElementById("user-selector");
-const addNewUserBtn = document.getElementById("add-new-user");
-let allUsers = [];
-let currentUser = "";
+// User management - MOVED TO setupUserIdManagement()
+// Old dropdown selector removed - now using manual user ID input
+// let allUsers = [];
+// let currentUser = "";
 
 // Helper function to get date X days ago
 function getDateXDaysAgo(days) {
@@ -190,7 +189,10 @@ function getDateXDaysAgo(days) {
   return date.toISOString().split("T")[0];
 }
 
-// Load user management first
+// REMOVED: Old user loading code - moved to setupUserIdManagement()
+// This old code loaded users into dropdown selector which no longer exists
+// User management now handled by setupUserIdManagement() with manual input
+/*
 ChromeAPI.storage.get(["mixread_users", "mixread_current_user"], (result) => {
   allUsers = result.mixread_users || [];
   currentUser = result.mixread_current_user || "";
@@ -294,6 +296,7 @@ ChromeAPI.storage.get(["mixread_users", "mixread_current_user"], (result) => {
     }
   );
 });
+*/
 
 /**
  * Update difficulty display
@@ -663,24 +666,14 @@ function updateUserDisplay() {
   }
 
   // Update selector
-  userSelector.value = currentUser;
+  // REMOVED: userSelector.value = currentUser;
+  // Old dropdown selector removed - user selection now handled by setupUserIdManagement()
 }
 
-// Event listeners for user management
-userSelector.addEventListener("change", (e) => {
-  const selectedUserId = e.target.value;
-  if (selectedUserId) {
-    switchToUser(selectedUserId);
-    // After switching, sync to all content scripts
-    setTimeout(() => {
-      syncCurrentUserToContentScripts();
-    }, 1000);
-  }
-});
-
-addNewUserBtn.addEventListener("click", () => {
-  createNewUser();
-});
+// Event listeners for user management - REMOVED OLD DROPDOWN
+// User selection is now handled by setupUserIdManagement() in the new manual input system
+// Removed: userSelector.addEventListener(...)
+// Removed: addNewUserBtn.addEventListener(...)
 
 // Function to sync current user with content scripts
 function syncCurrentUserToContentScripts() {
