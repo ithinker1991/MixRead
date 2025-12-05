@@ -308,13 +308,55 @@
       <!-- End domain-tab -->
     </div>
 
+    <!-- Inline debugging to trace script loading -->
+    <script>
+      console.log('[Popup-Inline] Starting script load sequence...');
+    </script>
+
     <script src="shared/api-client.js"></script>
+    <script>
+      console.log('[Popup-Inline] ✓ api-client.js loaded');
+      console.log('[Popup-Inline] ApiClient available:', typeof ApiClient !== 'undefined');
+    </script>
+
     <script src="shared/navigation.js"></script>
+    <script>
+      console.log('[Popup-Inline] ✓ navigation.js loaded');
+      console.log('[Popup-Inline] MixReadNavigation available:', typeof MixReadNavigation !== 'undefined');
+    </script>
+
     <script src="content/scripts/logger.js"></script>
+    <script>
+      console.log('[Popup-Inline] ✓ logger.js loaded');
+      console.log('[Popup-Inline] Logger available:', typeof Logger !== 'undefined');
+    </script>
+
     <script src="content/modules/domain-policy/domain-policy-store.js"></script>
+    <script>
+      console.log('[Popup-Inline] ✓ domain-policy-store.js loaded');
+      console.log('[Popup-Inline] DomainPolicyStore available:', typeof DomainPolicyStore !== 'undefined');
+    </script>
+
     <script src="content/modules/domain-policy/domain-policy-filter.js"></script>
+    <script>
+      console.log('[Popup-Inline] ✓ domain-policy-filter.js loaded');
+      console.log('[Popup-Inline] DomainPolicyFilter available:', typeof DomainPolicyFilter !== 'undefined');
+    </script>
+
     <script src="content/modules/domain-policy/preset-dialog.js"></script>
+    <script>
+      console.log('[Popup-Inline] ✓ preset-dialog.js loaded');
+      console.log('[Popup-Inline] PresetDialog available:', typeof PresetDialog !== 'undefined');
+    </script>
+
     <link rel="stylesheet" href="content/modules/domain-policy/preset-dialog.css" />
+
+    <script>
+      console.log('[Popup-Inline] About to load popup.js...');
+    </script>
     <script src="popup.js"></script>
+    <script>
+      console.log('[Popup-Inline] ✓ popup.js loaded successfully');
+    </script>
   </body>
 </html>
