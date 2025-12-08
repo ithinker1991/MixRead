@@ -495,9 +495,10 @@ function openLibraryPage() {
 function openLibraryUrl(userId) {
   try {
     // Open library viewer with user ID
-    const libraryUrl = `http://localhost:8002/library-viewer.html?user=${encodeURIComponent(
-      userId
-    )}`;
+    // Open library viewer with user ID
+    const libraryUrl =
+      chrome.runtime.getURL("pages/library.html") +
+      `?user=${encodeURIComponent(userId)}`;
 
     console.log("[Popup] Opening library page:", libraryUrl);
     chrome.tabs.create({ url: libraryUrl }, (tab) => {
@@ -988,10 +989,7 @@ function initializeQuickActions() {
       const tab = tabs[0];
       if (!tab.url) {
         console.warn("[Popup] Tab has no URL");
-        updateQuickActionStatus(
-          "Cannot get current page URL",
-          "error"
-        );
+        updateQuickActionStatus("Cannot get current page URL", "error");
         return;
       }
 
@@ -1001,12 +999,7 @@ function initializeQuickActions() {
         const domain = url.host; // Includes port number
         const path = url.pathname;
 
-        console.log(
-          "[Popup] Current page - domain:",
-          domain,
-          "path:",
-          path
-        );
+        console.log("[Popup] Current page - domain:", domain, "path:", path);
 
         // Display domain
         document.getElementById("current-page-domain").textContent = domain;
@@ -1057,10 +1050,7 @@ async function handleQuickExcludeDomain(domain, tab) {
     );
 
     if (success) {
-      updateQuickActionStatus(
-        `✅ Added "${domain}" to blacklist`,
-        "success"
-      );
+      updateQuickActionStatus(`✅ Added "${domain}" to blacklist`, "success");
 
       // Reload tab after 1.5 seconds
       setTimeout(() => {
@@ -1159,24 +1149,26 @@ setTimeout(() => {
  */
 
 // Start Review button
-const btnStartReview = document.getElementById('btn-start-review');
+const btnStartReview = document.getElementById("btn-start-review");
 if (btnStartReview) {
-  btnStartReview.addEventListener('click', () => {
-    console.log('[Popup] Starting review session');
+  btnStartReview.addEventListener("click", () => {
+    console.log("[Popup] Starting review session");
 
     // Get current user from storage (testUserId first for testing)
-    ChromeAPI.storage.get(['testUserId', 'userId', 'currentUser'], (result) => {
-      const userId = result.testUserId || result.currentUser || result.userId || 'test_user';
-      console.log('[Popup] Starting review for user:', userId);
+    ChromeAPI.storage.get(["testUserId", "userId", "currentUser"], (result) => {
+      const userId =
+        result.testUserId || result.currentUser || result.userId || "test_user";
+      console.log("[Popup] Starting review for user:", userId);
 
       // Use MixReadNavigation to open review page
-      if (typeof MixReadNavigation !== 'undefined') {
-        MixReadNavigation.openPage('review', { user_id: userId });
+      if (typeof MixReadNavigation !== "undefined") {
+        MixReadNavigation.openPage("review", { user_id: userId });
       } else {
         // Fallback if navigation not loaded
-        chrome.tabs.create({
-          url: `http://localhost:8001/pages/review/?user_id=${encodeURIComponent(userId)}`
-        });
+        const reviewUrl =
+          chrome.runtime.getURL("pages/review.html") +
+          `?user_id=${encodeURIComponent(userId)}`;
+        chrome.tabs.create({ url: reviewUrl });
       }
     });
   });
@@ -1184,22 +1176,24 @@ if (btnStartReview) {
 
 // Update Library button to use new navigation (use existing btnViewLibrary from line 177)
 if (btnViewLibrary) {
-  btnViewLibrary.addEventListener('click', () => {
-    console.log('[Popup] Opening library page');
+  btnViewLibrary.addEventListener("click", () => {
+    console.log("[Popup] Opening library page");
 
     // Get current user from storage (testUserId first for testing)
-    ChromeAPI.storage.get(['testUserId', 'userId', 'currentUser'], (result) => {
-      const userId = result.testUserId || result.currentUser || result.userId || 'test_user';
-      console.log('[Popup] Opening library for user:', userId);
+    ChromeAPI.storage.get(["testUserId", "userId", "currentUser"], (result) => {
+      const userId =
+        result.testUserId || result.currentUser || result.userId || "test_user";
+      console.log("[Popup] Opening library for user:", userId);
 
       // Use MixReadNavigation to open library page
-      if (typeof MixReadNavigation !== 'undefined') {
-        MixReadNavigation.openPage('library', { user_id: userId });
+      if (typeof MixReadNavigation !== "undefined") {
+        MixReadNavigation.openPage("library", { user_id: userId });
       } else {
         // Fallback if navigation not loaded
-        chrome.tabs.create({
-          url: `http://localhost:8001/pages/library/?user_id=${encodeURIComponent(userId)}`
-        });
+        const libraryUrl =
+          chrome.runtime.getURL("pages/library.html") +
+          `?user=${encodeURIComponent(userId)}`;
+        chrome.tabs.create({ url: libraryUrl });
       }
     });
   });
@@ -1211,34 +1205,34 @@ if (btnViewLibrary) {
  */
 
 function setupUserIdManagement() {
-  console.log('[Popup] Setting up user ID management');
+  console.log("[Popup] Setting up user ID management");
 
-  const userIdInput = document.getElementById('user-id-input');
-  const setUserBtn = document.getElementById('set-user-btn');
-  const userIdDisplay = document.getElementById('user-id-display');
-  const recentUsersContainer = document.getElementById('recent-users');
+  const userIdInput = document.getElementById("user-id-input");
+  const setUserBtn = document.getElementById("set-user-btn");
+  const userIdDisplay = document.getElementById("user-id-display");
+  const recentUsersContainer = document.getElementById("recent-users");
 
   if (!userIdInput || !setUserBtn) {
-    console.warn('[Popup] User ID elements not found');
+    console.warn("[Popup] User ID elements not found");
     return;
   }
 
-  console.log('[Popup] User ID elements found, initializing handlers');
+  console.log("[Popup] User ID elements found, initializing handlers");
 
   // Initialize user ID input
   function initializeUserIdInput() {
-    console.log('[Popup] Loading user ID from storage');
+    console.log("[Popup] Loading user ID from storage");
 
-    ChromeAPI.storage.get(['testUserId', 'recentUserIds'], (result) => {
+    ChromeAPI.storage.get(["testUserId", "recentUserIds"], (result) => {
       try {
-        const currentUserId = result.testUserId || 'test_user';
+        const currentUserId = result.testUserId || "test_user";
         const recentUserIds = result.recentUserIds || [];
 
         // Set current user display
         userIdDisplay.textContent = currentUserId;
         userIdInput.value = currentUserId;
 
-        console.log('[Popup] Current user ID:', currentUserId);
+        console.log("[Popup] Current user ID:", currentUserId);
 
         // Display recent users as buttons
         if (recentUserIds.length > 0) {
@@ -1256,19 +1250,21 @@ function setupUserIdManagement() {
               cursor: pointer;
             ">${userId}</button>`
             )
-            .join('');
+            .join("");
 
           // Add click handlers to recent user buttons
-          recentUsersContainer.querySelectorAll('.recent-user-btn').forEach((btn) => {
-            btn.addEventListener('click', () => {
-              const userId = btn.getAttribute('data-user-id');
-              console.log('[Popup] Clicked recent user:', userId);
-              setUserIdAndNavigate(userId);
+          recentUsersContainer
+            .querySelectorAll(".recent-user-btn")
+            .forEach((btn) => {
+              btn.addEventListener("click", () => {
+                const userId = btn.getAttribute("data-user-id");
+                console.log("[Popup] Clicked recent user:", userId);
+                setUserIdAndNavigate(userId);
+              });
             });
-          });
         }
       } catch (e) {
-        console.error('[Popup] Error initializing user ID:', e);
+        console.error("[Popup] Error initializing user ID:", e);
       }
     });
   }
@@ -1276,14 +1272,14 @@ function setupUserIdManagement() {
   // Set user ID function
   function setUserIdAndNavigate(userId) {
     if (!userId || userId.trim().length === 0) {
-      alert('Please enter a valid user ID');
+      alert("Please enter a valid user ID");
       return;
     }
 
     userId = userId.trim();
-    console.log('[Popup] Setting user ID to:', userId);
+    console.log("[Popup] Setting user ID to:", userId);
 
-    ChromeAPI.storage.get(['recentUserIds'], (result) => {
+    ChromeAPI.storage.get(["recentUserIds"], (result) => {
       try {
         let recentUserIds = result.recentUserIds || [];
 
@@ -1295,84 +1291,95 @@ function setupUserIdManagement() {
         ChromeAPI.storage.set(
           {
             testUserId: userId,
-            recentUserIds: recentUserIds
+            recentUserIds: recentUserIds,
           },
           () => {
             userIdDisplay.textContent = userId;
             userIdInput.value = userId;
             initializeUserIdInput();
-            console.log('[Popup] User ID successfully set:', userId);
-            alert(`✅ User ID set to: ${userId}\n\nYou can now use the quick entry buttons.`);
+            console.log("[Popup] User ID successfully set:", userId);
+            alert(
+              `✅ User ID set to: ${userId}\n\nYou can now use the quick entry buttons.`
+            );
           }
         );
       } catch (e) {
-        console.error('[Popup] Error setting user ID:', e);
+        console.error("[Popup] Error setting user ID:", e);
       }
     });
   }
 
   // Attach event listeners
-  console.log('[Popup] Attaching event listeners to setUserBtn:', setUserBtn);
+  console.log("[Popup] Attaching event listeners to setUserBtn:", setUserBtn);
 
   if (!setUserBtn) {
-    console.error('[Popup] ERROR: setUserBtn is null!');
+    console.error("[Popup] ERROR: setUserBtn is null!");
     return;
   }
 
-  setUserBtn.addEventListener('click', (event) => {
-    console.log('[Popup] ===== Set button clicked =====');
-    console.log('[Popup] Event:', event);
-    console.log('[Popup] userIdInput.value:', userIdInput.value);
+  setUserBtn.addEventListener("click", (event) => {
+    console.log("[Popup] ===== Set button clicked =====");
+    console.log("[Popup] Event:", event);
+    console.log("[Popup] userIdInput.value:", userIdInput.value);
     try {
       setUserIdAndNavigate(userIdInput.value);
     } catch (err) {
-      console.error('[Popup] Error in setUserIdAndNavigate:', err);
+      console.error("[Popup] Error in setUserIdAndNavigate:", err);
     }
   });
 
-  console.log('[Popup] Set button click listener attached');
+  console.log("[Popup] Set button click listener attached");
 
-  userIdInput.addEventListener('keypress', (e) => {
-    console.log('[Popup] Key pressed in input:', e.key);
-    if (e.key === 'Enter') {
-      console.log('[Popup] Enter pressed in input, value:', userIdInput.value);
+  userIdInput.addEventListener("keypress", (e) => {
+    console.log("[Popup] Key pressed in input:", e.key);
+    if (e.key === "Enter") {
+      console.log("[Popup] Enter pressed in input, value:", userIdInput.value);
       try {
         setUserIdAndNavigate(userIdInput.value);
       } catch (err) {
-        console.error('[Popup] Error in keypress handler:', err);
+        console.error("[Popup] Error in keypress handler:", err);
       }
     }
   });
 
-  console.log('[Popup] Keypress listener attached');
+  console.log("[Popup] Keypress listener attached");
 
   // Initialize on load
-  console.log('[Popup] Initial load of user ID');
+  console.log("[Popup] Initial load of user ID");
   initializeUserIdInput();
 }
 
 // Run setup when DOM is ready
-console.log('[Popup] popup.js loaded, document.readyState:', document.readyState);
-console.log('[Popup] user-id-input element:', document.getElementById('user-id-input'));
-console.log('[Popup] set-user-btn element:', document.getElementById('set-user-btn'));
+console.log(
+  "[Popup] popup.js loaded, document.readyState:",
+  document.readyState
+);
+console.log(
+  "[Popup] user-id-input element:",
+  document.getElementById("user-id-input")
+);
+console.log(
+  "[Popup] set-user-btn element:",
+  document.getElementById("set-user-btn")
+);
 
-if (document.readyState === 'loading') {
-  console.log('[Popup] Waiting for DOMContentLoaded');
-  document.addEventListener('DOMContentLoaded', () => {
-    console.log('[Popup] DOMContentLoaded fired');
+if (document.readyState === "loading") {
+  console.log("[Popup] Waiting for DOMContentLoaded");
+  document.addEventListener("DOMContentLoaded", () => {
+    console.log("[Popup] DOMContentLoaded fired");
     setupUserIdManagement();
   });
 } else {
-  console.log('[Popup] DOM already loaded, running setupUserIdManagement');
+  console.log("[Popup] DOM already loaded, running setupUserIdManagement");
   setTimeout(() => {
-    console.log('[Popup] Timeout callback: calling setupUserIdManagement');
+    console.log("[Popup] Timeout callback: calling setupUserIdManagement");
     setupUserIdManagement();
   }, 100);
 }
 
 // Additional logging
-window.addEventListener('load', () => {
-  console.log('[Popup] window load event fired');
+window.addEventListener("load", () => {
+  console.log("[Popup] window load event fired");
 });
 
-console.log('[Popup] Script initialization complete');
+console.log("[Popup] Script initialization complete");
