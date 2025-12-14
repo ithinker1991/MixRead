@@ -13,11 +13,25 @@
         <p class="subtitle">Learn English through reading</p>
         <div class="user-info">
           <!-- User Input Section -->
-          <div style="margin-bottom: 10px; padding: 8px; background: #f5f5f5; border-radius: 4px;">
-            <small style="color: #666; font-size: 10px; display: block; margin-bottom: 5px;">
+          <div
+            style="
+              margin-bottom: 10px;
+              padding: 8px;
+              background: #f5f5f5;
+              border-radius: 4px;
+            "
+          >
+            <small
+              style="
+                color: #666;
+                font-size: 10px;
+                display: block;
+                margin-bottom: 5px;
+              "
+            >
               <strong>User ID (for testing):</strong>
             </small>
-            <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+            <div style="display: flex; gap: 5px; margin-bottom: 5px">
               <input
                 type="text"
                 id="user-id-input"
@@ -45,15 +59,19 @@
                 Set
               </button>
             </div>
-            <small style="color: #999; font-size: 9px;">
-              💡 Enter any user ID or use a previous one. Used IDs will be saved here.
+            <small style="color: #999; font-size: 9px">
+              💡 Enter any user ID or use a previous one. Used IDs will be saved
+              here.
             </small>
           </div>
 
           <!-- Quick User Selection -->
-          <div style="margin-bottom: 8px;">
-            <small style="color: #666; font-size: 10px;">Recent Users:</small>
-            <div id="recent-users" style="display: flex; gap: 5px; flex-wrap: wrap; margin-top: 3px;"></div>
+          <div style="margin-bottom: 8px">
+            <small style="color: #666; font-size: 10px">Recent Users:</small>
+            <div
+              id="recent-users"
+              style="display: flex; gap: 5px; flex-wrap: wrap; margin-top: 3px"
+            ></div>
           </div>
 
           <!-- Current User Display -->
@@ -61,7 +79,14 @@
             Current:
             <code
               id="user-id-display"
-              style="background: #fff; padding: 2px 4px; border-radius: 3px; border: 1px solid #ddd; color: #28a745; font-weight: bold;"
+              style="
+                background: #fff;
+                padding: 2px 4px;
+                border-radius: 3px;
+                border: 1px solid #ddd;
+                color: #28a745;
+                font-weight: bold;
+              "
               >None</code
             >
           </small>
@@ -114,7 +139,11 @@
         </div>
 
         <div class="popup-section">
-          <button id="btn-start-review" class="btn btn-primary" style="background: #28a745; margin-bottom: 8px;">
+          <button
+            id="btn-start-review"
+            class="btn btn-primary"
+            style="background: #28a745; margin-bottom: 8px"
+          >
             ▶ Start Review Session
           </button>
         </div>
@@ -184,13 +213,42 @@
         </div>
 
         <!-- Quick Actions Section (NEW) -->
-        <div class="popup-section" style="background: #f0f8ff; border: 1px solid #b3d9ff; border-radius: 4px; padding: 10px">
-          <h4 style="margin: 0 0 8px 0; font-size: 12px; color: #0066cc; font-weight: bold">
+        <div
+          class="popup-section"
+          style="
+            background: #f0f8ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 4px;
+            padding: 10px;
+          "
+        >
+          <h4
+            style="
+              margin: 0 0 8px 0;
+              font-size: 12px;
+              color: #0066cc;
+              font-weight: bold;
+            "
+          >
             ⚡ Quick Actions
           </h4>
-          <div id="quick-action-status" style="display: none; padding: 6px; border-radius: 3px; margin-bottom: 8px; font-size: 11px; background: #fff; border: 1px solid #ddd"></div>
+          <div
+            id="quick-action-status"
+            style="
+              display: none;
+              padding: 6px;
+              border-radius: 3px;
+              margin-bottom: 8px;
+              font-size: 11px;
+              background: #fff;
+              border: 1px solid #ddd;
+            "
+          ></div>
           <p style="margin: 0 0 8px 0; font-size: 11px; color: #666">
-            Current Page: <strong id="current-page-domain" style="color: #0066cc">loading...</strong>
+            Current Page:
+            <strong id="current-page-domain" style="color: #0066cc"
+              >loading...</strong
+            >
           </p>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px">
             <button
@@ -306,6 +364,41 @@
         </div>
       </div>
       <!-- End domain-tab -->
+      <!-- Developer Tools Section -->
+      <div
+        class="popup-section"
+        style="margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px"
+      >
+        <h4
+          style="
+            margin: 0 0 8px 0;
+            font-size: 11px;
+            color: #999;
+            text-transform: uppercase;
+          "
+        >
+          Developer Tools
+        </h4>
+        <button
+          id="btn-reload-extension"
+          style="
+            width: 100%;
+            padding: 6px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+          "
+        >
+          🔄 Reload Extension
+        </button>
+      </div>
     </div>
 
     <script src="shared/api-client.js"></script>
@@ -314,7 +407,10 @@
     <script src="content/modules/domain-policy/domain-policy-store.js"></script>
     <script src="content/modules/domain-policy/domain-policy-filter.js"></script>
     <script src="content/modules/domain-policy/preset-dialog.js"></script>
-    <link rel="stylesheet" href="content/modules/domain-policy/preset-dialog.css" />
+    <link
+      rel="stylesheet"
+      href="content/modules/domain-policy/preset-dialog.css"
+    />
     <script src="popup.js"></script>
   </body>
 </html>

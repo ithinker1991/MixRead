@@ -1383,3 +1383,14 @@ window.addEventListener("load", () => {
 });
 
 console.log("[Popup] Script initialization complete");
+
+/**
+ * Developer Tools
+ */
+const btnReloadExtension = document.getElementById("btn-reload-extension");
+if (btnReloadExtension) {
+  btnReloadExtension.addEventListener("click", () => {
+    // Reload the extension
+    chrome.runtime.reload();
+  });
+}

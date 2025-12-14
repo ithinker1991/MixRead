@@ -500,11 +500,11 @@ class ReviewManager {
             </div>
         `;
 
-    // Add event listeners
     document
       .getElementById("back-to-library")
       ?.addEventListener("click", () => {
-        window.history.back();
+        const libraryUrl = chrome.runtime.getURL("pages/library-viewer.html");
+        window.location.href = `${libraryUrl}?user_id=${this.userId}`;
       });
 
     document.getElementById("start-another")?.addEventListener("click", () => {

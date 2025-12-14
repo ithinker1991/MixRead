@@ -4,18 +4,18 @@ Review API endpoints for the vocabulary review system
 Handles review sessions, submissions, and statistics.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
+from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
+from application.srs_adapter import VocabularyReviewProvider
+from domain.models import VocabularyStatus
+from fastapi import APIRouter, Depends, HTTPException
 from infrastructure.database import get_db
 from infrastructure.repositories import VocabularyRepository
-from application.srs_adapter import VocabularyReviewProvider
+from sqlalchemy.orm import Session
+from srs_core.models import LearningStatus, ReviewSession
 from srs_core.scheduler import SpacedRepetitionEngine
-from srs_core.models import ReviewSession, LearningStatus
-from domain.models import VocabularyStatus
-from datetime import datetime
 
 # In-memory store for active sessions (use Redis in production)
 active_sessions = {}
@@ -24,8 +24,15 @@ active_sessions = {}
 async def ensure_user_has_cards(user_id: str, vocab_repo: VocabularyRepository):
     """Ensure user has some vocabulary cards for review"""
     # Check if user already has cards
-    user_cards = vocab_repo.get_user_vocabulary(user_id, limit=1)
-    if user_cards:
+    # Check if user already has cards
+    # Import VocabularyEntryModel for detection
+    from infrastructure.models import VocabularyEntryModel
+    
+    existing = vocab_repo.db.query(VocabularyEntryModel).filter(
+        VocabularyEntryModel.user_id == user_id
+    ).first()
+    
+    if existing:
         return
 
     # Add some default cards for testing using raw SQL

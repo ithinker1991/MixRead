@@ -730,19 +730,38 @@ async function initializeDomainManagement() {
         "[DomainPolicy] Starting initialization with userId:",
         currentUser
       );
-      const initResult = await domainPolicyStore.initialize(currentUser);
-      logger.log("[DomainPolicy] Initialization result:", initResult);
+      try {
+        const initResult = await domainPolicyStore.initialize(currentUser);
+        logger.log("[DomainPolicy] Initialization result:", initResult);
+      } catch (initError) {
+        logger.error(
+          "[DomainPolicy] Store initialization failed (non-fatal):",
+          initError
+        );
+      }
     } else {
       logger.warn("[DomainPolicy] No current user, skipping initialization");
     }
 
-    // Setup event listeners
-    setupDomainEventListeners();
+    // Setup event listeners - create function safely
+    try {
+      setupDomainEventListeners();
+    } catch (e) {
+      logger.error("[DomainPolicy] Failed to setup listeners:", e);
+    }
 
     // Render blacklist
-    renderBlacklist();
+    try {
+      renderBlacklist();
+    } catch (e) {
+      logger.error("[DomainPolicy] Failed to render blacklist:", e);
+    }
   } catch (error) {
-    logger.error("[DomainPolicy] Initialization error:", error);
+    logger.error("[DomainPolicy] Critical initialization error:", error);
+    // Attempt fallback setup
+    try {
+      setupDomainEventListeners();
+    } catch (e) {}
   }
 }
 
@@ -995,10 +1014,7 @@ function initializeQuickActions() {
       const tab = tabs[0];
       if (!tab.url) {
         console.warn("[Popup] Tab has no URL");
-        updateQuickActionStatus(
-          "Cannot get current page URL",
-          "error"
-        );
+        updateQuickActionStatus("Cannot get current page URL", "error");
         return;
       }
 
@@ -1008,12 +1024,7 @@ function initializeQuickActions() {
         const domain = url.host; // Includes port number
         const path = url.pathname;
 
-        console.log(
-          "[Popup] Current page - domain:",
-          domain,
-          "path:",
-          path
-        );
+        console.log("[Popup] Current page - domain:", domain, "path:", path);
 
         // Display domain
         document.getElementById("current-page-domain").textContent = domain;
@@ -1064,10 +1075,7 @@ async function handleQuickExcludeDomain(domain, tab) {
     );
 
     if (success) {
-      updateQuickActionStatus(
-        `✅ Added "${domain}" to blacklist`,
-        "success"
-      );
+      updateQuickActionStatus(`✅ Added "${domain}" to blacklist`, "success");
 
       // Reload tab after 1.5 seconds
       setTimeout(() => {

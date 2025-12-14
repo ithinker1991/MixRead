@@ -633,55 +633,6 @@
     </template>
 
     <script src="../modules/review/review-manager.js?v=20241204-2"></script>
-    <script>
-      // Initialize review manager
-      const userId =
-        new URLSearchParams(window.location.search).get("user_id") ||
-        "test_user";
-      const reviewManager = new ReviewManager(userId);
-
-      // Session selector buttons
-      document.getElementById("mixed-btn")?.addEventListener("click", () => {
-        startReviewSession("mixed");
-      });
-
-      document.getElementById("new-btn")?.addEventListener("click", () => {
-        startReviewSession("new");
-      });
-
-      document.getElementById("review-btn")?.addEventListener("click", () => {
-        startReviewSession("review");
-      });
-
-      async function startReviewSession(sessionType) {
-        try {
-          // Load template
-          const template = document.getElementById("review-session-template");
-          const container = document.getElementById("review-container");
-
-          container.innerHTML = "";
-          container.appendChild(template.content.cloneNode(true));
-
-          // Start session
-          await reviewManager.startSession(sessionType);
-        } catch (error) {
-          console.error("Failed to start review:", error);
-          reviewManager.showError("Failed to start review session");
-        }
-      }
-
-      // Keyboard shortcut info
-      console.log(`
-    ╔════════════════════════════════╗
-    ║   MixRead Review Shortcuts      ║
-    ╠════════════════════════════════╣
-    ║  Space - Show answer            ║
-    ║  1     - Again (< 1 day)        ║
-    ║  2     - Hard (3 days)          ║
-    ║  3     - Good (1 week)          ║
-    ║  4     - Easy (2 weeks)         ║
-    ╚════════════════════════════════╝
-        `);
-    </script>
+    <script src="review.js"></script>
   </body>
 </html>

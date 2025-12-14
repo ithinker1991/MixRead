@@ -165,6 +165,11 @@ let batchMarkingPanel;
 let domainPolicyStore;
 let shouldExcludeCurrentPage = false;
 
+// ===== Tooltip State Management =====
+let tooltipShowTimer = null;
+let tooltipHideTimer = null;
+let activeTooltipWord = null;
+
 // ===== Sidebar Panel (Phase 1) =====
 let wordCacheManager = null;
 let sidebarPanel = null;
@@ -843,11 +848,39 @@ function processTextNode(node, wordSet) {
         span.dataset.definition = highlightedWordsMap[wordLower].definition;
       }
 
-      // Add click handler to show tooltip
-      span.addEventListener("click", (e) => {
-        console.log("[MixRead] Click event triggered for word:", word);
-        e.stopPropagation();
-        showTooltip(e, word);
+      // Add hover handlers to show tooltip
+      span.addEventListener("mouseenter", (e) => {
+        // Clear any pending hide timer (if we moved from tooltip back to word, or word to word)
+        if (tooltipHideTimer) {
+          clearTimeout(tooltipHideTimer);
+          tooltipHideTimer = null;
+        }
+
+        // Return if already showing this word
+        if (activeTooltipWord === word) return;
+
+        // Schedule show
+        tooltipShowTimer = setTimeout(() => {
+          activeTooltipWord = word;
+          showTooltip(e, word);
+        }, 300); // 300ms delay to prevent accidental triggers
+      });
+
+      span.addEventListener("mouseleave", (e) => {
+        // Cancel pending show if we left before it triggered
+        if (tooltipShowTimer) {
+          clearTimeout(tooltipShowTimer);
+          tooltipShowTimer = null;
+        }
+
+        // Schedule hide
+        tooltipHideTimer = setTimeout(() => {
+          const existingTooltip = document.querySelector(".mixread-tooltip");
+          if (existingTooltip) {
+            existingTooltip.remove();
+            activeTooltipWord = null;
+          }
+        }, 300);
       });
 
       fragment.appendChild(span);
@@ -960,6 +993,9 @@ function highlightWordsInDOM(highlightedWords) {
 /**
  * Show tooltip with word definition
  */
+/**
+ * Show tooltip with word definition
+ */
 function showTooltip(event, word) {
   console.log("[MixRead] showTooltip called with word:", word);
 
@@ -969,7 +1005,27 @@ function showTooltip(event, word) {
     existingTooltip.remove();
   }
 
-  // Get word info from backend with retry logic
+  const wordLower = word.toLowerCase();
+
+  // 1. Check local cache first for immediate feedback
+  // We prioritize local data if it has at least a definition or translation
+  const cachedInfo = highlightedWordsMap[wordLower];
+
+  if (cachedInfo && (cachedInfo.definition || cachedInfo.chinese)) {
+    console.log("[MixRead] Showing tooltip from local cache");
+    createTooltip(event, word, cachedInfo);
+    // Optional: We could still fetch in background to get more details (examples, audio url, etc)
+    return;
+  }
+
+  // 2. If no local data, show a "Loading..." tooltip immediately
+  console.log("[MixRead] No local cache, showing loading state");
+  createTooltip(event, word, {
+    definition: "Loading definition...",
+    isLoading: true,
+  });
+
+  // 3. Fetch full info from backend
   sendMessageWithRetry(
     {
       type: "GET_WORD_INFO",
@@ -980,15 +1036,30 @@ function showTooltip(event, word) {
 
       if (!response) {
         console.error("[MixRead] No response received from background script");
+        // Update tooltip to show error
+        const errorTooltip = document.createElement("div"); // Helper to update?
+        // Simpler: just recreate it with error
+        createTooltip(event, word, {
+          definition: "Error: Could not connect to extension.",
+        });
         return;
       }
 
       if (response.success) {
         const wordInfo = response.word_info;
-        console.log("[MixRead] Creating tooltip with word info:", wordInfo);
+        console.log("[MixRead] Updating tooltip with fetched info:", wordInfo);
+
+        // Cache it for next time
+        highlightedWordsMap[wordLower] = {
+          ...highlightedWordsMap[wordLower],
+          ...wordInfo,
+        };
+
+        // precise UI update (re-render)
         createTooltip(event, word, wordInfo);
       } else {
         console.error("[MixRead] Error getting word info:", response.error);
+        createTooltip(event, word, { definition: "Error loading definition." });
       }
     }
   );
@@ -1000,6 +1071,21 @@ function showTooltip(event, word) {
 function createTooltip(event, word, wordInfo) {
   const tooltip = document.createElement("div");
   tooltip.className = "mixread-tooltip";
+
+  // Add hover handlers to keep tooltip open
+  tooltip.addEventListener("mouseenter", () => {
+    if (tooltipHideTimer) {
+      clearTimeout(tooltipHideTimer);
+      tooltipHideTimer = null;
+    }
+  });
+
+  tooltip.addEventListener("mouseleave", () => {
+    tooltipHideTimer = setTimeout(() => {
+      tooltip.remove();
+      activeTooltipWord = null;
+    }, 300);
+  });
 
   let html = `
     <div class="mixread-tooltip-header">
