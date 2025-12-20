@@ -378,7 +378,7 @@ class BatchMarkingPanel {
     Object.entries(wordFrequency).forEach(([word, data]) => {
       const wordData = {
         word: word,
-        baseWord: Stemmer.stem(word),
+        baseWord: word,
         originalWords: Array.from(data.originalWords),
         count: data.count,
         chinese: data.chinese || "",
@@ -406,13 +406,10 @@ class BatchMarkingPanel {
    * Get cached contexts for a word from DOM
    */
   getCachedContexts(word) {
-    let wordStem = word.toLowerCase();
-    if (typeof Stemmer !== "undefined" && Stemmer.stem) {
-      wordStem = Stemmer.stem(wordStem);
-    }
+    const wordLower = word.toLowerCase();
 
     const elements = document.querySelectorAll(
-      `.mixread-highlight[data-word-stem="${wordStem}"]`
+      `.mixread-highlight[data-word="${wordLower}"]`
     );
 
     const validElements = Array.from(elements).filter(
@@ -843,7 +840,7 @@ class BatchMarkingPanel {
     console.log("[BatchMarkingPanel] Batch marking as known:", words);
 
     const promises = words.map((word) => {
-      const stemmedWord = Stemmer.stem(word);
+      const wordLower = word.toLowerCase();
       return new Promise((resolve) => {
         try {
           const sendMarkAsKnown = () => {
@@ -852,7 +849,7 @@ class BatchMarkingPanel {
                 {
                   type: "MARK_AS_KNOWN",
                   user_id: this.userStore.getUserId(),
-                  word: stemmedWord,
+                  word: wordLower,
                 },
                 (response) => {
                   try {
@@ -914,8 +911,7 @@ class BatchMarkingPanel {
     console.log("[BatchMarkingPanel] Batch marking as unknown:", words);
 
     const promises = words.map((word) => {
-      const stemmedWord = Stemmer.stem(word);
-      return this.unknownWordsService.markAsUnknown(stemmedWord);
+      return this.unknownWordsService.markAsUnknown(word);
     });
 
     await Promise.all(promises);
@@ -955,16 +951,13 @@ class BatchMarkingPanel {
           }/${words.length}: "${word}"`
         );
 
-        // Get word stem for querying (use same logic as content.js)
-        let wordStem = word.toLowerCase();
-        if (typeof Stemmer !== "undefined" && Stemmer.stem) {
-          wordStem = Stemmer.stem(wordStem);
-        }
+        // Use word directly
+        const wordLower = word.toLowerCase();
 
-        // Query by word stem to find all highlighted instances
+        // Query by word to find all highlighted instances
         // CRITICAL: Exclude elements inside the BatchMarkingPanel itself
         const allElements = document.querySelectorAll(
-          `.mixread-highlight[data-word-stem="${wordStem}"]`
+          `.mixread-highlight[data-word="${wordLower}"]`
         );
         const elements = Array.from(allElements).filter(
           (el) => !el.closest("#mixread-batch-panel")

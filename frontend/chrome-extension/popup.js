@@ -117,70 +117,114 @@ const ChromeAPI = {
   },
 };
 
-const DIFFICULTY_LEVELS = {
-  1: "A1",
-  2: "A2",
-  3: "B1",
-  4: "B2",
-  5: "C1",
-  6: "C2",
-};
-
-// Level descriptions - explains what each level means
-const LEVEL_DESCRIPTIONS = {
-  A1: {
-    range: "A1 only",
-    description:
-      "Beginner - highlights only the most basic words for complete beginners",
-  },
-  A2: {
-    range: "A2-C2",
-    description:
-      "Elementary - highlights words from basic to advanced, helping you build vocabulary",
-  },
-  B1: {
-    range: "B1-C2",
-    description:
-      "Intermediate - highlights intermediate and advanced words to improve reading",
-  },
-  B2: {
-    range: "B2-C2",
-    description:
-      "Upper-Intermediate - highlights advanced words for skilled readers",
-  },
-  C1: {
-    range: "C1-C2",
-    description:
-      "Advanced - highlights only difficult words, minimal annotations",
-  },
-  C2: {
-    range: "C2 only",
-    description:
-      "Mastery - highlights only the most challenging words for near-native readers",
-  },
-};
-
+// DOM Elements
 const difficultySlider = document.getElementById("difficulty-slider");
 const currentLevelDisplay = document.getElementById("current-level");
 const vocabCountDisplay = document.getElementById("vocab-count");
 const todayCountDisplay = document.getElementById("today-count");
 const totalCountDisplay = document.getElementById("total-count");
 const toggleChinese = document.getElementById("toggle-chinese");
-
-// New stat elements for week and reading time
-let weekCountDisplay = document.getElementById("week-count");
-let readingTimeDisplay = document.getElementById("reading-time");
-
+const weekCountDisplay = document.getElementById("week-count");
+const readingTimeDisplay = document.getElementById("reading-time");
 const btnViewVocab = document.getElementById("btn-view-vocabulary");
 const btnResetVocab = document.getElementById("btn-reset-vocab");
 const btnToggleSidebar = document.getElementById("btn-toggle-sidebar");
 const btnViewLibrary = document.getElementById("btn-view-library");
 const libraryCountDisplay = document.getElementById("library-count");
 
-// User management - MOVED TO setupUserIdManagement()
-// Old dropdown selector removed - now using manual user ID input
+// User management variables
 let allUsers = [];
 let currentUser = "";
+
+// MRS Descriptions Helper
+function getMRSDescription(score) {
+  if (score < 20) return { level: "A1", desc: "Beginner" };
+  if (score < 30) return { level: "A2", desc: "Elementary" };
+  if (score < 50) return { level: "B1", desc: "Intermediate" };
+  if (score < 70) return { level: "B2", desc: "Upper-Intermediate" };
+  if (score < 90) return { level: "C1", desc: "Advanced" };
+  return { level: "C2", desc: "Mastery" };
+}
+
+difficultySlider.addEventListener("input", function () {
+  const score = parseInt(this.value);
+  updateDifficultyDisplay(score);
+  saveDifficulty(score);
+});
+
+function updateDifficultyDisplay(score) {
+  const info = getMRSDescription(score);
+  currentLevelDisplay.textContent = `MRS: ${score} (${info.level})`;
+
+  // Color feedback based on score
+  const hue = 120 - score * 1.2; // Green to Red
+  currentLevelDisplay.style.color = `hsl(${hue}, 70%, 45%)`;
+
+  updateLevelDescription(info);
+}
+
+function updateLevelDescription(info) {
+  const descriptionElement = document.getElementById("level-description");
+  if (!descriptionElement) return;
+  descriptionElement.innerHTML = `Highlights <strong>${info.level}</strong> range - ${info.desc}`;
+}
+
+function saveDifficulty(score) {
+  const info = getMRSDescription(score);
+  console.log(
+    `[MixRead Popup] Saving difficulty - MRS: ${score}, Level: ${info.level}`
+  );
+
+  chrome.storage.local.set(
+    {
+      difficulty_mrs: score,
+      difficulty_level: info.level, // Fallback for legacy
+    },
+    function () {
+      // Notify content script
+      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        if (tabs[0]) {
+          console.log(
+            `[MixRead Popup] Sending updateDifficulty to tab ${tabs[0].id}`
+          );
+          chrome.tabs.sendMessage(
+            tabs[0].id,
+            {
+              action: "updateDifficulty",
+              difficulty_level: info.level,
+              difficulty_mrs: score,
+            },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                console.warn(
+                  "[MixRead Popup] Message error:",
+                  chrome.runtime.lastError.message
+                );
+              } else {
+                console.log(
+                  "[MixRead Popup] Message sent successfully, response:",
+                  response
+                );
+              }
+            }
+          );
+        }
+      });
+    }
+  );
+}
+
+// Initialize
+chrome.storage.local.get(["difficulty_mrs"], function (result) {
+  if (result.difficulty_mrs !== undefined) {
+    difficultySlider.value = result.difficulty_mrs;
+    updateDifficultyDisplay(result.difficulty_mrs);
+  } else {
+    // Default B1 approx (40)
+    difficultySlider.value = 40;
+    updateDifficultyDisplay(40);
+  }
+});
 
 // Helper function to get date X days ago
 function getDateXDaysAgo(days) {
@@ -301,86 +345,7 @@ ChromeAPI.storage.get(["mixread_users", "mixread_current_user"], (result) => {
 /**
  * Update difficulty display
  */
-function updateDifficultyDisplay(value) {
-  const level = DIFFICULTY_LEVELS[value];
-  currentLevelDisplay.textContent = level;
-
-  // Change color based on difficulty
-  const display = currentLevelDisplay.parentElement;
-  let bgColor = "#e7f3ff";
-  let textColor = "#0056b3";
-
-  if (value <= 2) {
-    bgColor = "#d4edda";
-    textColor = "#155724";
-  } else if (value >= 5) {
-    bgColor = "#f8d7da";
-    textColor = "#721c24";
-  }
-
-  display.style.background = bgColor;
-  display.style.color = textColor;
-
-  // Update level description
-  updateLevelDescription(level);
-}
-
-/**
- * Update level description text
- */
-function updateLevelDescription(level) {
-  const descriptionElement = document.getElementById("level-description");
-  if (!descriptionElement) return;
-
-  const info = LEVEL_DESCRIPTIONS[level];
-  if (!info) return;
-
-  descriptionElement.innerHTML = `Highlights <strong>${info.range}</strong> words - ${info.description}`;
-}
-
-/**
- * Handle Chinese toggle change
- */
-toggleChinese.addEventListener("change", (e) => {
-  const showChinese = e.target.checked;
-
-  // Save to storage
-  ChromeAPI.storage.set({ showChinese });
-
-  // Notify content script about the change
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs[0]?.id) {
-      chrome.tabs.sendMessage(tabs[0].id, {
-        type: "CHINESE_DISPLAY_CHANGED",
-        showChinese,
-      });
-    }
-  });
-});
-
-/**
- * Handle difficulty slider change
- */
-difficultySlider.addEventListener("input", (e) => {
-  const value = e.target.value;
-  const level = DIFFICULTY_LEVELS[value];
-
-  updateDifficultyDisplay(value);
-
-  // Save to storage
-  ChromeAPI.storage.set({ difficultyLevel: level }, () => {
-    // ALSO save to current user data to prevent overwriting on reload
-    saveCurrentUserVocabulary();
-  });
-
-  // Notify content script about the change
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    chrome.tabs.sendMessage(tabs[0].id, {
-      type: "DIFFICULTY_CHANGED",
-      difficulty_level: level,
-    });
-  });
-});
+// Deprecated functions removed in favor of MRS logic above
 
 /**
  * View vocabulary button

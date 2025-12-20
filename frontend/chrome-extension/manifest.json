@@ -20,7 +20,6 @@
         "content/scripts/storage.js",
         "shared/api-client.js",
         "shared/navigation.js",
-        "content/scripts/stemmer.js",
         "content/modules/user/user-store.js",
         "content/modules/unknown-words/unknown-words-store.js",
         "content/modules/unknown-words/unknown-words-service.js",

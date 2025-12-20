@@ -1,8 +1,4 @@
-/**
- * MixRead Content Script
- * Tokenizes page content and highlights difficult words
- * Integrates modular architecture for unknown words management
- */
+// No change, just checking context. I need to read the file first.
 
 // ===== Extension Context Management =====
 // Wrapper to safely handle chrome API calls even after context invalidation
@@ -148,6 +144,7 @@ const MUTATION_DEBOUNCE_MS = 1000; // Debounce delay for DOM mutations
 
 // ===== Global State =====
 let currentDifficultyLevel = "B1";
+let currentDifficultyMRS = null; // New MRS support
 let highlightedWordsMap = {};
 let userVocabulary = new Set();
 let isHighlighting = false; // Prevent infinite loop
@@ -199,6 +196,14 @@ async function initializeModules() {
     if (difficultyLevel) {
       currentDifficultyLevel = difficultyLevel;
     }
+
+    // Manual load of MRS
+    ChromeAPI.storage.get(["difficulty_mrs"], (r) => {
+      if (r.difficulty_mrs !== undefined) {
+        currentDifficultyMRS = r.difficulty_mrs;
+        console.log("[MixRead] Loaded difficulty_mrs:", currentDifficultyMRS);
+      }
+    });
 
     console.log(
       `[MixRead] User initialized - ID: ${userId}, Difficulty: ${difficultyLevel}`
@@ -449,28 +454,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 /**
  * Walk through all text nodes and highlight words
  */
-/**
- * Create a mapping of stems to original words
- * Example: { drop: [drop, dropped, drops, dropping], run: [run, running, runs, ran] }
- */
-function createStemMapping(words) {
-  const stemMap = {};
-
-  for (const word of words) {
-    const stem = Stemmer.stem(word);
-    if (!stemMap[stem]) {
-      stemMap[stem] = [];
-    }
-    stemMap[stem].push(word);
-  }
-
-  console.log(
-    "[MixRead] Created stem mapping for",
-    Object.keys(stemMap).length,
-    "unique stems"
-  );
-  return stemMap;
-}
 
 function highlightPageWords() {
   // Prevent infinite loop from MutationObserver
@@ -505,31 +488,21 @@ function highlightPageWords() {
   // Get unique words
   const uniqueWords = [...new Set(allWords)];
   console.log("[MixRead] Found", uniqueWords.length, "unique words");
-  console.log("[MixRead] Sample words:", uniqueWords.slice(0, 10).join(", "));
 
-  // Create stem mapping: stem → [original words]
-  const stemMap = createStemMapping(uniqueWords);
+  // SKIP FRONTEND STEMMING!
+  // The frontend stemmer is too aggressive (e.g. firing->fir, other->oth)
+  // We will send unique tokens to the backend and let the backend handle lemmatization
+  const wordsToQuery = uniqueWords;
 
-  // Get stems to query (unique stems instead of all words)
-  const stemsToQuery = Object.keys(stemMap);
   console.log(
     "[MixRead] Query backend with",
-    stemsToQuery.length,
-    "unique stems"
+    wordsToQuery.length,
+    "unique words"
   );
-  console.log("[MixRead] Sample stems:", stemsToQuery.slice(0, 10).join(", "));
+  console.log("[MixRead] Sample words:", wordsToQuery.slice(0, 10).join(", "));
 
   // Debug: Check if test words are in the mapping (development only)
-  if (false && stemsToQuery.length > 0) {
-    // Set to true for debugging
-    const testWords = ["stranger", "dream", "make", "build"];
-    console.log("[MixRead] Test words stem mapping:");
-    testWords.forEach((word) => {
-      const stem = Stemmer.stem(word);
-      const isInQuery = stemsToQuery.includes(stem);
-      console.log(`  ${word} → stem: ${stem}, in query: ${isInQuery}`);
-    });
-  }
+  // (Removed obsolete stemmer debug check)
 
   // Get user_id for API call (use userStore if initialized, fallback to legacy)
   const userId = userStore ? userStore.getUserId() : null;
@@ -538,18 +511,20 @@ function highlightPageWords() {
   // Send to background script to query API with retry logic
   console.log("[MixRead] === Sending to Background Script ===");
   console.log(
-    "[MixRead] words (stemsToQuery):",
-    stemsToQuery.slice(0, 20).join(", "),
-    `... (${stemsToQuery.length} total)`
+    "[MixRead] words:",
+    wordsToQuery.slice(0, 20).join(", "),
+    `... (${wordsToQuery.length} total)`
   );
   console.log("[MixRead] difficulty_level:", currentDifficultyLevel);
+  console.log("[MixRead] difficulty_mrs:", currentDifficultyMRS);
   console.log("[MixRead] user_id:", userId);
 
   sendMessageWithRetry(
     {
       type: "GET_HIGHLIGHTED_WORDS",
-      words: stemsToQuery, // Send stems instead of all variants
+      words: wordsToQuery, // Send actual words, let backend lemmatize
       difficulty_level: currentDifficultyLevel,
+      difficulty_mrs: currentDifficultyMRS,
       user_id: userId,
     },
     (response) => {
@@ -566,35 +541,28 @@ function highlightPageWords() {
           response.word_details?.length || 0
         );
 
-        // Expand highlighted stems back to all their original variants
-        const highlightedVariants = [];
+        // Create mapping for highlighting
+        // Backend returns details for the exact words we sent if they need highlighting
         response.word_details.forEach((detail) => {
-          const stem = detail.word.toLowerCase();
-
-          // Get all variants of this stem from our mapping
-          const variants = stemMap[stem] || [stem];
-
-          // Debug: show mapping for test words
-          const testWords = ["stranger", "dream", "make", "build", "explore"];
-          if (testWords.includes(stem)) {
-            console.log(`[MixRead] Stem "${stem}" maps to variants:`, variants);
-          }
-
-          // Map each variant to the detail info
-          variants.forEach((variant) => {
-            highlightedWordsMap[variant.toLowerCase()] = detail;
-            highlightedVariants.push(variant);
-          });
+          // Detail.word is the word we sent (e.g. "firing")
+          const wordLower = detail.word.toLowerCase();
+          highlightedWordsMap[wordLower] = detail;
         });
+
+        const highlightedVariants = Object.keys(highlightedWordsMap);
 
         console.log(
           "[MixRead] Will highlight",
           highlightedVariants.length,
-          "word variants from",
+          "words from",
           response.word_details.length,
-          "stems"
+          "backend results"
         );
-        console.log("[MixRead] Highlighted stems:", response.highlighted_words);
+        console.log(
+          "[MixRead] Will highlight",
+          highlightedVariants.length,
+          "words"
+        );
         console.log(
           "[MixRead] Sample word details:",
           response.word_details.slice(0, 3)
@@ -831,13 +799,7 @@ function processTextNode(node, wordSet) {
         span.dataset.sentenceContext = sentenceContext;
       }
 
-      // Add word stem for easy querying
-      if (typeof Stemmer !== "undefined" && Stemmer.stem) {
-        const stem = Stemmer.stem(wordLower);
-        span.dataset.wordStem = stem;
-      } else {
-        span.dataset.wordStem = wordLower;
-      }
+      span.dataset.wordStem = wordLower;
 
       // Add translation if available
       if (highlightedWordsMap[wordLower]?.chinese) {
@@ -1095,7 +1057,14 @@ function createTooltip(event, word, wordInfo) {
 
   let html = `
     <div class="mixread-tooltip-header">
-      <div class="mixread-tooltip-word">${word}</div>
+      <div class="mixread-tooltip-word-container">
+        <div class="mixread-tooltip-word">${word}</div>
+        ${
+          wordInfo.phonetic
+            ? `<div class="mixread-tooltip-phonetic">[${wordInfo.phonetic}]</div>`
+            : ""
+        }
+      </div>
   `;
 
   if (wordInfo.cefr_level) {
@@ -1518,8 +1487,7 @@ function markWordAsKnown(word) {
     return;
   }
 
-  // Use stemmer to normalize word form (evaluates → evalu)
-  const stemmedWord = Stemmer.stem(word);
+  // No longer using frontend stemmer
 
   // Get user ID from userStore
   if (!userStore) {
@@ -1535,10 +1503,8 @@ function markWordAsKnown(word) {
     return;
   }
 
-  console.log(
-    `[MixRead] Marking "${word}" as known (stem: "${stemmedWord}") for user: ${userId}`
-  );
-  logger.log(`Marking "${word}" as known`);
+  console.log(`[MixRead] Marking "${word}" as known for user: ${userId}`);
+  logger.info(`Marking "${word}" as known`);
 
   // Call backend API to mark word as known
   try {
@@ -1548,14 +1514,12 @@ function markWordAsKnown(word) {
           {
             type: "MARK_AS_KNOWN",
             user_id: userId,
-            word: stemmedWord,
+            word: word,
           },
           (response) => {
             try {
               if (response?.success) {
-                console.log(
-                  `[MixRead] Successfully marked "${stemmedWord}" as known`
-                );
+                console.log(`[MixRead] Successfully marked "${word}" as known`);
                 logger.info(`"${word}" marked as known`);
 
                 // Trigger page re-highlight to update highlights
@@ -1622,8 +1586,17 @@ window.addEventListener("unknown-words-updated", () => {
 // Listen for difficulty level changes from popup
 if (ChromeAPI.isContextValid()) {
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.type === "DIFFICULTY_CHANGED") {
+    // Handle both new 'updateDifficulty' action and legacy 'DIFFICULTY_CHANGED'
+    if (
+      request.type === "DIFFICULTY_CHANGED" ||
+      request.action === "updateDifficulty"
+    ) {
       currentDifficultyLevel = request.difficulty_level;
+      if (request.difficulty_mrs !== undefined) {
+        currentDifficultyMRS = request.difficulty_mrs;
+        ChromeAPI.storage.set({ difficulty_mrs: currentDifficultyMRS });
+      }
+
       ChromeAPI.storage.set({ difficultyLevel: currentDifficultyLevel });
 
       // Update user store if initialized
@@ -1659,15 +1632,11 @@ if (ChromeAPI.isContextValid()) {
     } else if (request.type === "CONTEXT_MARK_UNKNOWN") {
       // Handle Mark as Unknown from context menu
       const word = request.word;
-      // Use stemmer to normalize word form (recognizing → recogniz)
-      const stemmedWord = Stemmer.stem(word);
-      console.log(
-        `[MixRead] Context menu: Marking as unknown: "${word}" (stem: "${stemmedWord}")`
-      );
+      console.log(`[MixRead] Context menu: Marking as unknown: "${word}"`);
       unknownWordsService
-        .markAsUnknown(stemmedWord)
+        .markAsUnknown(word)
         .then(() => {
-          console.log("[MixRead] Successfully marked as unknown:", stemmedWord);
+          console.log("[MixRead] Successfully marked as unknown:", word);
           highlightPageWords();
           sendResponse({ success: true });
         })
@@ -1679,12 +1648,8 @@ if (ChromeAPI.isContextValid()) {
     } else if (request.type === "CONTEXT_MARK_KNOWN") {
       // Handle Mark as Known from context menu
       const word = request.word;
-      // Use stemmer to normalize word form (emphasizes → emphas)
-      const stemmedWord = Stemmer.stem(word);
-      console.log(
-        `[MixRead] Context menu: Marking as known: "${word}" (stem: "${stemmedWord}")`
-      );
-      markWordAsKnown(word); // markWordAsKnown will apply stemming internally
+      console.log(`[MixRead] Context menu: Marking as known: "${word}"`);
+      markWordAsKnown(word);
       sendResponse({ success: true });
     } else if (request.type === "TOGGLE_SIDEBAR") {
       // Handle sidebar toggle request
@@ -1904,18 +1869,16 @@ async function highlightDynamicContent(addedNodes) {
   if (uniqueWords.length === 0) return;
 
   // 2. Query Backend
-  const stemMap = createStemMapping(uniqueWords);
-  const stemsToQuery = Object.keys(stemMap);
   const userId = userStore ? userStore.getUserId() : null;
 
   console.log(
-    `[MixRead] Querying ${stemsToQuery.length} stems for dynamic content`
+    `[MixRead] Querying ${uniqueWords.length} words for dynamic content`
   );
 
   sendMessageWithRetry(
     {
       type: "GET_HIGHLIGHTED_WORDS",
-      words: stemsToQuery,
+      words: uniqueWords,
       difficulty_level: currentDifficultyLevel,
       user_id: userId,
     },
@@ -1925,17 +1888,14 @@ async function highlightDynamicContent(addedNodes) {
         const highlightedVariants = [];
         if (response.word_details) {
           response.word_details.forEach((detail) => {
-            const stem = detail.word.toLowerCase();
-            const variants = stemMap[stem] || [stem];
-            variants.forEach((variant) => {
-              highlightedWordsMap[variant.toLowerCase()] = detail;
-              highlightedVariants.push(variant);
-            });
+            const wordLower = detail.word.toLowerCase();
+            highlightedWordsMap[wordLower] = detail;
+            highlightedVariants.push(wordLower);
           });
         }
 
         console.log(
-          `[MixRead] Dynamic query returned ${highlightedVariants.length} variants to highlight`
+          `[MixRead] Dynamic query returned ${highlightedVariants.length} words to highlight`
         );
 
         // 4. Apply Highlights
@@ -1970,38 +1930,24 @@ function notifyPanelOfNewWords(wordDetails) {
   const newWordsMap = {};
 
   wordDetails.forEach((detail) => {
-    // Apply stemming to match DOM data-word-stem attribute
-    let stem = detail.word.toLowerCase();
-    if (typeof Stemmer !== "undefined" && Stemmer.stem) {
-      try {
-        stem = Stemmer.stem(stem);
-      } catch (e) {
-        console.warn("[MixRead] Stemming error in notifyPanelOfNewWords:", e);
-      }
-    }
+    const wordLower = detail.word.toLowerCase();
 
     const elements = document.querySelectorAll(
-      `.mixread-highlight[data-word-stem="${stem}"]`
+      `.mixread-highlight[data-word="${wordLower}"]`
     );
 
     if (elements.length > 0) {
       const firstElement = elements[0];
-      const word = firstElement.dataset.word || stem;
+      const word = firstElement.dataset.word || wordLower;
 
-      // Normalize word consistently (must match sidebar-panel.js normalizeWord logic)
+      // Normalize word consistently
       let normalizedWord = word.toLowerCase();
-      if (typeof Stemmer !== "undefined" && Stemmer.stem) {
-        try {
-          normalizedWord = Stemmer.stem(normalizedWord);
-        } catch (e) {
-          console.warn("[MixRead] Stemming error:", e);
-        }
-      }
 
       if (!newWordsMap[normalizedWord]) {
         newWordsMap[normalizedWord] = {
+          word: normalizedWord,
           count: elements.length,
-          originalWords: [], // Use array instead of Set for serialization
+          originalWords: [],
           chinese: firstElement.dataset.translation || "",
           definition: firstElement.dataset.definition || "",
           cefrLevel: firstElement.dataset.cefrLevel || "",
@@ -2057,7 +2003,7 @@ function setupMutationObserver() {
     // console.log(`[MixRead Debug] Mutation callback with ${mutations.length} mutations`);
     let hasRelevantAdded = false;
     let hasRelevantRemoved = false;
-    const removedStems = [];
+    const removedWords = [];
 
     for (const mutation of mutations) {
       if (mutation.type === "childList") {
@@ -2082,11 +2028,11 @@ function setupMutationObserver() {
             const highlightElements =
               node.querySelectorAll(".mixread-highlight");
             if (highlightElements.length > 0) {
-              // Extract word stems from removed elements
+              // Extract words from removed elements
               highlightElements.forEach((el) => {
-                const stem = el.dataset.wordStem;
-                if (stem) {
-                  removedStems.push(stem);
+                const word = el.dataset.word;
+                if (word) {
+                  removedWords.push(word);
                 }
               });
               hasRelevantRemoved = true;
@@ -2099,9 +2045,9 @@ function setupMutationObserver() {
     // Notify sidebar of removed words
     // DISABLED: Don't remove words from sidebar on infinite scroll feeds like Twitter
     // Words should persist in sidebar; only remove via explicit user action (mark known, delete)
-    // if (hasRelevantRemoved && removedStems.length > 0 && sidebarPanel) {
-    //   console.log(`[MixRead] Feed removed ${removedStems.length} words`);
-    //   sidebarPanel.onWordsRemoved(removedStems);
+    // if (hasRelevantRemoved && removedWords.length > 0 && sidebarPanel) {
+    //   console.log(`[MixRead] Feed removed ${removedWords.length} words`);
+    //   sidebarPanel.onWordsRemoved(removedWords);
     // }
 
     if (hasRelevantAdded) {

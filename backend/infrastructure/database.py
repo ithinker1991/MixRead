@@ -5,14 +5,18 @@ Sets up the ORM, session factory, and database connection
 """
 
 import os
+
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Database URL - can be SQLite, PostgreSQL, MySQL, etc.
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite:///./mixread.db"  # Default to SQLite for development
-)
+if os.getenv("DATABASE_URL"):
+    DATABASE_URL = os.getenv("DATABASE_URL")
+else:
+    # Default to mixread.db in the backend directory (parent of infrastructure)
+    # This ensures it works regardless of where the app is run from
+    db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "mixread.db")
+    DATABASE_URL = f"sqlite:///{db_path}"
 
 # Create engine with SQLite-specific optimizations
 if "sqlite" in DATABASE_URL:

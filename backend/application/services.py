@@ -5,11 +5,12 @@ Coordinates domain logic, infrastructure, and data access
 Implements specific business use cases
 """
 
-from typing import List, Dict, Optional
-from domain.models import Word, User
-from domain.services import HighlightService, DifficultyService
-from infrastructure.repositories import UserRepository, DomainManagementPolicyRepository
+from typing import Dict, List, Optional
+
+from domain.models import User, Word
+from domain.services import DifficultyService, HighlightService
 from infrastructure.models import DomainPolicyType
+from infrastructure.repositories import DomainManagementPolicyRepository, UserRepository
 
 
 class UserApplicationService:
@@ -161,28 +162,24 @@ class HighlightApplicationService:
     Highlight application service - coordinates word highlighting logic
     """
 
-    def __init__(self, user_repository: UserRepository, cefr_data: dict, chinese_dict: dict):
+    def __init__(self, user_repository: UserRepository, dictionary_service):
         self.user_repository = user_repository
-        self.cefr_data = cefr_data
-        self.chinese_dict = chinese_dict
+        self.dictionary_service = dictionary_service
 
     def get_highlighted_words(
         self,
         user_id: str,
         words: List[str],
-        difficulty_level: str
+        difficulty_level: str,
+        difficulty_mrs: Optional[int] = None
     ) -> Dict:
         """
         Use case: Get words that should be highlighted based on:
-        1. user_id's known_words and unknown_words (Priority 1 - ALWAYS highlight if marked unknown)
-        2. difficulty_level (Priority 2 - use CEFR level if not explicitly marked)
-        3. availability of Chinese translation
-
-        Key logic: If user explicitly marked a word as unknown/known, always highlight/skip it,
-        even if the word is not in the CEFR database.
+        1. user_id's known_words and unknown_words (Priority 1)
+        2. difficulty_level (Priority 2) - OR difficulty_mrs if provided
         """
-        # Validate difficulty level
-        if not DifficultyService.is_valid_level(difficulty_level):
+        # Validate difficulty level if MRS not provided
+        if difficulty_mrs is None and not DifficultyService.is_valid_level(difficulty_level):
             return {
                 "success": False,
                 "error": f"Invalid difficulty level: {difficulty_level}"
@@ -196,72 +193,77 @@ class HighlightApplicationService:
 
         for word_text in words:
             word_lower = word_text.lower()
-
+            
+            # Lookup word info using Hybrid Dictionary Service
+            word_info = self.dictionary_service.lookup(word_text)
+            
             # Priority 1: Check if user explicitly marked as unknown
-            # IMPORTANT: Highlight REGARDLESS of whether word is in CEFR database
             if word_lower in user.unknown_words:
-                # Get info from CEFR if available, otherwise use defaults
-                word_info = self.cefr_data.get(word_lower, {})
-                cefr_level = word_info.get("cefr_level", "Unknown")
-
-                # Try to get Chinese translation
-                chinese = self.chinese_dict.get(word_lower)
-                if not chinese:
-                    chinese = word_info.get("chinese", "")
-
-                # Highlight the word (user explicitly marked it)
                 highlighted.append(word_text)
                 word_details.append({
                     "word": word_text,
-                    "cefr_level": cefr_level,
+                    "cefr_level": word_info.get("level", "Unknown"),
+                    "mrs": word_info.get("mrs", 0),
+                    "phonetic": word_info.get("phonetic", ""),
                     "pos": word_info.get("pos", "unknown"),
-                    "chinese": chinese,
-                    "reason": "user_marked_unknown"  # For debugging/analytics
+                    "chinese": word_info.get("translation", ""),
+                    "reason": "user_marked_unknown"
                 })
                 continue
 
             # Priority 2: Check if user explicitly marked as known
-            # IMPORTANT: Skip highlighting REGARDLESS of CEFR level
             if word_lower in user.known_words:
-                # Don't highlight - user already knows this word
                 continue
 
-            # Priority 3: Apply CEFR-based difficulty rules
-            # Only process if word is in CEFR database
-            if word_lower not in self.cefr_data:
+            # Priority 3: Apply Difficulty Logic
+            if not word_info["found"]:
                 continue
+                
+            cefr_level = word_info.get("level") or "C2" 
+            # Default to 100 (hardest) if MRS is None (Tier 2/Unknown words)
+            mrs_from_info = word_info.get("mrs")
+            mrs_score = 100 if mrs_from_info is None else mrs_from_info
+            
+            # Create domain Word object
+            word_obj = Word(word_text, cefr_level)
+            # Inject MRS into word object (monkey patch for now, or update model later)
+            word_obj.mrs = mrs_score
 
-            word_info = self.cefr_data[word_lower]
-            word = Word(word_text, word_info.get("cefr_level", "A1"))
+            # Check if should highlight
+            should_highlight = False
+            if difficulty_mrs is not None:
+                # Use granular MRS logic
+                should_highlight = HighlightService.should_highlight_mrs(
+                    word_obj,
+                    difficulty_mrs,
+                    user.known_words,
+                    user.unknown_words
+                )
+            else:
+                # Use legacy CEFR logic
+                should_highlight = HighlightService.should_highlight(
+                    word_obj,
+                    difficulty_level,
+                    user.known_words,
+                    user.unknown_words
+                )
 
-            # Check if should highlight using domain logic
-            if HighlightService.should_highlight(
-                word,
-                difficulty_level,
-                user.known_words,
-                user.unknown_words
-            ):
-                # Try to get Chinese translation from two sources:
-                # 1. Chinese dictionary (for older words with high confidence)
-                # 2. Word info (for newly added words from CEFR-J)
-                chinese = self.chinese_dict.get(word_lower)
-                if not chinese:
-                    # Fallback to Chinese translation in word info (from expanded vocabulary)
-                    chinese = word_info.get("chinese", "")
-
-                # Highlight the word (with or without translation)
+            if should_highlight:
                 highlighted.append(word_text)
                 word_details.append({
                     "word": word_text,
-                    "cefr_level": word_info.get("cefr_level"),
+                    "cefr_level": cefr_level,
+                    "mrs": mrs_score,
+                    "phonetic": word_info.get("phonetic", ""),
                     "pos": word_info.get("pos"),
-                    "chinese": chinese,  # May be empty for C1/C2 words, but still highlighted
-                    "reason": "difficulty_based"  # For debugging/analytics
+                    "chinese": word_info.get("translation", ""),
+                    "reason": "difficulty_based"
                 })
 
         return {
             "success": True,
             "difficulty_level": difficulty_level,
+            "difficulty_mrs": difficulty_mrs,
             "total_words": len(words),
             "highlighted_count": len(highlighted),
             "highlighted_words": highlighted,

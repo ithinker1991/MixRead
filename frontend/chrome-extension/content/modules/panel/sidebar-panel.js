@@ -636,19 +636,14 @@ class SidebarPanel {
       try {
         const sendAddToLibrary = () => {
           try {
-            // Extract real sentence contexts from highlighted elements
-            let wordStem = word.toLowerCase();
-
-            // Use Stemmer to get word stem (same logic as in content.js)
-            if (typeof Stemmer !== "undefined" && Stemmer.stem) {
-              wordStem = Stemmer.stem(wordStem);
-            }
+            // Use word directly
+            const wordLower = word.toLowerCase();
 
             const sentenceSet = new Set();
 
-            // Find all highlighted elements with this word stem
+            // Find all highlighted elements with this word
             const allElements = document.querySelectorAll(
-              `.mixread-highlight[data-word-stem="${wordStem}"]`
+              `.mixread-highlight[data-word="${wordLower}"]`
             );
 
             console.log(
@@ -1172,20 +1167,7 @@ class SidebarPanel {
    */
   normalizeWord(word) {
     if (!word) return "";
-
-    // Convert to lowercase
-    let normalized = word.toLowerCase();
-
-    // Use Porter Stemmer if available (should be loaded by content.js)
-    if (typeof Stemmer !== "undefined" && Stemmer.stem) {
-      try {
-        normalized = Stemmer.stem(normalized);
-      } catch (e) {
-        console.warn("[SidebarPanel] Stemming error for word:", word, e);
-      }
-    }
-
-    return normalized;
+    return word.toLowerCase().trim();
   }
 
   /**
@@ -1381,17 +1363,14 @@ class SidebarPanel {
    */
   extractWordSentences(word) {
     try {
-      // Get word stem using same logic as in sendWordToLibrary
-      let wordStem = word.toLowerCase();
-      if (typeof Stemmer !== "undefined" && Stemmer.stem) {
-        wordStem = Stemmer.stem(wordStem);
-      }
+      // Use word directly
+      const wordLower = word.toLowerCase();
 
       const sentenceSet = new Set();
 
-      // Find all highlighted elements with this word stem
+      // Find all highlighted elements with this word
       const allElements = document.querySelectorAll(
-        `.mixread-highlight[data-word-stem="${wordStem}"]`
+        `.mixread-highlight[data-word="${wordLower}"]`
       );
 
       // Extract cached sentence contexts from data attributes

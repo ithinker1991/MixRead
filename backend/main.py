@@ -8,24 +8,24 @@ Layered architecture:
 - Presentation: API routes
 """
 
+import asyncio
 import json
 import os
-import asyncio
 import sys
 from typing import Optional
 
 import httpx
-from fastapi import FastAPI, HTTPException, Depends
+from api.review import router as review_router
+from api.routes import router as user_router
+from application.services import HighlightApplicationService, UserApplicationService
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
 # Import DDD layers
 from infrastructure.database import get_db, init_db
 from infrastructure.repositories import UserRepository
-from application.services import UserApplicationService, HighlightApplicationService
-from api.routes import router as user_router
-from api.review import router as review_router
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -59,16 +59,20 @@ app.add_middleware(
     expose_headers=["Access-Control-Allow-Private-Network"],
 )
 
+# ... (imports)
+from infrastructure.dictionary import dictionary_service
+
 # Global data caches
-cefr_data = {}
-chinese_dict = {}
+# cefr_data and chinese_dict are now managed by dictionary_service
 definition_cache = {}
 
+# ... (models)
 # Pydantic models for API
 class WordBatch(BaseModel):
     user_id: str
     words: list[str]
     difficulty_level: str = "B1"
+    difficulty_mrs: Optional[int] = None # Optional granular difficulty (0-100)
 
 
 class WordInfo(BaseModel):
@@ -79,35 +83,11 @@ class WordInfo(BaseModel):
     example: Optional[str] = None
     chinese: Optional[str] = None
 
+# Data loading functions removed (handled by DictionaryService)
 
-# Data loading functions
-def load_cefr_data():
-    """Load CEFR word database from JSON file"""
-    global cefr_data
-    cefr_path = os.path.join(os.path.dirname(__file__), "data", "cefr_words.json")
-    if os.path.exists(cefr_path):
-        with open(cefr_path, 'r', encoding='utf-8') as f:
-            cefr_data = json.load(f)
-        print(f"✓ Loaded {len(cefr_data)} words from CEFR database")
-    else:
-        print(f"⚠ Warning: CEFR database not found at {cefr_path}")
-
-
-def load_chinese_dict():
-    """Load Chinese translation dictionary"""
-    global chinese_dict
-    dict_path = os.path.join(os.path.dirname(__file__), "chinese_dict.json")
-    if os.path.exists(dict_path):
-        with open(dict_path, 'r', encoding='utf-8') as f:
-            chinese_dict = json.load(f)
-        print(f"✓ Loaded {len(chinese_dict)} Chinese translations")
-    else:
-        print(f"⚠ Warning: Chinese dictionary not found at {dict_path}")
-
-
-async def get_word_definition(word: str) -> dict:
+async def get_word_definition_external(word: str) -> dict:
     """
-    Fetch word definition from Free Dictionary API with caching
+    Fetch word definition from Free Dictionary API (Fallback for words not in local dictionary)
     """
     word_lower = word.lower()
 
@@ -153,8 +133,7 @@ async def get_word_definition(word: str) -> dict:
 async def startup_event():
     """Initialize on startup"""
     print("\n🚀 MixRead Backend Starting...")
-    load_cefr_data()
-    load_chinese_dict()
+    # dictionary_service is auto-initialized on import
     init_db()
     print("✓ Database initialized\n")
 
@@ -165,45 +144,42 @@ async def health():
     """Health check endpoint"""
     return {
         "status": "ok",
-        "version": "0.2.0",
-        "words_loaded": len(cefr_data),
-        "chinese_translations": len(chinese_dict)
+        "version": "0.3.0",
+        "dictionary": {
+            "tier1_core_words": len(dictionary_service.cefr_data),
+            "tier2_full_db": "Active (SQLite)"
+        }
     }
 
-# Handle OPTIONS requests for CORS preflight (including Private Network Access)
-@app.options("/{full_path:path}")
-async def options_handler(full_path: str):
-    """Handle OPTIONS requests for CORS preflight"""
-    return {"detail": "ok"}
-
+# ... (options_handler)
 
 # Word information endpoints
 @app.get("/word/{word}")
 async def get_word(word: str):
-    """Get word information including CEFR level, definition, and Chinese translation"""
-    chinese = chinese_dict.get(word.lower())
-
-    if word.lower() not in cefr_data:
-        definition_data = await get_word_definition(word)
+    """Get word information using Hybrid Dictionary Service"""
+    # 1. Lookup in Hybrid Dictionary
+    info = dictionary_service.lookup(word)
+    
+    if info["found"]:
         return {
-            "word": word,
-            "found": False,
-            "definition": definition_data.get("definition"),
-            "example": definition_data.get("example"),
-            "chinese": chinese
+            "word": info["word"],
+            "found": True,
+            "cefr_level": info.get("level"),
+            "mrs": info.get("mrs"),
+            "pos": info.get("pos"),
+            "definition": info.get("definition"),
+            "translation": info.get("translation"), # Chinese
+            "phonetic": info.get("phonetic", "")
         }
 
-    word_info = cefr_data[word.lower()]
-    definition_data = await get_word_definition(word)
-
+    # 2. Fallback to external API if really not found (Tier 3)
+    definition_data = await get_word_definition_external(word)
     return {
         "word": word,
-        "found": True,
-        "cefr_level": word_info.get("cefr_level"),
-        "pos": word_info.get("pos"),
+        "found": False,
         "definition": definition_data.get("definition"),
         "example": definition_data.get("example"),
-        "chinese": chinese
+        "chinese": None
     }
 
 
@@ -212,22 +188,17 @@ async def get_word(word: str):
 async def highlight_words(request: WordBatch, db: Session = Depends(get_db)):
     """
     Get highlighted words based on user's difficulty level and word lists
-
-    Priority for highlighting:
-    1. unknown_words - user explicitly marked as not knowing
-    2. known_words - user explicitly marked as knowing
-    3. difficulty_level - default CEFR level-based rule
     """
     try:
         service = HighlightApplicationService(
             UserRepository(db),
-            cefr_data,
-            chinese_dict
+            dictionary_service
         )
         result = service.get_highlighted_words(
             request.user_id,
             request.words,
-            request.difficulty_level
+            request.difficulty_level,
+            request.difficulty_mrs
         )
         return result
     except Exception as e:
@@ -241,20 +212,19 @@ async def batch_word_info(request: WordBatch):
     """
     results = []
 
-    tasks = [get_word_definition(word) for word in request.words]
-    definitions = await asyncio.gather(*tasks)
-
-    for word, definition_data in zip(request.words, definitions):
-        if word.lower() in cefr_data:
-            word_info = cefr_data[word.lower()]
-            results.append({
+    for word in request.words:
+        info = dictionary_service.lookup(word)
+        if info["found"]:
+             results.append({
                 "word": word,
-                "cefr_level": word_info.get("cefr_level"),
-                "pos": word_info.get("pos"),
-                "definition": definition_data.get("definition"),
-                "example": definition_data.get("example")
+                "cefr_level": info.get("level"),
+                "pos": info.get("pos"),
+                "definition": info.get("definition"),
+                "translation": info.get("translation")
             })
         else:
+            # Fallback for definitions
+            definition_data = await get_word_definition_external(word)
             results.append({
                 "word": word,
                 "cefr_level": None,
@@ -264,6 +234,8 @@ async def batch_word_info(request: WordBatch):
             })
 
     return {"words": results}
+
+# ... (routes)
 
 
 # Include user routes (known_words, unknown_words, vocabulary)
