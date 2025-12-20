@@ -179,8 +179,8 @@ const libraryCountDisplay = document.getElementById("library-count");
 
 // User management - MOVED TO setupUserIdManagement()
 // Old dropdown selector removed - now using manual user ID input
-// let allUsers = [];
-// let currentUser = "";
+let allUsers = [];
+let currentUser = "";
 
 // Helper function to get date X days ago
 function getDateXDaysAgo(days) {
@@ -368,7 +368,10 @@ difficultySlider.addEventListener("input", (e) => {
   updateDifficultyDisplay(value);
 
   // Save to storage
-  ChromeAPI.storage.set({ difficultyLevel: level });
+  ChromeAPI.storage.set({ difficultyLevel: level }, () => {
+    // ALSO save to current user data to prevent overwriting on reload
+    saveCurrentUserVocabulary();
+  });
 
   // Notify content script about the change
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -621,7 +624,7 @@ function loadUserVocabulary() {
   ChromeAPI.storage.get([userKey], (result) => {
     const userData = result[userKey] || {};
 
-    // Apply user's settings
+    // Apply user's settings, falling back to top-level storage if needed
     if (userData.vocabulary) {
       ChromeAPI.storage.set({ vocabulary: userData.vocabulary });
       vocabCountDisplay.textContent = userData.vocabulary.length;
@@ -632,14 +635,16 @@ function loadUserVocabulary() {
       ChromeAPI.storage.set({ vocabulary_dates: userData.vocabulary_dates });
     }
 
-    if (userData.difficultyLevel) {
-      ChromeAPI.storage.set({ difficultyLevel: userData.difficultyLevel });
-      const difficultyValue =
-        Object.entries(DIFFICULTY_LEVELS).find(
-          ([_, level]) => level === userData.difficultyLevel
-        )?.[0] || "3";
-      difficultySlider.value = difficultyValue;
-      updateDifficultyDisplay(difficultyValue);
+    // Load difficulty level - try user data first, then fall back to direct storage read
+    let level = userData.difficultyLevel;
+    if (!level) {
+      // Fallback: try reading directly from storage (top-level key)
+      ChromeAPI.storage.get(["difficultyLevel"], (res) => {
+        const directLevel = res.difficultyLevel || "B1";
+        updateDifficultyUI(directLevel);
+      });
+    } else {
+      updateDifficultyUI(level);
     }
 
     if (userData.showChinese !== undefined) {
@@ -647,6 +652,14 @@ function loadUserVocabulary() {
       toggleChinese.checked = userData.showChinese;
     }
   });
+}
+
+function updateDifficultyUI(level) {
+  ChromeAPI.storage.set({ difficultyLevel: level });
+  const difficultyValue =
+    Object.entries(DIFFICULTY_LEVELS).find(([_, l]) => l === level)?.[0] || "3";
+  difficultySlider.value = difficultyValue;
+  updateDifficultyDisplay(difficultyValue);
 }
 
 function resetUserVocabulary() {
@@ -1228,11 +1241,17 @@ function setupUserIdManagement() {
         const currentUserId = result.testUserId || "test_user";
         const recentUserIds = result.recentUserIds || [];
 
+        // Set global current user
+        currentUser = currentUserId;
+
         // Set current user display
         userIdDisplay.textContent = currentUserId;
         userIdInput.value = currentUserId;
 
         console.log("[Popup] Current user ID:", currentUserId);
+
+        // Load user vocabulary and settings
+        loadUserVocabulary();
 
         // Display recent users as buttons
         if (recentUserIds.length > 0) {
@@ -1296,6 +1315,11 @@ function setupUserIdManagement() {
           () => {
             userIdDisplay.textContent = userId;
             userIdInput.value = userId;
+
+            // Update global current user and reload data
+            currentUser = userId;
+            loadUserVocabulary();
+
             initializeUserIdInput();
             console.log("[Popup] User ID successfully set:", userId);
             alert(

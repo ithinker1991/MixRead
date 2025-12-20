@@ -34,7 +34,7 @@ class UserStore {
       this.user.id = userId;
 
       // Load difficulty level
-      const difficulty = await StorageManager.getItem("difficulty_level");
+      const difficulty = await StorageManager.getItem("difficultyLevel");
       if (difficulty) {
         this.user.difficultyLevel = difficulty;
       }
@@ -82,7 +82,7 @@ class UserStore {
    */
   async setDifficultyLevel(level) {
     this.user.difficultyLevel = level;
-    await StorageManager.setItem("difficulty_level", level);
+    await StorageManager.setItem("difficultyLevel", level);
     this.notify();
     logger.log(`Difficulty level changed to: ${level}`);
   }

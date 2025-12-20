@@ -4,178 +4,247 @@
 
 /* Highlighted difficult words */
 .mixread-highlight {
-  background-color: #fff3cd;
-  border-bottom: 1px dotted #ffc107;
+  /* Use semi-transparent background for dark mode compatibility */
+  /* Keeps text readable on both dark and light backgrounds */
+  background-color: rgba(255, 193, 7, 0.25);
+  border-bottom: 2px solid rgba(255, 193, 7, 0.8);
+  border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  padding: 0 1px;
+  color: inherit; /* Preserves original text color */
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
-.mixread-highlight:hover {
-  background-color: #ffecb5;
+.mixread-highlight:hover,
+.mixread-highlight[data-tooltip-open="true"] {
+  background-color: rgba(255, 193, 7, 0.5);
+  border-bottom-width: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 /* Chinese translation display */
 .mixread-chinese {
-  display: inline;
-  color: #6c757d;
-  font-size: 0.85em;
-  margin-left: 2px;
+  display: inline-block;
+  color: #888;
+  font-size: 0.8em;
+  margin-left: 4px;
   margin-right: 2px;
+  font-weight: 500;
   font-style: normal;
   white-space: nowrap;
+  vertical-align: 1px;
+  opacity: 0.9;
+  letter-spacing: 0.5px;
 }
 
 .mixread-chinese::before {
-  content: "(";
-  color: #6c757d;
+  content: ""; /* Removed brackets for cleaner look */
 }
 
 .mixread-chinese::after {
-  content: ")";
-  color: #6c757d;
+  content: "";
 }
 
 /* Tooltip container */
 .mixread-tooltip {
   position: absolute;
   background: white;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 0;
+  min-width: 300px;
   max-width: 380px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 10000;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.05);
+  z-index: 2147483647; /* Max z-index */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
   font-size: 14px;
   color: #333;
+  line-height: 1.5;
+  overflow: hidden;
+  animation: mixread-fade-in 0.2s ease-out;
+}
+
+@keyframes mixread-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .mixread-tooltip-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #eee;
+  gap: 10px;
+  padding: 16px 16px 12px;
+  background: #fcfcfc;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .mixread-tooltip-word {
-  font-weight: bold;
-  font-size: 18px;
-  color: #000;
+  font-weight: 700;
+  font-size: 20px;
+  color: #1a1a1a;
+  letter-spacing: -0.5px;
 }
 
 .mixread-tooltip-cefr {
-  display: inline-block;
-  background-color: #e7f3ff;
-  color: #0066cc;
-  padding: 3px 10px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #e3f2fd;
+  color: #1565c0;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.mixread-tooltip-content {
+  padding: 16px;
 }
 
 .mixread-tooltip-section {
   margin-bottom: 12px;
 }
 
+.mixread-tooltip-section:last-child {
+  margin-bottom: 0;
+}
+
 .mixread-tooltip-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #666;
-  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #888;
+  margin-bottom: 6px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .mixread-tooltip-definition {
-  color: #555;
+  color: #2c3e50;
   line-height: 1.5;
   font-size: 14px;
 }
 
 .mixread-tooltip-example {
-  background-color: #f5f5f5;
-  padding: 10px;
-  border-left: 3px solid #ddd;
+  background-color: #f8f9fa;
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 3px solid #e9ecef;
   font-size: 13px;
-  color: #666;
-  line-height: 1.4;
+  color: #495057;
+  line-height: 1.5;
   font-style: italic;
+  font-family: Georgia, "Times New Roman", serif;
 }
 
 .mixread-tooltip-actions {
-  margin-top: 10px;
-  padding-top: 10px;
+  padding: 12px 16px;
+  background: #f8f9fa;
   border-top: 1px solid #eee;
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 
 .mixread-btn {
   flex: 1;
-  padding: 6px 12px;
-  border: 1px solid #ddd;
-  border-radius: 3px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   background: white;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .mixread-btn:hover {
-  background: #f5f5f5;
-  border-color: #999;
+  background: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.mixread-btn:active {
+  transform: translateY(0);
 }
 
 .mixread-btn.primary {
-  background: #007bff;
+  background: #2563eb;
   color: white;
-  border-color: #007bff;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.3);
 }
 
 .mixread-btn.primary:hover {
-  background: #0056b3;
-  border-color: #0056b3;
+  background: #1d4ed8;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.4);
 }
 
-/* Pronunciation button */
+.mixread-btn.success {
+  background: #10b981;
+  color: white;
+  box-shadow: 0 1px 2px rgba(16, 185, 129, 0.3);
+}
+
+.mixread-btn.success:hover {
+  background: #059669;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.4);
+}
+
+/* Pronounce Button inside content */
 .mixread-btn-pronounce {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  color: #4b5563;
   font-size: 12px;
-  transition: all 0.2s ease;
-  margin-bottom: 8px;
-  display: block;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .mixread-btn-pronounce:hover {
-  background: #f0f0f0;
-  border-color: #999;
+  background: #e5e7eb;
+  color: #1f2937;
 }
 
 /* Chinese translation toggle */
 .mixread-tooltip-chinese-toggle {
-  margin-top: 8px;
-}
-
-.mixread-tooltip-chinese-toggle input[type="checkbox"] {
-  margin-right: 6px;
-  cursor: pointer;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #eee;
 }
 
 .mixread-tooltip-chinese-toggle label {
   cursor: pointer;
   font-size: 13px;
-  display: block;
-  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #666;
 }
 
 .mixread-tooltip-chinese-toggle strong {
-  color: #e74c3c;
+  color: #1a1a1a;
   font-weight: 600;
 }
 
@@ -183,30 +252,31 @@
 .mixread-context-menu {
   position: fixed;
   background: white;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 10001;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 2147483647;
   min-width: 180px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
   font-size: 13px;
+  overflow: hidden;
+  padding: 4px;
 }
 
 .mixread-context-menu-item {
   padding: 8px 12px;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: all 0.15s ease;
   user-select: none;
+  border-radius: 4px;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .mixread-context-menu-item:hover {
-  background-color: #f5f5f5;
-}
-
-.mixread-context-menu-item:first-child {
-  border-radius: 6px 6px 0 0;
-}
-
-.mixread-context-menu-item:last-child {
-  border-radius: 0 0 6px 6px;
+  background-color: #f3f4f6;
+  color: #111;
 }

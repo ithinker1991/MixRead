@@ -194,6 +194,12 @@ async function initializeModules() {
 
     const userId = userStore.getUserId();
     const difficultyLevel = userStore.getDifficultyLevel();
+
+    // SYNC FIX: Update global state with loaded user preference
+    if (difficultyLevel) {
+      currentDifficultyLevel = difficultyLevel;
+    }
+
     console.log(
       `[MixRead] User initialized - ID: ${userId}, Difficulty: ${difficultyLevel}`
     );
@@ -1626,6 +1632,8 @@ if (ChromeAPI.isContextValid()) {
       }
 
       // Re-highlight the page
+      // Force reset highlighting flag to ensure it runs even if previously stuck
+      isHighlighting = false;
       highlightPageWords();
       sendResponse({ success: true });
     } else if (request.type === "CHINESE_DISPLAY_CHANGED") {

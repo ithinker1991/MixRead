@@ -15,21 +15,21 @@
 const MixReadNavigation = {
   // Configuration
   config: {
-    webBaseUrl: 'http://localhost:8001',
+    webBaseUrl: "http://localhost:8001", // TODO: Change to production URL (e.g., https://app.mixread.com) when deploying
     pageMap: {
-      'review': '/pages/review/',
-      'library': '/pages/library/'
-    }
+      review: "/pages/review/",
+      library: "/pages/library/",
+    },
   },
 
   /**
    * Get the environment type (extension or web)
    */
   getEnvironment() {
-    if (typeof chrome !== 'undefined' && chrome.tabs) {
-      return 'extension';
+    if (typeof chrome !== "undefined" && chrome.tabs) {
+      return "extension";
     }
-    return 'web';
+    return "web";
   },
 
   /**
@@ -64,9 +64,9 @@ const MixReadNavigation = {
 
     const env = this.getEnvironment();
 
-    if (env === 'extension') {
+    if (env === "extension") {
       // Extension environment: open in new tab
-      if (typeof chrome !== 'undefined' && chrome.tabs) {
+      if (typeof chrome !== "undefined" && chrome.tabs) {
         chrome.tabs.create({ url });
       }
     } else {
@@ -86,10 +86,10 @@ const MixReadNavigation = {
     }
 
     // If in extension, try to get from storage
-    if (this.getEnvironment() === 'extension') {
+    if (this.getEnvironment() === "extension") {
       return new Promise((resolve) => {
-        if (typeof chrome !== 'undefined' && chrome.storage) {
-          chrome.storage.local.get('userId', (result) => {
+        if (typeof chrome !== "undefined" && chrome.storage) {
+          chrome.storage.local.get("userId", (result) => {
             resolve(result.userId || null);
           });
         } else {
@@ -105,7 +105,11 @@ const MixReadNavigation = {
    * Set current user ID (for extension storage)
    */
   setCurrentUserId(userId) {
-    if (this.getEnvironment() === 'extension' && typeof chrome !== 'undefined' && chrome.storage) {
+    if (
+      this.getEnvironment() === "extension" &&
+      typeof chrome !== "undefined" &&
+      chrome.storage
+    ) {
       chrome.storage.local.set({ userId });
     }
   },
@@ -116,16 +120,16 @@ const MixReadNavigation = {
   goBack() {
     const env = this.getEnvironment();
 
-    if (env === 'web' && document.referrer) {
+    if (env === "web" && document.referrer) {
       window.history.back();
     } else {
       // If no referrer, go to main page
       window.location.href = this.config.webBaseUrl;
     }
-  }
+  },
 };
 
 // Export for different environments
-if (typeof module !== 'undefined' && module.exports) {
+if (typeof module !== "undefined" && module.exports) {
   module.exports = MixReadNavigation;
 }

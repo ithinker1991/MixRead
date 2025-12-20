@@ -3,14 +3,10 @@
   "name": "MixRead",
   "version": "0.1.1",
   "description": "Improve your English reading with intelligent word highlighting and definitions",
-  "permissions": [
-    "storage",
-    "scripting",
-    "contextMenus",
-    "tabs"
-  ],
+  "permissions": ["storage", "scripting", "contextMenus", "tabs"],
   "host_permissions": [
     "http://localhost:8000/*",
+    "http://localhost:8001/*",
     "https://api.dictionaryapi.dev/*"
   ],
   "background": {
