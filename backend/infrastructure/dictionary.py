@@ -62,7 +62,9 @@ class DictionaryService:
                     if len(parts) != 2:
                         continue
                     
-                    lemma = parts[0].strip()
+                    # Handle "lemma/rank" format in lemma.en.txt
+                    lemma_part = parts[0].strip()
+                    lemma = lemma_part.split("/")[0] if "/" in lemma_part else lemma_part
                     variants_str = parts[1]
                     variants = [v.strip() for v in variants_str.split(",")]
                     
@@ -74,6 +76,39 @@ class DictionaryService:
             print(f"✓ Loaded {len(self.variant_map)} variants from lemma.en.txt")
         except Exception as e:
             print(f"⚠ Failed to load lemma.en.txt: {e}")
+
+    def calculate_dynamic_mrs(self, rank: Optional[int]) -> Optional[int]:
+        """
+        Calculate a rough MRS score (0-100+) based on word frequency ranking.
+        Based on the mapping:
+        - Top 1k: 0-20
+        - 1k-3k: 20-40
+        - 3k-6k: 40-60
+        - 6k-10k: 60-80
+        - 10k-15k: 80-100
+        - 15k+: 100+
+        """
+        if rank is None or rank <= 0:
+            return None
+            
+        import math
+        try:
+            if rank <= 1000:
+                # 0 - 20 scale
+                return int((math.log10(rank) / 3.0) * 20)
+            elif rank <= 15000:
+                # 20 - 100 scale
+                # log10(1000) = 3, log10(15000) = 4.17
+                # Linear mapping from log scale
+                normalized = (math.log10(rank) - 3.0) / (4.176 - 3.0)
+                return int(20 + normalized * 80)
+            else:
+                # 100+ scale
+                # 15k is ~100, 100k is ~150
+                normalized = (math.log10(rank) - 4.176) / (5.0 - 4.176)
+                return int(100 + normalized * 50)
+        except Exception:
+            return 100 # Safe default for生僻词
 
     def lookup(self, word: str) -> Dict[str, Any]:
         """
@@ -146,8 +181,8 @@ class DictionaryService:
                 "word": word,
                 "found": True,
                 "source": "full",
-                "level": None, # Full dict doesn't have curated levels
-                "mrs": None,   # Or calculate dynamic MRS based on ranking if available
+                "level": self._derive_cefr_from_mrs(self.calculate_dynamic_mrs(db_result.get("ranking"))), 
+                "mrs": self.calculate_dynamic_mrs(db_result.get("ranking")),
                 "pos": None,
                 "definition": db_result.get("definition"),
                 "translation": db_result.get("translation"),
@@ -185,18 +220,35 @@ class DictionaryService:
 
     def _format_entry(self, word: str, entry: Dict) -> Dict:
         """Format CEFR entry into standard response"""
+        level = entry.get("level") or entry.get("cefr")
+        mrs = entry.get("mrs")
+        
+        # If level is Unknown or missing, try to derive it from MRS
+        if (not level or level == "Unknown") and mrs is not None:
+             level = self._derive_cefr_from_mrs(mrs)
+             
         return {
             "word": word, # Return original requested word
             "found": True,
             "source": "core",
-            "level": entry.get("level") or entry.get("cefr"), 
-            "mrs": entry.get("mrs"),
+            "level": level, 
+            "mrs": mrs,
             "pos": entry.get("pos"),
             "definition": entry.get("def"),
             "translation": entry.get("chn"),
             "phonetic": entry.get("ph"),
             "rank": entry.get("rank")
         }
+
+    def _derive_cefr_from_mrs(self, mrs: Optional[int]) -> Optional[str]:
+        """Helper to derive CEFR level label from MRS score"""
+        if mrs is None: return None
+        if mrs < 20: return "A1"
+        if mrs < 40: return "A2"
+        if mrs < 60: return "B1"
+        if mrs < 80: return "B2"
+        if mrs < 100: return "C1"
+        return "C2"
 
 # Global instance
 dictionary_service = DictionaryService()

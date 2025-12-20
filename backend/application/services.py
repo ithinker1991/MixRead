@@ -219,10 +219,14 @@ class HighlightApplicationService:
             if not word_info["found"]:
                 continue
                 
-            cefr_level = word_info.get("level") or "C2" 
-            # Default to 100 (hardest) if MRS is None (Tier 2/Unknown words)
-            mrs_from_info = word_info.get("mrs")
-            mrs_score = 100 if mrs_from_info is None else mrs_from_info
+            # Use dynamic MRS from dictionary service if curated one is missing
+            mrs_score = word_info.get("mrs")
+            if mrs_score is None:
+                # If truly unknown, default to 100, but dictionary_service.lookup
+                # should now provide dynamic MRS for Tier 2 words.
+                mrs_score = 100
+            
+            cefr_level = word_info.get("level") or "C2"
             
             # Create domain Word object
             word_obj = Word(word_text, cefr_level)

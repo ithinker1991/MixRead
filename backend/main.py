@@ -8,9 +8,6 @@ Layered architecture:
 - Presentation: API routes
 """
 
-import asyncio
-import json
-import os
 import sys
 from typing import Optional
 
@@ -34,22 +31,7 @@ app = FastAPI(
     description="English reading enhancement with word difficulty control"
 )
 
-# Add Private Network Access support FIRST (executes LAST in middleware stack)
-# This ensures headers are added to all responses
-@app.middleware("http")
-async def add_private_network_headers(request, call_next):
-    response = await call_next(request)
-    # Always allow private network access for all requests
-    response.headers["Access-Control-Allow-Private-Network"] = "true"
-    sys.stderr.write(f"[CORS DEBUG] Added Private-Network header to {request.method} {request.url.path}\n")
-    sys.stderr.flush()
-    # For OPTIONS requests, also set these
-    if request.method == "OPTIONS":
-        response.headers["Access-Control-Request-Private-Network"] = "true"
-    return response
-
-# Add CORS middleware AFTER private network middleware
-# (will execute BEFORE in the stack)
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -58,6 +40,25 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["Access-Control-Allow-Private-Network"],
 )
+
+# Add Private Network Access support LAST (executes FIRST in middleware stack)
+# This ensures it can intercept and modify preflight responses from CORSMiddleware
+@app.middleware("http")
+async def add_private_network_headers(request, call_next):
+    # For PNA preflight, we need to check the request header
+    is_pna_preflight = request.headers.get("Access-Control-Request-Private-Network") == "true"
+    
+    response = await call_next(request)
+    
+    # Always add the header if it's a PNA preflight or if we just want to be safe
+    # Chrome requires this header for any request from a public site to a private/local one
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    
+    if is_pna_preflight:
+        sys.stderr.write(f"[CORS PNA] Handled PNA preflight for {request.url.path}\n")
+        sys.stderr.flush()
+        
+    return response
 
 # ... (imports)
 from infrastructure.dictionary import dictionary_service
