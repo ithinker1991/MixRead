@@ -225,7 +225,7 @@ class DictionaryService:
         
         # If level is Unknown or missing, try to derive it from MRS
         if (not level or level == "Unknown") and mrs is not None:
-             level = self._derive_cefr_from_mrs(mrs)
+            level = self._derive_cefr_from_mrs(mrs)
              
         return {
             "word": word, # Return original requested word
@@ -242,12 +242,18 @@ class DictionaryService:
 
     def _derive_cefr_from_mrs(self, mrs: Optional[int]) -> Optional[str]:
         """Helper to derive CEFR level label from MRS score"""
-        if mrs is None: return None
-        if mrs < 20: return "A1"
-        if mrs < 40: return "A2"
-        if mrs < 60: return "B1"
-        if mrs < 80: return "B2"
-        if mrs < 100: return "C1"
+        if mrs is None:
+            return None
+        if mrs < 20:
+            return "A1"
+        if mrs < 40:
+            return "A2"
+        if mrs < 60:
+            return "B1"
+        if mrs < 80:
+            return "B2"
+        if mrs < 100:
+            return "C1"
         return "C2"
 
 # Global instance
