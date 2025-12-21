@@ -7,7 +7,7 @@ Implements specific business use cases
 
 from typing import Dict, List, Optional
 
-from domain.models import User, Word
+from domain.models import User, VocabularyEntry, Word
 from domain.services import DifficultyService, HighlightService
 from infrastructure.models import DomainPolicyType
 from infrastructure.repositories import DomainManagementPolicyRepository, UserRepository
@@ -120,27 +120,12 @@ class UserApplicationService:
     def add_to_library(self, user_id: str, words: List[str], contexts: List[Dict] = None):
         """
         Use case: Add words to library with learning context
+        (Unified: contexts are stored in VocabularyEntry)
         """
         user = self.user_repository.get_user(user_id)
-
-        # Handle contexts: if provided, associate them with the words
-        if contexts:
-            # If contexts provided, assume first word gets all contexts
-            # (for backward compatibility with current frontend)
-            if len(words) == 1:
-                user.add_to_library(words, contexts)
-            else:
-                # Multiple words: distribute contexts evenly or assign empty contexts
-                contexts_per_word = len(contexts) // len(words) if contexts else 0
-                for i, word in enumerate(words):
-                    start_idx = i * contexts_per_word
-                    end_idx = (i + 1) * contexts_per_word if i < len(words) - 1 else len(contexts)
-                    word_contexts = contexts[start_idx:end_idx] if contexts else []
-                    user.add_to_library([word], word_contexts)
-        else:
-            user.add_to_library(words, [])
-
+        user.add_to_library(words, contexts)
         self.user_repository.save_user(user)
+        
         return {
             "success": True,
             "message": f"{len(words)} word(s) added to library",
@@ -178,6 +163,13 @@ class HighlightApplicationService:
         1. user_id's known_words and unknown_words (Priority 1)
         2. difficulty_level (Priority 2) - OR difficulty_mrs if provided
         """
+        # Validate user_id
+        if not user_id:
+            return {
+                "success": False,
+                "error": "user_id is required"
+            }
+
         # Validate difficulty level if MRS not provided
         if difficulty_mrs is None and not DifficultyService.is_valid_level(difficulty_level):
             return {

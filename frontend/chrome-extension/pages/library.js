@@ -19,6 +19,18 @@ function getUserFromURL() {
   return null;
 }
 
+// Safe URL parsing helper
+function safeGetHostname(urlStr) {
+  try {
+    if (!urlStr) return "Unknown Source";
+    const url = new URL(urlStr);
+    return url.hostname;
+  } catch (e) {
+    console.warn("Invalid URL encountered:", urlStr);
+    return "Unknown Source";
+  }
+}
+
 // Load library data
 async function loadLibrary() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -267,9 +279,11 @@ function renderTableRow(word) {
 
     // Show source info from first context
     const context = word.contexts[0];
-    const domain = new URL(context.page_url).hostname;
+    const domain = safeGetHostname(context.page_url);
     sourceInfo = `
-            <a href="${context.page_url}" target="_blank" class="source-link">
+            <a href="${
+              context.page_url || "#"
+            }" target="_blank" class="source-link">
                 <i class="fas fa-link"></i>
                 <div class="source-title">${
                   context.page_title || "Untitled"
@@ -344,11 +358,10 @@ function viewContexts(word) {
   const sentenceSources = new Map(); // sentence -> array of sources
 
   wordData.contexts.forEach((context, index) => {
-    const url = new URL(context.page_url);
-    const domain = url.hostname;
+    const domain = safeGetHostname(context.page_url);
     const sourceInfo = {
       title: context.page_title || "Untitled Page",
-      url: context.page_url,
+      url: context.page_url || "#",
       domain: domain,
       index: index,
     };
@@ -409,13 +422,12 @@ function viewContexts(word) {
             <div class="sources-list">
                 ${wordData.contexts
                   .map((context, index) => {
-                    const url = new URL(context.page_url);
-                    const domain = url.hostname;
+                    const domain = safeGetHostname(context.page_url);
                     return `
                         <div class="source-card">
                             <span class="source-number">${index + 1}</span>
                             <a href="${
-                              context.page_url
+                              context.page_url || "#"
                             }" target="_blank" class="source-item">
                                 <div class="source-item-title">${
                                   context.page_title || "Untitled Page"

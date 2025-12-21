@@ -35,7 +35,9 @@ graph TD
 
 - **Core**: CEFR-J dataset (~7,000 words) stored locally in backend.
 - **Expansion**: Dynamic fetching from external Dictionary APIs (planned).
-- **Storage**: `vocabulary_entries` table for user learning progress.
+- **Core**: CEFR-J dataset (~7,000 words) stored locally in backend.
+- **Learning Pool**: User-added words with context (contexts_json) stored in `vocabulary_entries`.
+- **Expansion**: Dynamic fetching from external Dictionary APIs (planned).
 
 ### 3. Frontend Architecture
 
@@ -73,11 +75,13 @@ graph TD
 - `domain`: String
 - `is_active`: Boolean
 
-### Vocabulary
+### Vocabulary (Unified Learning System)
 
 - `user_id`: FK
 - `word`: String
-- `status`: Enum (learning/mastered)
+- `status`: Enum (learning/reviewing/mastered)
+- `contexts_json`: JSON (List of encountering contexts: sentence, url, page_title)
+- `srs_state`: (last_review, next_review, interval, easiness) - SM2 fields
 
 ---
 

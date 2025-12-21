@@ -47,7 +47,7 @@ class Word:
 
 
 class VocabularyEntry:
-    """Vocabulary entry - represents a word user wants to learn"""
+    """Vocabulary entry - represents a word user wants to learn (Unified with Library)"""
 
     def __init__(self, word: str, added_at: datetime = None):
         self.word = word.lower()
@@ -55,6 +55,15 @@ class VocabularyEntry:
         self.status = VocabularyStatus.LEARNING
         self.attempt_count = 0
         self.last_reviewed = None
+        self.contexts = []  # List of context objects (sentence, url, etc.)
+
+    def add_context(self, context: dict):
+        """Add learning context"""
+        self.contexts.append(context)
+
+    def get_contexts(self) -> list:
+        """Get all learning contexts"""
+        return self.contexts
 
     def mark_reviewed(self):
         """Mark this entry as reviewed"""
@@ -67,22 +76,10 @@ class VocabularyEntry:
         self.mark_reviewed()
 
 
-class LibraryEntry:
-    """Library entry - represents a word user wants to learn with context"""
-
-    def __init__(self, word: str, added_at: datetime = None):
-        self.word = word.lower()
-        self.added_at = added_at or datetime.now()
-        self.contexts = []  # List of context objects with page info and sentences
-        self.status = VocabularyStatus.LEARNING
-
-    def add_context(self, context: dict):
-        """Add learning context (page URL, sentences, etc.)"""
-        self.contexts.append(context)
-
-    def get_contexts(self) -> list:
-        """Get all learning contexts"""
-        return self.contexts
+# LibraryEntry is unified into VocabularyEntry
+class LibraryEntry(VocabularyEntry):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 
 class User:
@@ -95,8 +92,7 @@ class User:
         # Three independent lists for highlighting logic
         self.known_words: set = set()  # Words user confirmed they know
         self.unknown_words: set = set()  # Words user marked as not knowing
-        self.vocabulary: dict = {}  # Words user wants to learn (VocabularyEntry)
-        self.library: dict = {}  # Words user wants to learn with context (LibraryEntry)
+        self.vocabulary: dict = {}  # Unified storage for learning words (VocabularyEntry)
 
     def add_known_word(self, word: str):
         """Mark a word as known"""
@@ -142,33 +138,41 @@ class User:
             self.add_to_vocabulary(word_lower)
 
     def add_to_library(self, words: list, contexts: list = None):
-        """Add words to library with learning context"""
+        """Add words to library with learning context (Unified: points to vocabulary)"""
         for i, word in enumerate(words):
             word_lower = word.lower()
-            if word_lower not in self.library:
-                self.library[word_lower] = LibraryEntry(word_lower)
+            
+            # Use unified vocabulary storage
+            if word_lower not in self.vocabulary:
+                self.vocabulary[word_lower] = VocabularyEntry(word_lower)
+            
+            # Mark it as a vocabulary entry
+            self.unknown_words.discard(word_lower)
 
             # Add contexts if provided
+            entry = self.vocabulary[word_lower]
             if contexts:
                 # If we have the same number of words and contexts, associate 1:1
                 if len(words) == len(contexts):
-                    self.library[word_lower].add_context(contexts[i])
+                    entry.add_context(contexts[i])
                 # If we have multiple contexts for a single word
                 elif len(words) == 1:
                     for ctx in contexts:
-                        self.library[word_lower].add_context(ctx)
+                        entry.add_context(ctx)
                 # Fallback: just add if index matches
                 elif i < len(contexts):
-                    self.library[word_lower].add_context(contexts[i])
+                    entry.add_context(contexts[i])
 
     def remove_from_library(self, word: str):
-        """Remove a word from library"""
-        self.library.pop(word.lower(), None)
+        """Remove a word from library (Unified: remove from vocabulary)"""
+        self.remove_from_vocabulary(word)
 
     def get_library_with_context(self) -> list:
-        """Get library words with their contexts"""
+        """Get library words with their contexts (Unified: from vocabulary)"""
         result = []
-        for word_lower, entry in self.library.items():
+        for word_lower, entry in self.vocabulary.items():
+            # Only include if it has contexts or we want all vocabulary in library view
+            # For now, let's treat all vocabulary as "library" items for maximum consistency
             result.append({
                 "word": word_lower,
                 "added_at": entry.added_at.isoformat() if entry.added_at else None,

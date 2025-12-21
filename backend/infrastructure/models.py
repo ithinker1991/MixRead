@@ -4,15 +4,26 @@ SQLAlchemy ORM Models
 Maps domain concepts to database tables
 """
 
-from sqlalchemy import Column, String, DateTime, Text, Integer, Enum as SQLEnum, ForeignKey, Index, Boolean, Float
-from sqlalchemy.orm import relationship
-from datetime import datetime
 import json
+from datetime import datetime
 from enum import Enum
+
 from domain.models import VocabularyStatus
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+)
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy.orm import relationship
 
 from infrastructure.database import Base
-
 
 # ========== Domain Management Policy Enums ==========
 
@@ -36,7 +47,6 @@ class UserModel(Base):
     # Relationships
     unknown_words = relationship("UnknownWordModel", back_populates="user", cascade="all, delete-orphan")
     vocabulary_entries = relationship("VocabularyEntryModel", back_populates="user", cascade="all, delete-orphan")
-    library_entries = relationship("LibraryEntryModel", back_populates="user", cascade="all, delete-orphan")
     domain_management_policies = relationship("DomainManagementPolicy", back_populates="user", cascade="all, delete-orphan")
 
     def get_known_words(self) -> set:
@@ -96,6 +106,9 @@ class VocabularyEntryModel(Base):
     review_streak = Column(Integer, default=0)    # consecutive correct answers
     last_review_quality = Column(Integer, nullable=True)  # quality score 0-5
 
+    # Learning Context Preservation
+    contexts_json = Column(Text, default="[]")  # Store contexts as JSON
+
     # Add unique constraint on user_id + word
     __table_args__ = (
         Index("ix_user_word_vocabulary", "user_id", "word", unique=True),
@@ -104,29 +117,6 @@ class VocabularyEntryModel(Base):
 
     # Relationship
     user = relationship("UserModel", back_populates="vocabulary_entries")
-
-    def __repr__(self):
-        return f"<VocabularyEntryModel user_id={self.user_id} word={self.word} status={self.status}>"
-
-
-class LibraryEntryModel(Base):
-    """Library entries table - words user wants to learn with context"""
-    __tablename__ = "library_entries"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String(255), ForeignKey("users.user_id"), index=True)
-    word = Column(String(255), index=True)
-    status = Column(SQLEnum(VocabularyStatus), default=VocabularyStatus.LEARNING)
-    added_at = Column(DateTime, default=datetime.now)
-    contexts_json = Column(Text, default="[]")  # Store contexts as JSON
-
-    # Add unique constraint on user_id + word
-    __table_args__ = (
-        Index("ix_user_word_library", "user_id", "word", unique=True),
-    )
-
-    # Relationship
-    user = relationship("UserModel", back_populates="library_entries")
 
     def get_contexts(self) -> list:
         """Get contexts as a list"""
@@ -140,7 +130,11 @@ class LibraryEntryModel(Base):
         self.contexts_json = json.dumps(contexts)
 
     def __repr__(self):
-        return f"<LibraryEntryModel user_id={self.user_id} word={self.word} status={self.status}>"
+        return f"<VocabularyEntryModel user_id={self.user_id} word={self.word} status={self.status}>"
+
+
+# The LibraryEntryModel has been unified into VocabularyEntryModel to prevent data inconsistency.
+# In a "Clean Slate" refactor, we remove the redundant table entirely.
 
 
 class DomainManagementPolicy(Base):

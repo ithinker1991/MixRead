@@ -4,20 +4,20 @@ Repository Pattern Implementation
 Provides data access layer using SQLAlchemy ORM
 """
 
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from typing import List, Optional
-from datetime import datetime
 import logging
+from datetime import datetime
+from typing import List, Optional
 
-from domain.models import User, VocabularyEntry, LibraryEntry
+from domain.models import User, VocabularyEntry
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from infrastructure.models import (
-    UserModel,
-    UnknownWordModel,
-    VocabularyEntryModel,
-    LibraryEntryModel,
     DomainManagementPolicy,
     DomainPolicyType,
+    UnknownWordModel,
+    UserModel,
+    VocabularyEntryModel,
 )
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,9 @@ class UserRepository:
         Returns:
             User domain model (creates new if doesn't exist)
         """
+        if not user_id:
+            raise ValueError("user_id cannot be None or empty")
+
         user_model = self.db.query(UserModel).filter(
             UserModel.user_id == user_id
         ).first()
@@ -137,7 +140,7 @@ class UserRepository:
             if vocab_model.word.lower() not in desired_vocab_set:
                 self.db.delete(vocab_model)
 
-        # Update or add vocabulary entries
+        # Update or add vocabulary entries (Unified storage)
         for word, entry in user.vocabulary.items():
             vocab_model = next(
                 (v for v in current_vocab if v.word.lower() == word.lower()),
@@ -148,6 +151,7 @@ class UserRepository:
                 vocab_model.status = entry.status
                 vocab_model.attempt_count = entry.attempt_count
                 vocab_model.last_reviewed = entry.last_reviewed
+                vocab_model.set_contexts(entry.get_contexts())
             else:
                 # Create new
                 vocab_model = VocabularyEntryModel(
@@ -156,40 +160,11 @@ class UserRepository:
                     status=entry.status,
                     added_at=entry.added_at
                 )
+                vocab_model.set_contexts(entry.get_contexts())
                 self.db.add(vocab_model)
 
-        # Update library entries
-        current_library = self.db.query(LibraryEntryModel).filter(
-            LibraryEntryModel.user_id == user.user_id
-        ).all()
-        current_library_set = {l.word.lower() for l in current_library}
-        desired_library_set = set(user.library.keys())
-
-        # Remove words no longer in library
-        for library_model in current_library:
-            if library_model.word.lower() not in desired_library_set:
-                self.db.delete(library_model)
-
-        # Update or add library entries
-        for word, entry in user.library.items():
-            library_model = next(
-                (l for l in current_library if l.word.lower() == word.lower()),
-                None
-            )
-            if library_model:
-                # Update existing
-                library_model.status = entry.status
-                library_model.set_contexts(entry.contexts)
-            else:
-                # Create new
-                library_model = LibraryEntryModel(
-                    user_id=user.user_id,
-                    word=word,
-                    status=entry.status,
-                    added_at=entry.added_at
-                )
-                library_model.set_contexts(entry.contexts)
-                self.db.add(library_model)
+        # Library entries are now unified into vocabulary entries.
+        # Logic to handle them separately is removed.
 
         self.db.commit()
 
@@ -314,18 +289,8 @@ class UserRepository:
             entry.status = vocab_model.status
             entry.attempt_count = vocab_model.attempt_count
             entry.last_reviewed = vocab_model.last_reviewed
+            entry.contexts = vocab_model.get_contexts()
             user.vocabulary[vocab_model.word.lower()] = entry
-
-        # Load library
-        library_models = self.db.query(LibraryEntryModel).filter(
-            LibraryEntryModel.user_id == user_model.user_id
-        ).all()
-
-        for library_model in library_models:
-            entry = LibraryEntry(library_model.word, added_at=library_model.added_at)
-            entry.status = library_model.status
-            entry.contexts = library_model.get_contexts()
-            user.library[library_model.word.lower()] = entry
 
         return user
 
