@@ -130,6 +130,7 @@ const btnViewVocab = document.getElementById("btn-view-vocabulary");
 const btnResetVocab = document.getElementById("btn-reset-vocab");
 const btnToggleSidebar = document.getElementById("btn-toggle-sidebar");
 const btnViewLibrary = document.getElementById("btn-view-library");
+const btnStartReview = document.getElementById("btn-start-review");
 const libraryCountDisplay = document.getElementById("library-count");
 
 // User management variables
@@ -427,6 +428,11 @@ if (btnToggleSidebar) {
  * Load library word count from backend
  */
 async function loadLibraryCount(userId) {
+  if (!userId) {
+    console.log("[Popup] No user ID provided for library count");
+    libraryCountDisplay.textContent = "0";
+    return;
+  }
   try {
     const response = await fetch(
       `http://localhost:8000/users/${encodeURIComponent(userId)}/library`
@@ -461,12 +467,23 @@ function openLibraryPage() {
  * Open library URL with given user ID
  */
 function openLibraryUrl(userId) {
+  const finalUserId = userId || currentUser;
+  if (!finalUserId) {
+    console.error("[Popup] No user ID for library URL");
+    return;
+  }
+
   try {
-    // Open library viewer with user ID
+    // Use MixReadNavigation to open library page if available
+    if (typeof MixReadNavigation !== "undefined") {
+      MixReadNavigation.openPage("library", { user_id: finalUserId });
+      return;
+    }
+
     // Open library viewer with user ID
     const libraryUrl =
       chrome.runtime.getURL("pages/library.html") +
-      `?user=${encodeURIComponent(userId)}`;
+      `?user=${encodeURIComponent(finalUserId)}`;
 
     console.log("[Popup] Opening library page:", libraryUrl);
     chrome.tabs.create({ url: libraryUrl }, (tab) => {
@@ -485,9 +502,6 @@ function openLibraryUrl(userId) {
 /**
  * View Library button click handler
  */
-if (btnViewLibrary) {
-  btnViewLibrary.addEventListener("click", openLibraryPage);
-}
 
 // Update stats when vocabulary changes
 chrome.storage.onChanged.addListener((changes) => {
@@ -620,11 +634,20 @@ function loadUserVocabulary() {
 }
 
 function updateDifficultyUI(level) {
-  ChromeAPI.storage.set({ difficultyLevel: level });
-  const difficultyValue =
-    Object.entries(DIFFICULTY_LEVELS).find(([_, l]) => l === level)?.[0] || "3";
-  difficultySlider.value = difficultyValue;
-  updateDifficultyDisplay(difficultyValue);
+  // Convert CEFR level to MRS score
+  const levelToMRS = {
+    A1: 10,
+    A2: 25,
+    B1: 40,
+    B2: 60,
+    C1: 80,
+    C2: 95,
+  };
+  const mrsScore = levelToMRS[level] || 40; // Default to B1 (40)
+
+  ChromeAPI.storage.set({ difficulty_mrs: mrsScore, difficulty_level: level });
+  difficultySlider.value = mrsScore;
+  updateDifficultyDisplay(mrsScore);
 }
 
 function resetUserVocabulary() {
@@ -1127,53 +1150,34 @@ setTimeout(() => {
  */
 
 // Start Review button
-const btnStartReview = document.getElementById("btn-start-review");
 if (btnStartReview) {
   btnStartReview.addEventListener("click", () => {
     console.log("[Popup] Starting review session");
 
-    // Get current user from storage (testUserId first for testing)
-    ChromeAPI.storage.get(["testUserId", "userId", "currentUser"], (result) => {
-      const userId =
-        result.testUserId || result.currentUser || result.userId || "test_user";
-      console.log("[Popup] Starting review for user:", userId);
+    // Favor current selected user from memory first
+    const userId = currentUser || "test_user";
+    console.log("[Popup] Starting review for user:", userId);
 
-      // Use MixReadNavigation to open review page
-      if (typeof MixReadNavigation !== "undefined") {
-        MixReadNavigation.openPage("review", { user_id: userId });
-      } else {
-        // Fallback if navigation not loaded
-        const reviewUrl =
-          chrome.runtime.getURL("pages/review.html") +
-          `?user_id=${encodeURIComponent(userId)}`;
-        chrome.tabs.create({ url: reviewUrl });
-      }
-    });
+    // Use MixReadNavigation to open review page
+    if (typeof MixReadNavigation !== "undefined") {
+      MixReadNavigation.openPage("review", { user_id: userId });
+    } else {
+      // Fallback if navigation not loaded
+      const reviewUrl =
+        chrome.runtime.getURL("pages/review.html") +
+        `?user_id=${encodeURIComponent(userId)}`;
+      chrome.tabs.create({ url: reviewUrl });
+    }
   });
 }
 
-// Update Library button to use new navigation (use existing btnViewLibrary from line 177)
+// Update Library button to use new navigation
 if (btnViewLibrary) {
   btnViewLibrary.addEventListener("click", () => {
     console.log("[Popup] Opening library page");
 
-    // Get current user from storage (testUserId first for testing)
-    ChromeAPI.storage.get(["testUserId", "userId", "currentUser"], (result) => {
-      const userId =
-        result.testUserId || result.currentUser || result.userId || "test_user";
-      console.log("[Popup] Opening library for user:", userId);
-
-      // Use MixReadNavigation to open library page
-      if (typeof MixReadNavigation !== "undefined") {
-        MixReadNavigation.openPage("library", { user_id: userId });
-      } else {
-        // Fallback if navigation not loaded
-        const libraryUrl =
-          chrome.runtime.getURL("pages/library.html") +
-          `?user=${encodeURIComponent(userId)}`;
-        chrome.tabs.create({ url: libraryUrl });
-      }
-    });
+    // Use openLibraryUrl helper which handles the logic
+    openLibraryUrl(currentUser);
   });
 }
 
@@ -1201,30 +1205,36 @@ function setupUserIdManagement() {
   function initializeUserIdInput() {
     console.log("[Popup] Loading user ID from storage");
 
-    ChromeAPI.storage.get(["testUserId", "recentUserIds"], (result) => {
-      try {
-        const currentUserId = result.testUserId || "test_user";
-        const recentUserIds = result.recentUserIds || [];
+    ChromeAPI.storage.get(
+      ["testUserId", "mixread_user_id", "recentUserIds"],
+      (result) => {
+        try {
+          const currentUserId =
+            result.testUserId || result.mixread_user_id || "test_user";
+          const recentUserIds = result.recentUserIds || [];
 
-        // Set global current user
-        currentUser = currentUserId;
+          // Set global current user
+          currentUser = currentUserId;
 
-        // Set current user display
-        userIdDisplay.textContent = currentUserId;
-        userIdInput.value = currentUserId;
+          // Set current user display
+          userIdDisplay.textContent = currentUserId;
+          userIdInput.value = currentUserId;
 
-        console.log("[Popup] Current user ID:", currentUserId);
+          console.log("[Popup] Current user ID:", currentUserId);
 
-        // Load user vocabulary and settings
-        loadUserVocabulary();
+          // Load user vocabulary and settings
+          loadUserVocabulary();
 
-        // Display recent users as buttons
-        if (recentUserIds.length > 0) {
-          recentUsersContainer.innerHTML = recentUserIds
-            .slice(0, 5)
-            .map(
-              (userId) =>
-                `<button class="recent-user-btn" data-user-id="${userId}" style="
+          // Initialize domain management (tab switching, blacklist, etc.)
+          initializeDomainManagement();
+
+          // Display recent users as buttons
+          if (recentUserIds.length > 0) {
+            recentUsersContainer.innerHTML = recentUserIds
+              .slice(0, 5)
+              .map(
+                (userId) =>
+                  `<button class="recent-user-btn" data-user-id="${userId}" style="
               font-size: 9px;
               padding: 2px 6px;
               background: #e8f5e9;
@@ -1233,24 +1243,25 @@ function setupUserIdManagement() {
               border-radius: 3px;
               cursor: pointer;
             ">${userId}</button>`
-            )
-            .join("");
+              )
+              .join("");
 
-          // Add click handlers to recent user buttons
-          recentUsersContainer
-            .querySelectorAll(".recent-user-btn")
-            .forEach((btn) => {
-              btn.addEventListener("click", () => {
-                const userId = btn.getAttribute("data-user-id");
-                console.log("[Popup] Clicked recent user:", userId);
-                setUserIdAndNavigate(userId);
+            // Add click handlers to recent user buttons
+            recentUsersContainer
+              .querySelectorAll(".recent-user-btn")
+              .forEach((btn) => {
+                btn.addEventListener("click", () => {
+                  const userId = btn.getAttribute("data-user-id");
+                  console.log("[Popup] Clicked recent user:", userId);
+                  setUserIdAndNavigate(userId);
+                });
               });
-            });
+          }
+        } catch (e) {
+          console.error("[Popup] Error initializing user ID:", e);
         }
-      } catch (e) {
-        console.error("[Popup] Error initializing user ID:", e);
       }
-    });
+    );
   }
 
   // Set user ID function
@@ -1272,9 +1283,12 @@ function setupUserIdManagement() {
           recentUserIds = recentUserIds.slice(0, 10);
         }
 
+        // Write to BOTH testUserId (popup) AND mixread_user_id (content script)
+        // This ensures all components use the same user ID
         ChromeAPI.storage.set(
           {
             testUserId: userId,
+            mixread_user_id: userId, // <-- Key for content script sync
             recentUserIds: recentUserIds,
           },
           () => {
@@ -1284,6 +1298,28 @@ function setupUserIdManagement() {
             // Update global current user and reload data
             currentUser = userId;
             loadUserVocabulary();
+
+            // Notify ALL content scripts to update their user ID
+            chrome.tabs.query({}, (tabs) => {
+              tabs.forEach((tab) => {
+                if (tab.url && tab.url.startsWith("http")) {
+                  chrome.tabs.sendMessage(
+                    tab.id,
+                    {
+                      type: "UPDATE_USER_ID",
+                      userId: userId,
+                    },
+                    (response) => {
+                      if (chrome.runtime.lastError) {
+                        // Tab might not have content script, that's ok
+                      } else {
+                        console.log(`[Popup] Synced user ID to tab ${tab.id}`);
+                      }
+                    }
+                  );
+                }
+              });
+            });
 
             initializeUserIdInput();
             console.log("[Popup] User ID successfully set:", userId);

@@ -5,8 +5,8 @@ Domain layer contains pure business logic and entities
 No dependencies on ORM, database, or infrastructure
 """
 
-from enum import Enum
 from datetime import datetime
+from enum import Enum
 
 
 class VocabularyStatus(Enum):
@@ -148,9 +148,18 @@ class User:
             if word_lower not in self.library:
                 self.library[word_lower] = LibraryEntry(word_lower)
 
-            # Add context if provided
-            if contexts and i < len(contexts):
-                self.library[word_lower].add_context(contexts[i])
+            # Add contexts if provided
+            if contexts:
+                # If we have the same number of words and contexts, associate 1:1
+                if len(words) == len(contexts):
+                    self.library[word_lower].add_context(contexts[i])
+                # If we have multiple contexts for a single word
+                elif len(words) == 1:
+                    for ctx in contexts:
+                        self.library[word_lower].add_context(ctx)
+                # Fallback: just add if index matches
+                elif i < len(contexts):
+                    self.library[word_lower].add_context(contexts[i])
 
     def remove_from_library(self, word: str):
         """Remove a word from library"""

@@ -12,16 +12,17 @@ Architecture:
   SRS Core Library (SpacedRepetitionEngine, ReviewSession, etc.)
 """
 
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
+
+from infrastructure.models import VocabularyEntryModel
+from infrastructure.repositories import VocabularyRepository
 from srs_core.models import (
-    LearningStatus,
     LearningItem,
+    LearningStatus,
     ReviewProvider,
     ReviewResult,
 )
-from infrastructure.models import VocabularyEntryModel
-from infrastructure.repositories import VocabularyRepository
 
 
 class AdaptedVocabularyItem(LearningItem):

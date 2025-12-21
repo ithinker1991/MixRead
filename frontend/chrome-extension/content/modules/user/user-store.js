@@ -20,14 +20,20 @@ class UserStore {
   async initialize() {
     try {
       // Get current user ID from popup's user management
+      // Priority: testUserId (popup's manual input) > mixread_current_user > mixread_user_id
       const result = await StorageManager.getItems([
+        "testUserId",
         "mixread_current_user",
         "mixread_user_id",
       ]);
-      let userId = result.mixread_current_user || result.mixread_user_id;
+
+      let userId =
+        result.testUserId ||
+        result.mixread_current_user ||
+        result.mixread_user_id;
 
       if (!userId) {
-        // Fallback to generate new user
+        // Fallback to StorageManager's generation/retrieval logic
         userId = await StorageManager.getUserId();
       }
 
@@ -44,19 +50,9 @@ class UserStore {
       );
     } catch (error) {
       logger.error("Failed to initialize user", error);
-      this.user.id = this.generateUserId();
+      // Fallback to a clean generation if everything fails
+      this.user.id = await StorageManager.getUserId();
     }
-  }
-
-  /**
-   * Generate a unique user_id
-   * Format: mixread-user-{timestamp}-{random}
-   * @returns {string}
-   */
-  generateUserId() {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substr(2, 9);
-    return `mixread-user-${timestamp}-${random}`;
   }
 
   /**

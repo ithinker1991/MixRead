@@ -5,21 +5,21 @@
 将记忆系统（SRS/间隔重复）从"背单词"的具体业务中**完全解耦**，建立一个通用的闪卡核心库：
 
 ```
-MixRead (背单词) ──┐
-                   ├─→ [通用闪卡核心库] ← 语言学习App
-                   ├─→ 历史记忆App
-                   └─→ 知识卡片App
+MixRead (back-end API) ──┐
+                         ├─→ [通用闪卡核心库] ← 语言学习App
+                         ├─→ 历史记忆App
+                         └─→ 知识卡片App
 ```
 
 ## 设计原则
 
 ### 1. 单一职责：核心库只做三件事
 
-| 层级 | 职责 | 不涉及 |
-|------|------|-------|
-| **SRS 调度层** | 计算复习时间、难度调整 | 数据如何存储 |
-| **会话管理层** | 构建复习队列、追踪进度 | 卡片内容结构 |
-| **分析层** | 统计学习效果、生成报告 | 用户界面、数据库 |
+| 层级           | 职责                   | 不涉及           |
+| -------------- | ---------------------- | ---------------- |
+| **SRS 调度层** | 计算复习时间、难度调整 | 数据如何存储     |
+| **会话管理层** | 构建复习队列、追踪进度 | 卡片内容结构     |
+| **分析层**     | 统计学习效果、生成报告 | 用户界面、数据库 |
 
 ### 2. 接口驱动设计
 
@@ -52,7 +52,7 @@ class ReviewProvider(ABC):
 
 ## 分层架构
 
-### 第1层：核心SRS引擎（核心库）
+### 第 1 层：核心 SRS 引擎（核心库）
 
 ```python
 # srs_core/scheduler.py
@@ -102,12 +102,13 @@ class SpacedRepetitionEngine:
 ```
 
 **特点**：
+
 - 无任何数据库依赖
 - 无应用特定逻辑
 - 100% 可测试
 - 其他项目直接 `import SpacedRepetitionEngine`
 
-### 第2层：会话管理（核心库）
+### 第 2 层：会话管理（核心库）
 
 ```python
 # srs_core/session.py
@@ -188,22 +189,38 @@ class ReviewSession:
 ```
 
 **特点**：
+
 - 会话只通过 `ReviewProvider` 接口获取数据
 - 不创建 item，只创建 `ReviewCard` 视图
 - 返回 `ReviewResult` 让应用决定如何保存
 - 完全无副作用
 
-### 第3层：数据适配层（应用端）
+### 第 3 层：数据适配层（应用端）
 
 ```python
-# mixread/vocabulary_review/srs_adapter.py
+# mixread/application/srs_adapter.py
 """MixRead特定的SRS适配 - 连接核心库和应用数据"""
 
-from srs_core.session import ReviewProvider, LearningItem
-from domain.models import VocabularyEntry
+from srs_core.models import ReviewProvider, LearningItem, LearningStatus, ReviewResult
+from infrastructure.models import VocabularyEntryModel
 
 class VocabularyReviewProvider(ReviewProvider):
-    """将MixRead的VocabularyEntry适配到通用ReviewProvider"""
+    """将MixRead的Unified VocabularyEntryModel适配到通用ReviewProvider"""
+
+    def __init__(self, vocabulary_repo):
+        from infrastructure.repositories import VocabularyRepository
+        self.vocabulary_repo = vocabulary_repo
+
+    def get_items_by_status(self, status: LearningStatus, limit: int = 20):
+        # 从统一的 vocabulary_entries 表中查询
+        if status == LearningStatus.DUE:
+            models = self.vocabulary_repo.get_due_for_review(limit=limit)
+        elif status == LearningStatus.NEW:
+            models = self.vocabulary_repo.get_new_words(limit=limit)
+        else:
+            models = []
+
+        return [AdaptedVocabularyItem(m) for m in models]
 
     def __init__(self, vocabulary_repo):
         self.vocabulary_repo = vocabulary_repo
@@ -264,7 +281,7 @@ class VocabularyReviewProvider(ReviewProvider):
         )
 ```
 
-### 第4层：API路由（应用端）
+### 第 4 层：API 路由（应用端）
 
 ```python
 # mixread/api/review.py
@@ -315,7 +332,7 @@ async def submit_answer(user_id: str, session_id: str, quality: int):
 
 ## 跨项目复用示意
 
-### 项目A：MixRead（背单词）
+### 项目 A：MixRead（背单词）
 
 ```python
 # mixread/srs_adapter.py
@@ -330,7 +347,7 @@ class VocabularyReviewProvider(ReviewProvider):
         vocabulary_repo.update(entry)
 ```
 
-### 项目B：HistoryApp（历史人物记忆）
+### 项目 B：HistoryApp（历史人物记忆）
 
 ```python
 # history_app/srs_adapter.py
@@ -345,7 +362,7 @@ class HistoryEventReviewProvider(ReviewProvider):
         history_event_repo.update(event)
 ```
 
-### 项目C：FormulaApp（公式记忆）
+### 项目 C：FormulaApp（公式记忆）
 
 ```python
 # formula_app/srs_adapter.py
@@ -392,7 +409,7 @@ mixread/
 
 ## 核心库的发布和版本管理
 
-### 选项1：Python包
+### 选项 1：Python 包
 
 ```bash
 # srs_core/setup.py
@@ -411,7 +428,7 @@ setup(
 pip install git+https://github.com/yourname/srs-core.git
 ```
 
-### 选项2：Monorepo 方式
+### 选项 2：Monorepo 方式
 
 ```
 root/
@@ -489,23 +506,23 @@ def test_vocabulary_provider_integration():
 
 ## 与现有文档的关系
 
-| 文档 | 作用 |
-|------|------|
-| **README.md** | 面向MixRead的使用文档（业务层） |
-| **ARCHITECTURE.md** | 本文档，面向可复用性的架构设计 |
-| **IMPLEMENTATION.md** （可选） | 具体实现细节和API参考 |
+| 文档                           | 作用                              |
+| ------------------------------ | --------------------------------- |
+| **README.md**                  | 面向 MixRead 的使用文档（业务层） |
+| **ARCHITECTURE.md**            | 本文档，面向可复用性的架构设计    |
+| **IMPLEMENTATION.md** （可选） | 具体实现细节和 API 参考           |
 
 ## 总结
 
 这个设计的关键优势：
 
-| 方面 | 好处 |
-|------|------|
-| **解耦** | 核心库与业务无关，可直接复用 |
-| **可测试性** | 核心库是纯函数，易于单测 |
-| **灵活性** | 应用可自定义业务逻辑，不修改核心库 |
-| **扩展性** | 新项目只需实现 `ReviewProvider` 接口 |
-| **维护性** | 修复SRS算法bug只需改一处，所有项目受益 |
-| **性能** | 会话基于回调，支持流式处理，无批量加载 |
+| 方面         | 好处                                       |
+| ------------ | ------------------------------------------ |
+| **解耦**     | 核心库与业务无关，可直接复用               |
+| **可测试性** | 核心库是纯函数，易于单测                   |
+| **灵活性**   | 应用可自定义业务逻辑，不修改核心库         |
+| **扩展性**   | 新项目只需实现 `ReviewProvider` 接口       |
+| **维护性**   | 修复 SRS 算法 bug 只需改一处，所有项目受益 |
+| **性能**     | 会话基于回调，支持流式处理，无批量加载     |
 
 核心原则：**核心库只管"学习算法"，不管"数据怎么存"，应用决定"业务怎么做"**

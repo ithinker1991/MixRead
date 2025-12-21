@@ -449,6 +449,74 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     sendResponse({ success: true });
   }
+
+  // Handle user ID update from popup
+  if (request.type === "UPDATE_USER_ID") {
+    const newUserId = request.userId;
+    console.log("[MixRead] Received UPDATE_USER_ID:", newUserId);
+
+    // Update UserStore if it exists
+    if (userStore && newUserId) {
+      const oldUserId = userStore.getUserId();
+      userStore.user.id = newUserId;
+      console.log(`[MixRead] UserStore updated: ${oldUserId} → ${newUserId}`);
+
+      // Sync unknown words for the new user
+      if (unknownWordsService && unknownWordsStore) {
+        console.log("[MixRead] Syncing unknown words for new user...");
+        unknownWordsService
+          .loadFromBackend()
+          .then((backendWords) => {
+            unknownWordsStore.clear();
+            if (backendWords && backendWords.length > 0) {
+              backendWords.forEach((word) => unknownWordsStore.add(word));
+              console.log(
+                `[MixRead] Loaded ${backendWords.length} words for new user`
+              );
+            }
+            return unknownWordsStore.sync();
+          })
+          .then(() => {
+            console.log("[MixRead] Unknown words sync completed");
+            // Trigger highlight refresh
+            if (!shouldExcludeCurrentPage) {
+              clearHighlights();
+              highlightPageWords();
+            }
+          })
+          .catch((err) => {
+            console.error("[MixRead] Failed to sync words for new user:", err);
+          });
+      }
+
+      // Reload domain policies for the new user
+      if (domainPolicyStore) {
+        domainPolicyStore.reload(newUserId).then(() => {
+          // Re-check domain exclusion
+          const wasExcluded = shouldExcludeCurrentPage;
+          shouldExcludeCurrentPage =
+            DomainPolicyFilter.shouldExcludeCurrentPage(
+              window.location.href,
+              domainPolicyStore
+            );
+
+          console.log(
+            `[MixRead] Domain re-check after user change: excluded=${shouldExcludeCurrentPage} (was=${wasExcluded})`
+          );
+
+          if (shouldExcludeCurrentPage && !wasExcluded) {
+            clearHighlights();
+          } else if (!shouldExcludeCurrentPage && wasExcluded) {
+            if (!isHighlighting) {
+              highlightPageWords();
+            }
+          }
+        });
+      }
+    }
+
+    sendResponse({ success: true, userId: newUserId });
+  }
 });
 
 /**
@@ -1431,7 +1499,7 @@ function addWordToVocabulary(word) {
           {
             type: "ADD_TO_LIBRARY",
             user_id: userId,
-            words: [word],
+            word: word, // Use single 'word' to match background expectation
             contexts: [
               {
                 page_url: pageUrl,

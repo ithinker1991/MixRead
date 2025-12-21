@@ -317,6 +317,58 @@ class UnknownWordsService {
       return false;
     }
   }
+
+  /**
+   * Mark multiple words as known (batch operation)
+   *
+   * @param {string} userId - User ID
+   * @param {string[]} words - Words to mark as known
+   * @returns {Promise<boolean>} Success status
+   */
+  async markWordsAsKnown(userId, words) {
+    try {
+      console.log(
+        `[UnknownWordsService] Marking ${words.length} words as known for user ${userId}`
+      );
+
+      // Mark each word as known
+      for (const word of words) {
+        // Remove from unknown words if present
+        if (this.store.has(word)) {
+          this.store.remove(word);
+        }
+
+        // Add to known words on backend
+        try {
+          await this.apiClient.post(`/users/${userId}/known-words`, {
+            word: word,
+          });
+          console.log(
+            `[UnknownWordsService] Marked "${word}" as known on backend`
+          );
+        } catch (error) {
+          console.warn(
+            `[UnknownWordsService] Failed to mark "${word}" as known:`,
+            error
+          );
+        }
+      }
+
+      // Sync store after all removals
+      await this.store.sync();
+
+      // Trigger page re-highlight
+      window.dispatchEvent(new Event("unknown-words-updated"));
+      console.log(
+        `[UnknownWordsService] Completed marking ${words.length} words as known`
+      );
+
+      return true;
+    } catch (error) {
+      console.error("[UnknownWordsService] Error in markWordsAsKnown:", error);
+      return false;
+    }
+  }
 }
 
 // Export for use in both module and global scope

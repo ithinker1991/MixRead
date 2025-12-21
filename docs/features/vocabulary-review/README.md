@@ -10,10 +10,12 @@ The Vocabulary Review system extends MixRead's existing vocabulary management wi
 
 #### **Data Models** (from `backend/domain/models.py`)
 
-- ✅ `VocabularyEntry` with status tracking (LEARNING/REVIEWING/MASTERED)
-- ✅ `LibraryEntry` with context preservation
-- ✅ Basic metadata: `attempt_count`, `last_reviewed`
-- ✅ CEFR levels and frequency rankings
+- ✅ `VocabularyEntry` (Unified): Tracks both SRS status (LEARNING/REVIEWING/MASTERED) and learning contexts.
+- ✅ Metadata: `attempt_count`, `last_reviewed`, `review_interval`, `ease_factor`, `next_review`.
+- ✅ Contexts: List of original sentences and URLs where the word was encountered.
+- ✅ CEFR levels and frequency rankings.
+
+> [!NOTE] > `LibraryEntry` is now unified into `VocabularyEntry`. The user's "Library" is a view of their `VocabularyEntry` collection where they have preservation of context and SRS state.
 
 #### **API Endpoints** (from `backend/api/routes.py`)
 
@@ -46,19 +48,23 @@ The Vocabulary Review system extends MixRead's existing vocabulary management wi
 
 ## System Architecture
 
-### 1. Data Model Extensions
+### 1. Data Model (Unified)
 
 ```python
-# Extended VocabularyEntry for SRS
+# Unified VocabularyEntry for SRS and Context
 class VocabularyEntry:
-    # Existing fields
+    # Basic Word Info
     word: str
-    definition: str
-    example: str
+    cefr_level: str
+
+    # Learning Meta
     status: VocabularyStatus
     added_at: datetime
 
-    # SRS extensions
+    # Context Preservation (from original Library)
+    contexts: List[Dict] = []  # [{ "sentence": "...", "url": "...", "added_at": "..." }]
+
+    # SRS Logic
     next_review: datetime = None
     review_interval: int = 0        # Hours until next review
     ease_factor: float = 2.5        # SRS difficulty multiplier

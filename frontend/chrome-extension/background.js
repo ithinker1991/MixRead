@@ -11,45 +11,59 @@ const API_BASE = "http://localhost:8000";
  * Create context menu items
  */
 function createContextMenus() {
-  console.log('[Background] Creating context menus');
+  console.log("[Background] Creating context menus");
 
   // Clear existing context menus first
   chrome.contextMenus.removeAll(() => {
-    console.log('[Background] Cleared old context menus');
+    console.log("[Background] Cleared old context menus");
   });
 
   // Create context menu for marking unknown
-  chrome.contextMenus.create({
-    id: 'mixread-mark-unknown',
-    title: 'Mark as Unknown (MixRead)',
-    contexts: ['selection'],
-  }, () => {
-    if (chrome.runtime.lastError) {
-      console.warn('[Background] Error creating mark-unknown menu:', chrome.runtime.lastError);
-    } else {
-      console.log('[Background] Created mark-unknown context menu');
+  chrome.contextMenus.create(
+    {
+      id: "mixread-mark-unknown",
+      title: "Mark as Unknown (MixRead)",
+      contexts: ["selection"],
+    },
+    () => {
+      if (chrome.runtime.lastError) {
+        console.warn(
+          "[Background] Error creating mark-unknown menu:",
+          chrome.runtime.lastError
+        );
+      } else {
+        console.log("[Background] Created mark-unknown context menu");
+      }
     }
-  });
+  );
 
   // Create context menu for marking known
-  chrome.contextMenus.create({
-    id: 'mixread-mark-known',
-    title: 'Mark as Known (MixRead)',
-    contexts: ['selection'],
-  }, () => {
-    if (chrome.runtime.lastError) {
-      console.warn('[Background] Error creating mark-known menu:', chrome.runtime.lastError);
-    } else {
-      console.log('[Background] Created mark-known context menu');
+  chrome.contextMenus.create(
+    {
+      id: "mixread-mark-known",
+      title: "Mark as Known (MixRead)",
+      contexts: ["selection"],
+    },
+    () => {
+      if (chrome.runtime.lastError) {
+        console.warn(
+          "[Background] Error creating mark-known menu:",
+          chrome.runtime.lastError
+        );
+      } else {
+        console.log("[Background] Created mark-known context menu");
+      }
     }
-  });
+  );
 }
 
 /**
  * Create context menus when extension loads
  */
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('[Background] Extension installed/updated, setting up context menus');
+  console.log(
+    "[Background] Extension installed/updated, setting up context menus"
+  );
   createContextMenus();
 });
 
@@ -60,26 +74,32 @@ createContextMenus();
  * Handle context menu item clicks
  */
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  console.log('[Background] Context menu clicked:', info.menuItemId);
-  console.log('[Background] Selected text:', info.selectionText);
+  console.log("[Background] Context menu clicked:", info.menuItemId);
+  console.log("[Background] Selected text:", info.selectionText);
 
   const word = info.selectionText?.trim().toLowerCase();
 
   if (!word) {
-    console.warn('[Background] No word selected');
+    console.warn("[Background] No word selected");
     return;
   }
 
   try {
     // Send message to content script to handle the action
     const response = await chrome.tabs.sendMessage(tab.id, {
-      type: info.menuItemId === 'mixread-mark-unknown' ? 'CONTEXT_MARK_UNKNOWN' : 'CONTEXT_MARK_KNOWN',
+      type:
+        info.menuItemId === "mixread-mark-unknown"
+          ? "CONTEXT_MARK_UNKNOWN"
+          : "CONTEXT_MARK_KNOWN",
       word: word,
     });
 
-    console.log('[Background] Content script response:', response);
+    console.log("[Background] Content script response:", response);
   } catch (error) {
-    console.error('[Background] Error sending message to content script:', error);
+    console.error(
+      "[Background] Error sending message to content script:",
+      error
+    );
   }
 });
 
@@ -108,10 +128,14 @@ async function handleGetHighlightedWords(request, sendResponse) {
   try {
     const { words, difficulty_level, user_id } = request;
 
-    console.log('[Background] === Handling GET_HIGHLIGHTED_WORDS ===');
-    console.log('[Background] Received words:', words?.slice(0, 20).join(', '), `... (${words?.length || 0} total)`);
-    console.log('[Background] difficulty_level:', difficulty_level);
-    console.log('[Background] user_id:', user_id);
+    console.log("[Background] === Handling GET_HIGHLIGHTED_WORDS ===");
+    console.log(
+      "[Background] Received words:",
+      words?.slice(0, 20).join(", "),
+      `... (${words?.length || 0} total)`
+    );
+    console.log("[Background] difficulty_level:", difficulty_level);
+    console.log("[Background] user_id:", user_id);
 
     const response = await fetch(`${API_BASE}/highlight-words`, {
       method: "POST",
@@ -130,9 +154,15 @@ async function handleGetHighlightedWords(request, sendResponse) {
     }
 
     const data = await response.json();
-    console.log('[Background] API Response received');
-    console.log('[Background] highlighted_words:', data.highlighted_words?.slice(0, 20));
-    console.log('[Background] word_details count:', data.word_details?.length || 0);
+    console.log("[Background] API Response received");
+    console.log(
+      "[Background] highlighted_words:",
+      data.highlighted_words?.slice(0, 20)
+    );
+    console.log(
+      "[Background] word_details count:",
+      data.word_details?.length || 0
+    );
 
     sendResponse({
       success: true,
@@ -155,12 +185,15 @@ async function handleGetWordInfo(request, sendResponse) {
   try {
     const { word } = request;
 
-    const response = await fetch(`${API_BASE}/word/${encodeURIComponent(word)}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    const response = await fetch(
+      `${API_BASE}/word/${encodeURIComponent(word)}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
@@ -191,21 +224,24 @@ async function handleGetUserData(request, sendResponse) {
       throw new Error("user_id is required");
     }
 
-    console.log('[Background] Getting user data for:', user_id);
+    console.log("[Background] Getting user data for:", user_id);
 
-    const response = await fetch(`${API_BASE}/users/${encodeURIComponent(user_id)}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    const response = await fetch(
+      `${API_BASE}/users/${encodeURIComponent(user_id)}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('[Background] User data retrieved');
+    console.log("[Background] User data retrieved");
 
     sendResponse({
       success: true,
@@ -231,24 +267,32 @@ async function handleMarkAsKnown(request, sendResponse) {
       throw new Error("user_id and word are required");
     }
 
-    console.log('[Background] Marking word as known:', word, 'for user:', user_id);
+    console.log(
+      "[Background] Marking word as known:",
+      word,
+      "for user:",
+      user_id
+    );
 
-    const response = await fetch(`${API_BASE}/users/${encodeURIComponent(user_id)}/known-words`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        word: word.toLowerCase(),
-      }),
-    });
+    const response = await fetch(
+      `${API_BASE}/users/${encodeURIComponent(user_id)}/known-words`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          word: word.toLowerCase(),
+        }),
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('[Background] Word marked as known:', data);
+    console.log("[Background] Word marked as known:", data);
 
     sendResponse({
       success: true,
@@ -274,26 +318,38 @@ async function handleAddToLibrary(request, sendResponse) {
       throw new Error("user_id and word are required");
     }
 
-    console.log('[Background] Adding word to library:', word, 'for user:', user_id);
-    console.log('[Background] Contexts count:', contexts?.length || 0);
+    console.log(
+      "[Background] Adding word to library:",
+      word,
+      "for user:",
+      user_id
+    );
+    console.log("[Background] Contexts count:", contexts?.length || 0);
 
-    const response = await fetch(`${API_BASE}/users/${encodeURIComponent(user_id)}/library`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        words: [word.toLowerCase()], // Single word in array
-        contexts: contexts || [], // Contexts for this word
-      }),
-    });
+    const body = {
+      words: [word.toLowerCase()], // Single word in array
+      contexts: contexts || [], // Contexts for this word
+    };
+
+    console.log("[Background] Sending to backend:", JSON.stringify(body));
+
+    const response = await fetch(
+      `${API_BASE}/users/${encodeURIComponent(user_id)}/library`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('[Background] Word added to library:', data);
+    console.log("[Background] Word added to library:", data);
 
     sendResponse({
       success: true,
@@ -318,7 +374,7 @@ function handleGetTabId(request, sender, sendResponse) {
     if (!tabId) {
       throw new Error("Unable to determine tab ID");
     }
-    console.log('[Background] Returning tab ID:', tabId);
+    console.log("[Background] Returning tab ID:", tabId);
     sendResponse({
       success: true,
       tabId: tabId,

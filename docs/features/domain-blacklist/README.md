@@ -56,52 +56,67 @@ Domain Blacklist allows users to disable MixRead's word highlighting on specific
 
 ### Backend
 
-- **Repository**: `backend/infrastructure/repositories.py`
+- **Repository**: [repositories.py](file:///Users/yinshucheng/code/creo/MixRead/backend/infrastructure/repositories.py)
 
-  - DEFAULT_BLACKLIST constant (13 domains)
-  - `_import_default_blacklist()` for new users
-  - UserRepository handles user-specific blacklists
+  - `DEFAULT_BLACKLIST` constant (13 domains) - lines 27-52
+  - `_import_default_blacklist()` for new users - lines 332-370
+  - `DomainManagementPolicyRepository` class - lines 373-651
 
 - **Database Table**: `domain_management_policies`
 
   ```sql
-  user_id, domain, policy_type, is_active, description, timestamps
+  user_id, domain, policy_type, is_active, description, added_at, updated_at
   ```
 
-- **API Endpoints**:
+- **API Endpoints** ([routes.py](file:///Users/yinshucheng/code/creo/MixRead/backend/api/routes.py) lines 206-315):
 
-  ```
-  GET    /users/{userId}/domain-policies/blacklist
-  POST   /users/{userId}/domain-policies/blacklist
-  DELETE /users/{userId}/domain-policies/blacklist/{domain}
-  ```
+  | Method | Endpoint                                                 | Description                |
+  | ------ | -------------------------------------------------------- | -------------------------- |
+  | GET    | `/users/{userId}/domain-policies/blacklist`              | Get all blacklist domains  |
+  | GET    | `/users/{userId}/domain-policies/blacklist/detailed`     | Get policies with metadata |
+  | POST   | `/users/{userId}/domain-policies/blacklist`              | Add domain to blacklist    |
+  | POST   | `/users/{userId}/domain-policies/blacklist/batch`        | Add multiple domains       |
+  | DELETE | `/users/{userId}/domain-policies/blacklist/{domain}`     | Remove domain              |
+  | POST   | `/users/{userId}/domain-policies/blacklist/batch-remove` | Remove multiple domains    |
+  | POST   | `/users/{userId}/domain-policies/check`                  | Check if domain excluded   |
+  | GET    | `/users/{userId}/domain-policies/statistics`             | Get statistics             |
 
 ### Frontend
 
-- **UI**: `frontend/popup.html` (lines 170-214)
+- **UI**: [popup.html](file:///Users/yinshucheng/code/creo/MixRead/frontend/chrome-extension/popup.html) (lines 206-366)
 
-  - Quick Actions section
-  - Blacklist display
+  - Tab navigation (lines 96-100)
+  - Quick Actions section (lines 215-288)
+  - Domain input and blacklist display (lines 290-365)
 
-- **Logic**: `frontend/popup.js` (lines 977-1163)
+- **Logic**: [popup.js](file:///Users/yinshucheng/code/creo/MixRead/frontend/chrome-extension/popup.js)
 
-  - initializeQuickActions()
-  - handleQuickExcludeDomain()
-  - handleQuickExcludePath()
-  - renderBlacklist()
+  - `initializeDomainManagement()` - lines 700-728
+  - `setupDomainEventListeners()` - lines 733-760
+  - `initializeQuickActions()` - lines 961-1010
+  - `handleQuickExcludeDomain()` - lines 1017-1056
+  - `handleQuickExcludePath()` - lines 1062-1101
+  - `renderBlacklist()` - lines 845-882
 
-- **Store**: `frontend/modules/domain-policy/domain-policy-store.js`
+- **Store**: [domain-policy-store.js](file:///Users/yinshucheng/code/creo/MixRead/frontend/chrome-extension/content/modules/domain-policy/domain-policy-store.js) (406 lines)
 
   - Data caching and API synchronization
+  - Key methods: `initialize()`, `shouldExcludeDomain()`, `addBlacklistDomain()`, `removeBlacklistDomain()`
+
+- **Filter**: [domain-policy-filter.js](file:///Users/yinshucheng/code/creo/MixRead/frontend/chrome-extension/content/modules/domain-policy/domain-policy-filter.js) (171 lines)
+
+  - Runtime domain checking for content script
+  - Key methods: `shouldExcludeCurrentPage()`, `extractDomain()`, `isDomainInList()`
 
 ## Testing
 
-### Test Coverage (29 tests - 100% pass)
+### Test Coverage
 
 ```bash
 # Backend
 python -m pytest backend/test_default_blacklist.py
 python -m pytest backend/test_p1_integration.py
+python -m pytest backend/test_api_domain_management.py
 
 # Frontend
 node frontend/test_p1_quick_actions.js
@@ -109,19 +124,22 @@ node frontend/test_p1_quick_actions.js
 
 ### Test Files
 
-- `backend/test_default_blacklist.py` (7 tests)
-- `backend/test_p1_integration.py` (7 tests)
-- `frontend/test_p1_quick_actions.js` (15 tests)
+- `backend/test_default_blacklist.py` - Default blacklist import tests
+- `backend/test_p1_integration.py` - End-to-end integration tests
+- `backend/test_api_domain_management.py` - API endpoint tests
+- `frontend/test_p1_quick_actions.js` - Quick action UI tests
 
 ## Future Enhancements (Not Yet Implemented)
 
 - Context menu for quick exclude
 - Multi-level matching (exact/subdomain/path)
 - Admin platform for global presets
+- Domain analytics reporting (backend prepared at `reportDomainStatus()`)
 
 ## Maintenance Notes
 
 - Each user has independent blacklist stored in database
-- Default domains are imported only for new users
+- Default domains are imported only for new users (on first `get_user()` call)
 - No confirmation dialog on delete (user preference)
 - Port numbers are preserved in domain matching (e.g., localhost:8002)
+- Whitelist endpoints exist in backend but not exposed in UI (Phase 2+)
