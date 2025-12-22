@@ -191,25 +191,21 @@ async function initializeModules() {
 
     const userId = userStore.getUserId();
     const difficultyLevel = userStore.getDifficultyLevel();
+    const difficultyMRS = userStore.user.difficultyMRS;
 
     // SYNC FIX: Update global state with loaded user preference
     if (difficultyLevel) {
       currentDifficultyLevel = difficultyLevel;
     }
-
-    // Manual load of MRS
-    ChromeAPI.storage.get(["difficulty_mrs"], (r) => {
-      if (r.difficulty_mrs !== undefined) {
-        currentDifficultyMRS = r.difficulty_mrs;
-        console.log("[MixRead] Loaded difficulty_mrs:", currentDifficultyMRS);
-      }
-    });
+    if (difficultyMRS !== undefined) {
+      currentDifficultyMRS = difficultyMRS;
+    }
 
     console.log(
-      `[MixRead] User initialized - ID: ${userId}, Difficulty: ${difficultyLevel}`
+      `[MixRead] User initialized - ID: ${userId}, Difficulty: ${difficultyLevel}, MRS: ${currentDifficultyMRS}`
     );
     logger.info(
-      `User initialized - ID: ${userId}, Difficulty: ${difficultyLevel}`
+      `User initialized - ID: ${userId}, Difficulty: ${difficultyLevel}, MRS: ${currentDifficultyMRS}`
     );
 
     // 2. Initialize unknown words store
@@ -1668,8 +1664,11 @@ if (ChromeAPI.isContextValid()) {
       ChromeAPI.storage.set({ difficultyLevel: currentDifficultyLevel });
 
       // Update user store if initialized
-      if (userStore) {
-        userStore.setDifficultyLevel(request.difficulty_level);
+      if (typeof userStore !== "undefined") {
+        userStore.setDifficultyLevel(
+          request.difficulty_level,
+          request.difficulty_mrs
+        );
       }
 
       // Re-highlight the page

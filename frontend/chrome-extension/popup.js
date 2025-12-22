@@ -176,43 +176,57 @@ function saveDifficulty(score) {
     `[MixRead Popup] Saving difficulty - MRS: ${score}, Level: ${info.level}`
   );
 
-  chrome.storage.local.set(
-    {
-      difficulty_mrs: score,
-      difficulty_level: info.level, // Fallback for legacy
-    },
-    function () {
-      // Notify content script
-      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        if (tabs[0]) {
-          console.log(
-            `[MixRead Popup] Sending updateDifficulty to tab ${tabs[0].id}`
-          );
-          chrome.tabs.sendMessage(
-            tabs[0].id,
-            {
-              action: "updateDifficulty",
-              difficulty_level: info.level,
-              difficulty_mrs: score,
-            },
-            (response) => {
-              if (chrome.runtime.lastError) {
-                console.warn(
-                  "[MixRead Popup] Message error:",
-                  chrome.runtime.lastError.message
-                );
-              } else {
-                console.log(
-                  "[MixRead Popup] Message sent successfully, response:",
-                  response
-                );
-              }
+  const updates = {
+    difficulty_mrs: score,
+    difficulty_level: info.level, // Fallback for legacy
+    difficultyLevel: info.level, // Sync with content script key
+  };
+
+  // Also save to current user's data if available
+  if (currentUser) {
+    const userKey = `user_data_${currentUser}`;
+    chrome.storage.local.get([userKey], (result) => {
+      const userData = result[userKey] || {};
+      userData.difficulty_mrs = score;
+      userData.difficultyLevel = info.level;
+
+      const userUpdate = {};
+      userUpdate[userKey] = userData;
+      chrome.storage.local.set(userUpdate);
+    });
+  }
+
+  chrome.storage.local.set(updates, function () {
+    // Notify content script
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      if (tabs[0]) {
+        console.log(
+          `[MixRead Popup] Sending updateDifficulty to tab ${tabs[0].id}`
+        );
+        chrome.tabs.sendMessage(
+          tabs[0].id,
+          {
+            action: "updateDifficulty",
+            difficulty_level: info.level,
+            difficulty_mrs: score,
+          },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              console.warn(
+                "[MixRead Popup] Message error:",
+                chrome.runtime.lastError.message
+              );
+            } else {
+              console.log(
+                "[MixRead Popup] Message sent successfully, response:",
+                response
+              );
             }
-          );
-        }
-      });
-    }
-  );
+          }
+        );
+      }
+    });
+  });
 }
 
 // Initialize
@@ -579,13 +593,20 @@ function switchToUser(userId) {
 
 function saveCurrentUserVocabulary(callback) {
   ChromeAPI.storage.get(
-    ["vocabulary", "vocabulary_dates", "difficultyLevel", "showChinese"],
+    [
+      "vocabulary",
+      "vocabulary_dates",
+      "difficultyLevel",
+      "difficulty_mrs",
+      "showChinese",
+    ],
     (result) => {
       const userKey = `user_data_${currentUser}`;
       const userData = {
         vocabulary: result.vocabulary || [],
         vocabulary_dates: result.vocabulary_dates || {},
         difficultyLevel: result.difficultyLevel || "B1",
+        difficulty_mrs: result.difficulty_mrs || 40,
         showChinese:
           result.showChinese !== undefined ? result.showChinese : true,
       };
@@ -616,14 +637,17 @@ function loadUserVocabulary() {
 
     // Load difficulty level - try user data first, then fall back to direct storage read
     let level = userData.difficultyLevel;
-    if (!level) {
-      // Fallback: try reading directly from storage (top-level key)
-      ChromeAPI.storage.get(["difficultyLevel"], (res) => {
-        const directLevel = res.difficultyLevel || "B1";
-        updateDifficultyUI(directLevel);
-      });
+    let mrsScore = userData.difficulty_mrs;
+
+    if (level || mrsScore) {
+      updateDifficultyUI(level, mrsScore);
     } else {
-      updateDifficultyUI(level);
+      // Fallback: try reading directly from storage (top-level key)
+      ChromeAPI.storage.get(["difficultyLevel", "difficulty_mrs"], (res) => {
+        const directLevel = res.difficultyLevel || "B1";
+        const directMRS = res.difficulty_mrs || 40;
+        updateDifficultyUI(directLevel, directMRS);
+      });
     }
 
     if (userData.showChinese !== undefined) {
@@ -633,19 +657,32 @@ function loadUserVocabulary() {
   });
 }
 
-function updateDifficultyUI(level) {
-  // Convert CEFR level to MRS score
-  const levelToMRS = {
-    A1: 10,
-    A2: 25,
-    B1: 40,
-    B2: 60,
-    C1: 80,
-    C2: 95,
-  };
-  const mrsScore = levelToMRS[level] || 40; // Default to B1 (40)
+function updateDifficultyUI(level, mrsScore = null) {
+  // If we have an MRS score, use it directly as it's more granular
+  if (mrsScore === null || mrsScore === undefined) {
+    // Convert CEFR level to MRS score (approximate)
+    const levelToMRS = {
+      A1: 10,
+      A2: 25,
+      B1: 40,
+      B2: 60,
+      C1: 80,
+      C2: 95,
+    };
+    mrsScore = levelToMRS[level] || 40; // Default to B1 (40)
+  } else {
+    // If we have MRS but no level, derive level from MRS
+    if (!level) {
+      const info = getMRSDescription(mrsScore);
+      level = info.level;
+    }
+  }
 
-  ChromeAPI.storage.set({ difficulty_mrs: mrsScore, difficulty_level: level });
+  ChromeAPI.storage.set({
+    difficulty_mrs: mrsScore,
+    difficulty_level: level,
+    difficultyLevel: level,
+  });
   difficultySlider.value = mrsScore;
   updateDifficultyDisplay(mrsScore);
 }

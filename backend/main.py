@@ -216,10 +216,13 @@ async def batch_word_info(request: WordBatch):
     for word in request.words:
         info = dictionary_service.lookup(word)
         if info["found"]:
-             results.append({
+            results.append({
                 "word": word,
                 "cefr_level": info.get("level"),
                 "pos": info.get("pos"),
+                "phonetic": info.get("phonetic"),
+                "mrs": info.get("mrs"),
+                "tag": info.get("tag"),
                 "definition": info.get("definition"),
                 "translation": info.get("translation")
             })

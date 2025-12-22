@@ -9,6 +9,7 @@ class UserStore {
     this.user = {
       id: null,
       difficultyLevel: "B1",
+      difficultyMRS: 40,
     };
     this.listeners = [];
   }
@@ -40,13 +41,19 @@ class UserStore {
       this.user.id = userId;
 
       // Load difficulty level
-      const difficulty = await StorageManager.getItem("difficultyLevel");
-      if (difficulty) {
-        this.user.difficultyLevel = difficulty;
+      const diffResult = await StorageManager.getItems([
+        "difficultyLevel",
+        "difficulty_mrs",
+      ]);
+      if (diffResult.difficultyLevel) {
+        this.user.difficultyLevel = diffResult.difficultyLevel;
+      }
+      if (diffResult.difficulty_mrs !== undefined) {
+        this.user.difficultyMRS = diffResult.difficulty_mrs;
       }
 
       logger.log(
-        `User initialized - ID: ${userId}, Difficulty: ${this.user.difficultyLevel}`
+        `User initialized - ID: ${userId}, Difficulty: ${this.user.difficultyLevel}, MRS: ${this.user.difficultyMRS}`
       );
     } catch (error) {
       logger.error("Failed to initialize user", error);
@@ -76,11 +83,19 @@ class UserStore {
    * @param {string} level - New difficulty level (A1-C2)
    * @returns {Promise<void>}
    */
-  async setDifficultyLevel(level) {
+  async setDifficultyLevel(level, mrs = null) {
     this.user.difficultyLevel = level;
-    await StorageManager.setItem("difficultyLevel", level);
+    if (mrs !== null) {
+      this.user.difficultyMRS = mrs;
+    }
+    await StorageManager.setItems({
+      difficultyLevel: level,
+      difficulty_mrs: this.user.difficultyMRS,
+    });
     this.notify();
-    logger.log(`Difficulty level changed to: ${level}`);
+    logger.log(
+      `Difficulty level changed to: ${level}, MRS: ${this.user.difficultyMRS}`
+    );
   }
 
   /**

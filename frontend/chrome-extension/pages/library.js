@@ -60,34 +60,130 @@ async function loadLibrary() {
   showLoading();
 
   try {
-    const response = await fetch(
-      `http://localhost:8000/users/${encodeURIComponent(userId)}/library`
-    );
+    // Fetch all word types in parallel
+    const [libraryRes, knownRes, unknownRes] = await Promise.all([
+      fetch(
+        `http://localhost:8000/users/${encodeURIComponent(userId)}/library`
+      ),
+      fetch(
+        `http://localhost:8000/users/${encodeURIComponent(userId)}/known-words`
+      ),
+      fetch(
+        `http://localhost:8000/users/${encodeURIComponent(
+          userId
+        )}/unknown-words`
+      ),
+    ]);
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    const libraryData = await libraryRes.json();
+    const knownData = await knownRes.json();
+    const unknownData = await unknownRes.json();
+
+    let mergedLibrary = [];
+
+    if (libraryData.success) {
+      // Library words already have context/status
+      mergedLibrary = [...(libraryData.library || [])];
     }
 
-    const data = await response.json();
-
-    if (data.success) {
-      currentLibrary = data.library || [];
-      renderLibrary();
-    } else {
-      showError(data.error || "Failed to load library");
+    if (knownData.success) {
+      // Known words are simple strings, convert to library-like structure
+      const knownWords = knownData.known_words || [];
+      knownWords.forEach((word) => {
+        // Only add if not already in library (library takes precedence)
+        if (!mergedLibrary.some((w) => w.word === word)) {
+          mergedLibrary.push({
+            word: word,
+            status: "known",
+            added_at: null,
+            contexts: [],
+          });
+        }
+      });
     }
+
+    if (unknownData.success) {
+      // Unknown words are simple strings, convert to library-like structure
+      const unknownWords = unknownData.unknown_words || [];
+      unknownWords.forEach((word) => {
+        // Only add if not already in library (unlikely but safe)
+        if (!mergedLibrary.some((w) => w.word === word)) {
+          mergedLibrary.push({
+            word: word,
+            status: "unknown",
+            added_at: null,
+            contexts: [],
+          });
+        }
+      });
+    }
+
+    currentLibrary = mergedLibrary;
+
+    // Fetch extra details for all words
+    if (currentLibrary.length > 0) {
+      try {
+        const wordsToFetch = currentLibrary.map((w) => w.word);
+        const detailsRes = await fetch(
+          `http://localhost:8000/batch-word-info`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_id: userId,
+              words: wordsToFetch,
+            }),
+          }
+        );
+
+        const detailsData = await detailsRes.json();
+        if (detailsData.words) {
+          // Merge details into currentLibrary
+          const detailsMap = new Map(detailsData.words.map((w) => [w.word, w]));
+          currentLibrary.forEach((wordObj) => {
+            const detail = detailsMap.get(wordObj.word);
+            if (detail) {
+              wordObj.translation = detail.translation;
+              wordObj.phonetic = detail.phonetic;
+              wordObj.pos = detail.pos;
+              wordObj.cefr_level = detail.cefr_level;
+              wordObj.mrs = detail.mrs;
+              wordObj.tag = detail.tag;
+              wordObj.definition = detail.definition;
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to fetch word details:", err);
+      }
+    }
+
+    renderLibrary();
   } catch (error) {
     showError(`Error loading library: ${error.message}`);
   }
 }
 
-// Delete word from library
+// Delete word from library/known/unknown
 async function deleteWord(word) {
   try {
+    // Find the word to determine its type
+    const wordData = currentLibrary.find((w) => w.word === word);
+    if (!wordData) return;
+
+    let endpoint = "";
+    if (wordData.status === "known") {
+      endpoint = `known-words/${encodeURIComponent(word)}`;
+    } else if (wordData.status === "unknown") {
+      endpoint = `unknown-words/${encodeURIComponent(word)}`;
+    } else {
+      endpoint = `library/${encodeURIComponent(word)}`;
+    }
+
     const response = await fetch(
       `http://localhost:8000/users/${encodeURIComponent(
         currentUser
-      )}/library/${encodeURIComponent(word)}`,
+      )}/${endpoint}`,
       {
         method: "DELETE",
       }
@@ -100,7 +196,7 @@ async function deleteWord(word) {
     const data = await response.json();
 
     if (data.success) {
-      showToast(`"${word}" removed from library`);
+      showToast(`"${word}" removed`);
       currentLibrary = currentLibrary.filter((w) => w.word !== word);
       renderLibrary();
     } else {
@@ -127,10 +223,22 @@ async function deleteSelectedWords() {
 
   for (const word of selectedWords) {
     try {
+      const wordData = currentLibrary.find((w) => w.word === word);
+      if (!wordData) continue;
+
+      let endpoint = "";
+      if (wordData.status === "known") {
+        endpoint = `known-words/${encodeURIComponent(word)}`;
+      } else if (wordData.status === "unknown") {
+        endpoint = `unknown-words/${encodeURIComponent(word)}`;
+      } else {
+        endpoint = `library/${encodeURIComponent(word)}`;
+      }
+
       const response = await fetch(
         `http://localhost:8000/users/${encodeURIComponent(
           currentUser
-        )}/library/${encodeURIComponent(word)}`,
+        )}/${endpoint}`,
         {
           method: "DELETE",
         }
@@ -196,7 +304,19 @@ function renderLibrary() {
     }
 
     if (currentFilter === "learning") {
-      return word.status === "learning";
+      return (
+        word.status === "learning" ||
+        word.status === "reviewing" ||
+        word.status === "mastered"
+      );
+    }
+
+    if (currentFilter === "known") {
+      return word.status === "known";
+    }
+
+    if (currentFilter === "unknown") {
+      return word.status === "unknown";
     }
 
     return true;
@@ -235,11 +355,13 @@ function renderLibrary() {
 
 // Render table row
 function renderTableRow(word) {
-  const addedDate = new Date(word.added_at).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const addedDate = word.added_at
+    ? new Date(word.added_at).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "N/A";
 
   const isSelected = selectedWords.has(word.word);
   const contextCount = word.contexts?.length || 0;
@@ -299,6 +421,33 @@ function renderTableRow(word) {
     }
   }
 
+  // Word info display
+  const phonetic = word.phonetic
+    ? `<span class="word-phonetic">/${word.phonetic}/</span>`
+    : "";
+  const pos = word.pos ? `<span class="word-pos">${word.pos}</span>` : "";
+  const translation =
+    word.translation || '<span style="color: #adb5bd;">no translation</span>';
+  const levelClass = word.cefr_level
+    ? `level-${word.cefr_level.toLowerCase()}`
+    : "";
+  const mrs =
+    word.mrs !== undefined
+      ? `<span class="word-mrs">MRS: ${word.mrs}</span>`
+      : "";
+
+  // Render tags
+  let tagsHtml = "";
+  if (word.tag) {
+    const tags = word.tag.split(" ").filter((t) => t.trim().length > 0);
+    tagsHtml = tags.map((t) => `<span class="word-tag">${t}</span>`).join("");
+  }
+
+  // English definition
+  const englishDef = word.definition
+    ? `<div class="word-definition">${word.definition}</div>`
+    : "";
+
   return `
         <tr class="${isSelected ? "selected" : ""}" data-word="${word.word}">
             <td>
@@ -306,11 +455,31 @@ function renderTableRow(word) {
                   word.word
                 }" ${isSelected ? "checked" : ""}>
             </td>
-            <td class="word-cell">${word.word}</td>
+            <td class="word-cell">
+                <div class="word-main">${word.word}</div>
+                <div class="word-sub">
+                    ${phonetic}
+                    ${pos}
+                </div>
+                <div class="word-tags">
+                    ${tagsHtml}
+                </div>
+            </td>
+            <td class="level-cell">
+                <span class="level-badge ${levelClass}">${
+    word.cefr_level || "Unknown"
+  }</span>
+                <br>
+                ${mrs}
+            </td>
+            <td class="translation-cell">
+                <div class="translation-text">${translation}</div>
+                ${englishDef}
+            </td>
             <td class="date-cell">${addedDate}</td>
-            <td><span class="status-badge">${
+            <td><span class="status-badge status-${
               word.status || "learning"
-            }</span></td>
+            }">${word.status || "learning"}</span></td>
             <td class="sentences-cell">
                 ${
                   sentencesPreview ||
@@ -463,9 +632,21 @@ function updateStats() {
     (w) => w.status === "learning"
   ).length;
 
+  const knownWords = currentLibrary.filter((w) => w.status === "known").length;
+  const unknownWords = currentLibrary.filter(
+    (w) => w.status === "unknown"
+  ).length;
+
   document.getElementById("totalWords").textContent = totalWords;
   document.getElementById("totalContexts").textContent = totalContexts;
   document.getElementById("learningWords").textContent = learningWords;
+
+  // Need to ensure these elements exist in HTML
+  const knownEl = document.getElementById("knownWords");
+  const unknownEl = document.getElementById("unknownWords");
+  if (knownEl) knownEl.textContent = knownWords;
+  if (unknownEl) unknownEl.textContent = unknownWords;
+
   document.getElementById("statsSection").style.display = "grid";
 }
 
