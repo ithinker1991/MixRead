@@ -77,20 +77,67 @@ class DictionaryService:
         except Exception as e:
             print(f"⚠ Failed to load lemma.en.txt: {e}")
 
-    def calculate_dynamic_mrs(self, rank: Optional[int]) -> Optional[int]:
+    def calculate_dynamic_mrs(self, rank: Optional[int], tags: str = "", word: str = "", translation: str = "") -> Optional[int]:
         """
-        Calculate a rough MRS score (0-100+) based on word frequency ranking.
-        Based on the mapping:
-        - Top 1k: 0-20
-        - 1k-3k: 20-40
-        - 3k-6k: 40-60
-        - 6k-10k: 60-80
-        - 10k-15k: 80-100
-        - 15k+: 100+
+        Calculate a rough MRS score (0-100+) based on word frequency ranking, tags, and translation content.
         """
+        word_lower = word.lower()
+        translation = translation or ""
+
+        # 1. Pinyin Detection (Highest priority for Chinese users)
+        if "（汉语拼音）" in translation:
+            return 5 # Very easy (A1)
+
+        # 2. Handle common Easy words/contractions without rank
+        if "'" in word_lower:
+            # Common contractions are usually very easy (A1/A2 range)
+            return 15
+
+        # 3. Handle hyphenated words (compound words)
+        if "-" in word_lower and (rank is None or rank <= 0) and not tags:
+            parts = [p for p in word_lower.split("-") if p]
+            if parts:
+                part_scores = []
+                for p in parts:
+                    # Recursive check for parts using lookup logic
+                    p_lemma = self.variant_map.get(p, p)
+                    p_info = self.cefr_data.get(p_lemma)
+                    if p_info and p_info.get("mrs") is not None:
+                        part_scores.append(p_info["mrs"])
+                    else:
+                        # Fallback for common parts
+                        if len(p) <= 3: part_scores.append(20) # A1-like
+                        else: part_scores.append(80) # Default for unknown parts
+                
+                # Take the max difficulty of parts but cap at a reasonable level
+                return min(max(part_scores), 100)
+
+        # 4. Use translation features for estimation if rank is missing or 0
         if rank is None or rank <= 0:
-            return None
+            # Abbreviations (abbr.)
+            if translation.strip().startswith("abbr."):
+                is_all_consonants = all(c not in "aeiou" for c in word_lower if c.isalpha())
+                if is_all_consonants or len(word_lower) <= 3:
+                    return 40 # Common abbr (B1)
+                return 60 # Rarer abbr (B2)
+                
+            # Domain tags in translation
+            domain_tags = ["[计]", "[医]", "[经]", "[法]", "[机]"]
+            if any(tag in translation for tag in domain_tags):
+                return 60 # Technical term (B2)
+
+            # Traditional exam tags
+            if tags:
+                tag_list = tags.split(' ') if isinstance(tags, str) else []
+                if 'zk' in tag_list: return 30  # A2
+                if 'gk' in tag_list or 'cet4' in tag_list: return 50  # B1
+                if 'cet6' in tag_list: return 70  # B2
+                if 'ky' in tag_list or 'toefl' in tag_list or 'ielts' in tag_list: return 90  # C1
+                if 'gre' in tag_list: return 110 # C2
             
+            # Default for words in dictionary but no ranking/traits
+            return 100 
+
         import math
         try:
             if rank <= 1000:
@@ -108,7 +155,7 @@ class DictionaryService:
                 normalized = (math.log10(rank) - 4.176) / (5.0 - 4.176)
                 return int(100 + normalized * 50)
         except Exception:
-            return 100 # Safe default for生僻词
+            return 100 # Safe default for problematic entries
 
     def lookup(self, word: str) -> Dict[str, Any]:
         """
@@ -177,17 +224,23 @@ class DictionaryService:
         # 2. Tier 2: Check Full Dictionary (Database)
         db_result = self._lookup_tier2(word_lower)
         if db_result:
+            tags = db_result.get("tag", "")
+            ranking = db_result.get("ranking")
+            translation = db_result.get("translation", "")
+            mrs = self.calculate_dynamic_mrs(ranking, tags, word_lower, translation)
+            
             return {
                 "word": word,
                 "found": True,
                 "source": "full",
-                "level": self._derive_cefr_from_mrs(self.calculate_dynamic_mrs(db_result.get("ranking"))), 
-                "mrs": self.calculate_dynamic_mrs(db_result.get("ranking")),
+                "level": self._derive_cefr_from_mrs(mrs), 
+                "mrs": mrs,
                 "pos": None,
                 "definition": db_result.get("definition"),
-                "translation": db_result.get("translation"),
+                "translation": translation,
                 "phonetic": db_result.get("phonetic"),
-                "rank": db_result.get("ranking")
+                "rank": ranking,
+                "tag": tags
             }
 
         return {"word": word, "found": False}
@@ -226,6 +279,15 @@ class DictionaryService:
         # If level is Unknown or missing, try to derive it from MRS
         if (not level or level == "Unknown") and mrs is not None:
             level = self._derive_cefr_from_mrs(mrs)
+        
+        # Fallback for MRS if missing even in core library
+        if mrs is None:
+            tags = " ".join(entry.get("tags", [])) if isinstance(entry.get("tags"), list) else entry.get("tags", "")
+            rank = entry.get("rank")
+            translation = entry.get("chn", "")
+            mrs = self.calculate_dynamic_mrs(rank, tags, word, translation)
+            if not level:
+                level = self._derive_cefr_from_mrs(mrs)
              
         return {
             "word": word, # Return original requested word
@@ -237,7 +299,8 @@ class DictionaryService:
             "definition": entry.get("def"),
             "translation": entry.get("chn"),
             "phonetic": entry.get("ph"),
-            "rank": entry.get("rank")
+            "rank": entry.get("rank"),
+            "tag": " ".join(entry.get("tags", [])) if isinstance(entry.get("tags"), list) else entry.get("tags", "")
         }
 
     def _derive_cefr_from_mrs(self, mrs: Optional[int]) -> Optional[str]:
