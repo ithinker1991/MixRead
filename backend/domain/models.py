@@ -85,9 +85,14 @@ class LibraryEntry(VocabularyEntry):
 class User:
     """User entity - represents a MixRead user"""
 
-    def __init__(self, user_id: str, created_at: datetime = None):
+    def __init__(self, user_id: str, created_at: datetime = None, google_id: str = None, email: str = None, avatar_url: str = None):
         self.user_id = user_id
         self.created_at = created_at or datetime.now()
+        
+        # Auth fields
+        self.google_id = google_id
+        self.email = email
+        self.avatar_url = avatar_url
 
         # Three independent lists for highlighting logic
         self.known_words: set = set()  # Words user confirmed they know

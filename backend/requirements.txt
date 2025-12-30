@@ -4,3 +4,6 @@ pydantic==2.5.0
 httpx==0.25.2
 sqlalchemy==2.0.23
 alembic==1.13.1
+google-auth==2.23.4
+python-jose==3.3.0
+requests==2.31.0

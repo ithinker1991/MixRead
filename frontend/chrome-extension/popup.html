@@ -12,8 +12,53 @@
         <h1>MixRead</h1>
         <p class="subtitle">Learn English through reading</p>
         <div class="user-info">
-          <!-- User Input Section -->
+          <!-- Auth Section -->
+          <div id="auth-section" style="margin-bottom: 10px">
+            <!-- Logged In View -->
+            <div
+              id="logged-in-view"
+              style="display: none; align-items: center; gap: 8px"
+            >
+              <img
+                id="user-avatar"
+                src=""
+                alt="Avatar"
+                style="width: 24px; height: 24px; border-radius: 50%"
+              />
+              <span
+                id="user-name"
+                style="font-size: 12px; font-weight: bold"
+              ></span>
+              <button
+                id="btn-logout"
+                style="font-size: 10px; padding: 2px 6px; margin-left: auto"
+              >
+                Logout
+              </button>
+            </div>
+            <!-- Login View -->
+            <div id="login-view">
+              <button
+                id="btn-login"
+                style="
+                  width: 100%;
+                  padding: 6px;
+                  background: #4285f4;
+                  color: white;
+                  border: none;
+                  border-radius: 4px;
+                  font-weight: bold;
+                  cursor: pointer;
+                "
+              >
+                Google Login
+              </button>
+            </div>
+          </div>
+
+          <!-- Legacy/Dev User Input Section (Hidden if logged in) -->
           <div
+            id="dev-user-section"
             style="
               margin-bottom: 10px;
               padding: 8px;
@@ -402,6 +447,7 @@
     </div>
 
     <script src="shared/api-client.js"></script>
+    <script src="shared/auth-service.js"></script>
     <script src="shared/navigation.js"></script>
     <script src="content/scripts/logger.js"></script>
     <script src="content/modules/domain-policy/domain-policy-store.js"></script>

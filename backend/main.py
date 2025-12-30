@@ -12,6 +12,7 @@ import sys
 from typing import Optional
 
 import httpx
+from api.auth import router as auth_router
 from api.review import router as review_router
 from api.routes import router as user_router
 from application.services import HighlightApplicationService, UserApplicationService
@@ -247,6 +248,9 @@ app.include_router(user_router)
 
 # Include review routes (SRS-based flashcard review system)
 app.include_router(review_router)
+
+# Include auth routes
+app.include_router(auth_router)
 
 # Root endpoint
 @app.get("/")

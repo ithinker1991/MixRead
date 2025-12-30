@@ -90,7 +90,20 @@ class UserRepository:
             logger.info(f"✅ Created new user {user_id} with default blacklist")
 
         # Convert to domain model
+        # Convert to domain model
         return self._model_to_domain(user_model)
+
+    def get_by_google_id(self, google_id: str) -> Optional[User]:
+        """
+        Find user by Google ID
+        """
+        user_model = self.db.query(UserModel).filter(
+            UserModel.google_id == google_id
+        ).first()
+        
+        if user_model:
+            return self._model_to_domain(user_model)
+        return None
 
     def save_user(self, user: User):
         """
@@ -106,6 +119,11 @@ class UserRepository:
         if not user_model:
             user_model = UserModel(user_id=user.user_id)
             self.db.add(user_model)
+
+        # Update basic fields
+        if user.google_id: user_model.google_id = user.google_id
+        if user.email: user_model.email = user.email
+        if user.avatar_url: user_model.avatar_url = user.avatar_url
 
         # Update known words
         user_model.set_known_words(user.known_words)
@@ -268,7 +286,13 @@ class UserRepository:
 
     def _model_to_domain(self, user_model: UserModel) -> User:
         """Convert ORM model to domain model"""
-        user = User(user_id=user_model.user_id, created_at=user_model.created_at)
+        user = User(
+            user_id=user_model.user_id, 
+            created_at=user_model.created_at,
+            google_id=user_model.google_id,
+            email=user_model.email,
+            avatar_url=user_model.avatar_url
+        )
 
         # Load known words
         user.known_words = user_model.get_known_words()

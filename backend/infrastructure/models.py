@@ -40,6 +40,11 @@ class UserModel(Base):
     user_id = Column(String(255), primary_key=True, index=True)
     created_at = Column(DateTime, default=datetime.now, index=True)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Google Auth Fields
+    google_id = Column(String(255), unique=True, nullable=True, index=True)
+    email = Column(String(255), unique=True, nullable=True, index=True)
+    avatar_url = Column(String(500), nullable=True)
 
     # Store known_words as JSON
     known_words_json = Column(Text, default="[]")

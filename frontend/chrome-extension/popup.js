@@ -1439,6 +1439,115 @@ if (document.readyState === "loading") {
   }, 100);
 }
 
+// ========== Auth UI Logic ==========
+async function setupAuthUI() {
+  console.log("[Popup] Setting up Auth UI");
+  const loginView = document.getElementById("login-view");
+  const loggedInView = document.getElementById("logged-in-view");
+  const btnLogin = document.getElementById("btn-login");
+  const btnLogout = document.getElementById("btn-logout");
+  const userAvatar = document.getElementById("user-avatar");
+  const userName = document.getElementById("user-name");
+  const devUserSection = document.getElementById("dev-user-section");
+
+  if (!btnLogin) return;
+
+  btnLogin.addEventListener("click", async () => {
+    try {
+      btnLogin.textContent = "Logging in...";
+      btnLogin.disabled = true;
+      const session = await authService.login();
+      handleAuthUser(session);
+    } catch (e) {
+      console.error("Login failed", e);
+      alert("Login failed: " + e.message);
+      btnLogin.textContent = "Google Login";
+      btnLogin.disabled = false;
+    }
+  });
+
+  btnLogout.addEventListener("click", async () => {
+    if (confirm("Are you sure you want to logout?")) {
+      await authService.logout();
+      handleLogout();
+    }
+  });
+
+  // Check initial state
+  const user = await authService.getUser();
+  if (user) {
+    console.log("[Popup] Found authenticated user:", user);
+    handleAuthUser(user);
+  } else {
+    console.log("[Popup] No authenticated user");
+  }
+}
+
+function handleAuthUser(userSession) {
+  // Update UI
+  document.getElementById("login-view").style.display = "none";
+  document.getElementById("logged-in-view").style.display = "flex";
+  document.getElementById("dev-user-section").style.display = "none"; // Hide dev input
+
+  // Set user info
+  if (userSession.avatar)
+    document.getElementById("user-avatar").src = userSession.avatar;
+  if (userSession.name)
+    document.getElementById("user-name").textContent =
+      userSession.name || userSession.email;
+
+  // Set global user
+  const userId = userSession.user_id;
+  currentUser = userId;
+
+  // Direct Update storage (Bypassing testUserId logic to enforce auth user)
+  ChromeAPI.storage.set(
+    {
+      mixread_current_user: userId,
+      mixread_user_id: userId,
+      // We don't touch testUserId so it remains as fallback
+    },
+    () => {
+      console.log("[Popup] Auth user set:", userId);
+      updateUserDisplay();
+      loadUserVocabulary();
+      loadLibraryCount(userId);
+      initializeDomainManagement();
+
+      // Notify tabs
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach((tab) => {
+          if (tab.url && tab.url.startsWith("http")) {
+            chrome.tabs.sendMessage(tab.id, {
+              type: "UPDATE_USER_ID",
+              userId: userId,
+            });
+          }
+        });
+      });
+
+      // Also update the display to show the auth user ID
+      const userIdDisplay = document.getElementById("user-id-display");
+      if (userIdDisplay) userIdDisplay.textContent = userId;
+    }
+  );
+}
+
+function handleLogout() {
+  document.getElementById("login-view").style.display = "block";
+  document.getElementById("logged-in-view").style.display = "none";
+  document.getElementById("dev-user-section").style.display = "block";
+  document.getElementById("btn-login").textContent = "Google Login";
+  document.getElementById("btn-login").disabled = false;
+
+  // Re-run setup to restore test user or clear
+  console.log("[Popup] Logged out, restoring dev user management");
+  setupUserIdManagement();
+}
+
+// Call setupAuthUI
+setupAuthUI();
+
 // Additional logging
 window.addEventListener("load", () => {
   console.log("[Popup] window load event fired");
