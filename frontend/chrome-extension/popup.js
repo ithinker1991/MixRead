@@ -1440,113 +1440,229 @@ if (document.readyState === "loading") {
 }
 
 // ========== Auth UI Logic ==========
-async function setupAuthUI() {
-  console.log("[Popup] Setting up Auth UI");
-  const loginView = document.getElementById("login-view");
-  const loggedInView = document.getElementById("logged-in-view");
-  const btnLogin = document.getElementById("btn-login");
-  const btnLogout = document.getElementById("btn-logout");
-  const userAvatar = document.getElementById("user-avatar");
-  const userName = document.getElementById("user-name");
-  const devUserSection = document.getElementById("dev-user-section");
+// Requirements covered:
+// - 2.1: Click "Google Login" button initiates OAuth flow
+// - 2.5: Display user avatar, name, email after login
+// - 3.1: Check for existing session on page load
+// - 3.2: Display logged-in view while valid session exists
+// - 3.3: Clear session on logout
+// - 3.4: Display login view after logout
 
+/**
+ * Handle login button click (Requirement 2.1, 3.3)
+ * Initiates Google OAuth flow via AuthService
+ */
+async function handleLoginClick() {
+  const btnLogin = document.getElementById("btn-login");
   if (!btnLogin) return;
 
-  btnLogin.addEventListener("click", async () => {
-    try {
-      btnLogin.textContent = "Logging in...";
-      btnLogin.disabled = true;
-      const session = await authService.login();
-      handleAuthUser(session);
-    } catch (e) {
-      console.error("Login failed", e);
-      alert("Login failed: " + e.message);
+  try {
+    // Update button state to show loading
+    btnLogin.textContent = "Logging in...";
+    btnLogin.disabled = true;
+
+    // Initiate login via AuthService (Req 2.1)
+    const session = await window.authService.login();
+
+    // Handle user cancellation gracefully (Req 4.1)
+    // When user cancels OAuth flow, we silently restore UI without showing any error
+    if (session === null) {
+      // User cancelled - restore button state silently, no error message shown
       btnLogin.textContent = "Google Login";
       btnLogin.disabled = false;
+      console.log("[Popup] User cancelled OAuth flow - handled gracefully");
+      return;
     }
-  });
 
-  btnLogout.addEventListener("click", async () => {
-    if (confirm("Are you sure you want to logout?")) {
-      await authService.logout();
-      handleLogout();
+    // Login successful - update UI (Req 2.5)
+    updateAuthUI(true, session);
+    console.log("[Popup] Login successful for user:", session.user_id);
+  } catch (error) {
+    console.error("[Popup] Login failed:", error);
+
+    // Show appropriate error message based on error type
+    if (error.code === "NETWORK_ERROR") {
+      // Network error - backend unreachable (Req 4.3)
+      alert("Cannot connect to server");
+    } else {
+      alert("Login failed: " + (error.message || "Unknown error"));
     }
-  });
 
-  // Check initial state
-  const user = await authService.getUser();
-  if (user) {
-    console.log("[Popup] Found authenticated user:", user);
-    handleAuthUser(user);
-  } else {
-    console.log("[Popup] No authenticated user");
+    // Restore button state
+    btnLogin.textContent = "Google Login";
+    btnLogin.disabled = false;
   }
 }
 
-function handleAuthUser(userSession) {
-  // Update UI
-  document.getElementById("login-view").style.display = "none";
-  document.getElementById("logged-in-view").style.display = "flex";
-  document.getElementById("dev-user-section").style.display = "none"; // Hide dev input
+/**
+ * Handle logout button click (Requirement 3.3)
+ * Clears session and updates UI
+ */
+async function handleLogoutClick() {
+  // Confirm logout action
+  if (!confirm("Are you sure you want to logout?")) {
+    return;
+  }
 
-  // Set user info
-  if (userSession.avatar)
-    document.getElementById("user-avatar").src = userSession.avatar;
-  if (userSession.name)
-    document.getElementById("user-name").textContent =
-      userSession.name || userSession.email;
+  try {
+    // Clear session via AuthService (Req 3.3)
+    await window.authService.logout();
 
-  // Set global user
-  const userId = userSession.user_id;
-  currentUser = userId;
+    // Update UI to show login view (Req 3.4)
+    updateAuthUI(false, null);
 
-  // Direct Update storage (Bypassing testUserId logic to enforce auth user)
-  ChromeAPI.storage.set(
-    {
-      mixread_current_user: userId,
-      mixread_user_id: userId,
-      // We don't touch testUserId so it remains as fallback
-    },
-    () => {
-      console.log("[Popup] Auth user set:", userId);
-      updateUserDisplay();
-      loadUserVocabulary();
-      loadLibraryCount(userId);
-      initializeDomainManagement();
+    console.log("[Popup] Logout successful");
 
-      // Notify tabs
-      chrome.tabs.query({}, (tabs) => {
-        tabs.forEach((tab) => {
-          if (tab.url && tab.url.startsWith("http")) {
-            chrome.tabs.sendMessage(tab.id, {
-              type: "UPDATE_USER_ID",
-              userId: userId,
-            });
-          }
-        });
-      });
+    // Re-initialize dev user management for testing
+    setupUserIdManagement();
+  } catch (error) {
+    console.error("[Popup] Logout error:", error);
+    alert("Logout failed: " + (error.message || "Unknown error"));
+  }
+}
 
-      // Also update the display to show the auth user ID
-      const userIdDisplay = document.getElementById("user-id-display");
-      if (userIdDisplay) userIdDisplay.textContent = userId;
+/**
+ * Initialize Auth UI on page load (Requirements 3.1, 3.2)
+ * Checks for existing session and displays appropriate UI
+ */
+async function initializeAuthUI() {
+  console.log("[Popup] Initializing Auth UI");
+
+  const btnLogin = document.getElementById("btn-login");
+  const btnLogout = document.getElementById("btn-logout");
+
+  if (!btnLogin || !btnLogout) {
+    console.warn("[Popup] Auth UI elements not found");
+    return;
+  }
+
+  // Attach event handlers for login/logout buttons
+  btnLogin.addEventListener("click", handleLoginClick);
+  btnLogout.addEventListener("click", handleLogoutClick);
+
+  // Check for existing session (Req 3.1)
+  try {
+    const isLoggedIn = await window.authService.isLoggedIn();
+
+    if (isLoggedIn) {
+      // Valid session exists - get user data and show logged-in view (Req 3.2)
+      const userData = await window.authService.getUser();
+      console.log(
+        "[Popup] Found existing session for user:",
+        userData?.user_id
+      );
+      updateAuthUI(true, userData);
+    } else {
+      // No valid session - show login view
+      console.log("[Popup] No existing session found");
+      updateAuthUI(false, null);
     }
-  );
+  } catch (error) {
+    console.error("[Popup] Error checking auth status:", error);
+    // Default to logged out state on error
+    updateAuthUI(false, null);
+  }
 }
 
-function handleLogout() {
-  document.getElementById("login-view").style.display = "block";
-  document.getElementById("logged-in-view").style.display = "none";
-  document.getElementById("dev-user-section").style.display = "block";
-  document.getElementById("btn-login").textContent = "Google Login";
-  document.getElementById("btn-login").disabled = false;
+/**
+ * Update Auth UI based on login state (Requirements 2.5, 3.2, 3.4)
+ * @param {boolean} isLoggedIn - Whether user is logged in
+ * @param {object|null} userData - User data (user_id, email, name, avatar)
+ */
+function updateAuthUI(isLoggedIn, userData) {
+  const loginView = document.getElementById("login-view");
+  const loggedInView = document.getElementById("logged-in-view");
+  const devUserSection = document.getElementById("dev-user-section");
+  const recentUsersSection = document.getElementById("recent-users-section");
+  const userAvatar = document.getElementById("user-avatar");
+  const userName = document.getElementById("user-name");
+  const btnLogin = document.getElementById("btn-login");
+  const userIdDisplay = document.getElementById("user-id-display");
 
-  // Re-run setup to restore test user or clear
-  console.log("[Popup] Logged out, restoring dev user management");
-  setupUserIdManagement();
+  if (isLoggedIn && userData) {
+    // Show logged-in view (Req 3.2)
+    loginView.style.display = "none";
+    loggedInView.style.display = "flex";
+    devUserSection.style.display = "none"; // Hide dev input when logged in
+    if (recentUsersSection) recentUsersSection.style.display = "none"; // Hide recent users
+
+    // Display user info (Req 2.5)
+    if (userData.avatar && userAvatar) {
+      userAvatar.src = userData.avatar;
+      userAvatar.style.display = "block";
+    }
+    if (userName) {
+      userName.textContent = userData.name || userData.email || "User";
+    }
+
+    // Set global user ID for other components
+    const userId = userData.user_id;
+    currentUser = userId;
+
+    // Update storage with authenticated user
+    ChromeAPI.storage.set(
+      {
+        mixread_current_user: userId,
+        mixread_user_id: userId,
+      },
+      () => {
+        console.log("[Popup] Auth user set in storage:", userId);
+
+        // Update user display
+        if (userIdDisplay) {
+          userIdDisplay.textContent = userId;
+        }
+        updateUserDisplay();
+
+        // Load user data
+        loadUserVocabulary();
+        loadLibraryCount(userId);
+        initializeDomainManagement();
+
+        // Notify all tabs about user change
+        chrome.tabs.query({}, (tabs) => {
+          tabs.forEach((tab) => {
+            if (tab.url && tab.url.startsWith("http")) {
+              chrome.tabs.sendMessage(
+                tab.id,
+                {
+                  type: "UPDATE_USER_ID",
+                  userId: userId,
+                },
+                () => {
+                  // Ignore errors for tabs without content script
+                  if (chrome.runtime.lastError) {
+                    // Silent ignore
+                  }
+                }
+              );
+            }
+          });
+        });
+      }
+    );
+  } else {
+    // Show login view (Req 3.4)
+    loginView.style.display = "block";
+    loggedInView.style.display = "none";
+    devUserSection.style.display = "block"; // Show dev input for testing
+    if (recentUsersSection) recentUsersSection.style.display = "block"; // Show recent users
+
+    // Reset login button state
+    if (btnLogin) {
+      btnLogin.textContent = "Google Login";
+      btnLogin.disabled = false;
+    }
+
+    // Hide avatar
+    if (userAvatar) {
+      userAvatar.style.display = "none";
+    }
+  }
 }
 
-// Call setupAuthUI
-setupAuthUI();
+// Initialize Auth UI when script loads
+initializeAuthUI();
 
 // Additional logging
 window.addEventListener("load", () => {

@@ -4,15 +4,6 @@
   "version": "0.1.1",
   "description": "Improve your English reading with intelligent word highlighting and definitions",
   "permissions": ["storage", "scripting", "contextMenus", "tabs", "identity"],
-  "key": "YOUR_EXTENSION_KEY_FROM_CHROME_WEB_STORE_DASHBOARD",
-  "oauth2": {
-    "client_id": "YOUR_GOOGLE_CLIENT_ID_FROM_GCP_CONSOLE",
-    "scopes": [
-      "https://www.googleapis.com/auth/userinfo.email",
-      "https://www.googleapis.com/auth/userinfo.profile",
-      "openid"
-    ]
-  },
   "host_permissions": [
     "http://localhost:8000/*",
     "http://localhost:8001/*",
@@ -50,6 +41,14 @@
       ]
     }
   ],
+  "oauth2": {
+    "client_id": "499014045984-hceonrjgo341ginajl8tfllpc7g366hb.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile",
+      "openid"
+    ]
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "MixRead"

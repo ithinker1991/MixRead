@@ -3,16 +3,20 @@
   "name": "MixRead",
   "version": "0.1.1",
   "description": "Improve your English reading with intelligent word highlighting and definitions",
-  "permissions": [
-    "storage",
-    "scripting",
-    "contextMenus",
-    "tabs"
-  ],
+  "permissions": ["storage", "scripting", "contextMenus", "tabs", "identity"],
   "host_permissions": [
     "http://localhost:8000/*",
+    "http://localhost:8001/*",
     "https://api.dictionaryapi.dev/*"
   ],
+  "oauth2": {
+    "client_id": "499014045984-hceonrjgo341ginajl8tfllpc7g366hb.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile",
+      "openid"
+    ]
+  },
   "background": {
     "service_worker": "background.js"
   },

@@ -38,18 +38,35 @@ async function loadLibrary() {
 
   if (!userId && typeof chrome !== "undefined" && chrome.storage) {
     // Try to get from storage if not in URL
+    // Priority: auth_user (Google login) > mixread_user_id > testUserId
     const result = await new Promise((resolve) => {
       chrome.storage.local.get(
-        ["testUserId", "mixread_user_id", "userId"],
+        [
+          "auth_user",
+          "mixread_user_id",
+          "mixread_current_user",
+          "testUserId",
+          "userId",
+        ],
         resolve
       );
     });
-    userId = result.testUserId || result.mixread_user_id || result.userId;
+
+    // Prefer Google authenticated user
+    if (result.auth_user && result.auth_user.user_id) {
+      userId = result.auth_user.user_id;
+    } else {
+      userId =
+        result.mixread_current_user ||
+        result.mixread_user_id ||
+        result.testUserId ||
+        result.userId;
+    }
   }
 
   if (!userId) {
     showError(
-      "No user ID found. Please set your ID in the extension popup first."
+      "No user ID found. Please login with Google or set your ID in the extension popup first."
     );
     return;
   }

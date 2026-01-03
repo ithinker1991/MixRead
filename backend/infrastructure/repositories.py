@@ -96,6 +96,12 @@ class UserRepository:
     def get_by_google_id(self, google_id: str) -> Optional[User]:
         """
         Find user by Google ID
+        
+        Args:
+            google_id: Google account ID
+            
+        Returns:
+            User domain model if found, None otherwise
         """
         user_model = self.db.query(UserModel).filter(
             UserModel.google_id == google_id
@@ -104,6 +110,31 @@ class UserRepository:
         if user_model:
             return self._model_to_domain(user_model)
         return None
+
+    def update_google_info(self, user_id: str, google_id: str, email: str, avatar_url: str) -> bool:
+        """
+        Update user's Google specific info
+        
+        Args:
+            user_id: User ID
+            google_id: Google account ID
+            email: User's email from Google
+            avatar_url: User's avatar URL from Google
+            
+        Returns:
+            True if user was found and updated, False otherwise
+        """
+        user_model = self.db.query(UserModel).filter(
+            UserModel.user_id == user_id
+        ).first()
+
+        if user_model:
+            user_model.google_id = google_id
+            user_model.email = email
+            user_model.avatar_url = avatar_url
+            self.db.commit()
+            return True
+        return False
 
     def save_user(self, user: User):
         """

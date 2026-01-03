@@ -9,6 +9,28 @@ from infrastructure.repositories import UserRepository
 from jose import jwt
 
 
+class AuthConfigurationError(Exception):
+    """Raised when AuthService configuration is invalid or missing."""
+    pass
+
+
+class InvalidTokenError(Exception):
+    """
+    Raised when a Google token is invalid, malformed, or cannot be verified.
+    (Requirements 4.2, 4.4)
+    """
+    def __init__(self, message: str, reason: str = "unknown"):
+        self.message = message
+        self.reason = reason
+        super().__init__(self.message)
+
+
+class TokenExpiredError(InvalidTokenError):
+    """Raised when a Google token has expired. (Requirement 4.4)"""
+    def __init__(self, message: str = "Token has expired"):
+        super().__init__(message, reason="expired")
+
+
 class AuthService:
     """
     Authentication Service
@@ -16,24 +38,58 @@ class AuthService:
     """
     
     # Placeholder for Client ID - to be provided via environment variable
-    GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "YOUR_GOOGLE_CLIENT_ID_PLACEHOLDER")
+    GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
     SECRET_KEY = os.getenv("SECRET_KEY", "YOUR_SECRET_KEY_PLACEHOLDER")
     ALGORITHM = "HS256"
 
     def __init__(self, user_repository: UserRepository):
         self.user_repository = user_repository
+        self._validate_config()
+
+    def _validate_config(self) -> None:
+        """
+        Validate required configuration.
+        Raises AuthConfigurationError if GOOGLE_CLIENT_ID is not configured.
+        (Requirements 1.2, 1.3)
+        """
+        if not self.GOOGLE_CLIENT_ID or self.GOOGLE_CLIENT_ID == "YOUR_GOOGLE_CLIENT_ID_PLACEHOLDER":
+            raise AuthConfigurationError(
+                "GOOGLE_CLIENT_ID environment variable is not configured. "
+                "Please set GOOGLE_CLIENT_ID to your Google OAuth client ID."
+            )
 
     def verify_google_token(self, token: str) -> Dict:
         """
         Verify Google ID Token
         Returns user info if valid
+        
+        Raises:
+            InvalidTokenError: When token is invalid, malformed, or verification fails
+            TokenExpiredError: When token has expired
+        
+        (Requirements 4.2, 4.4)
         """
+        # Validate token format first
+        if not token or not isinstance(token, str):
+            raise InvalidTokenError(
+                "Invalid token format: Token must be a non-empty string",
+                reason="invalid_format"
+            )
+        
+        # Check for obviously malformed tokens
+        token = token.strip()
+        if len(token) < 10:
+            raise InvalidTokenError(
+                "Invalid token format: Token is too short to be valid",
+                reason="invalid_format"
+            )
+        
         try:
             # Specify the CLIENT_ID of the app that accesses the backend:
             id_info = id_token.verify_oauth2_token(
                 token, 
                 requests.Request(), 
-                self.GOOGLE_CLIENT_ID if self.GOOGLE_CLIENT_ID != "YOUR_GOOGLE_CLIENT_ID_PLACEHOLDER" else None
+                self.GOOGLE_CLIENT_ID
             )
 
             # ID token is valid. Get the user's Google Account ID from the decoded token.
@@ -45,8 +101,40 @@ class AuthService:
                 "email_verified": id_info.get("email_verified")
             }
         except ValueError as e:
-            # Invalid token
-            raise Exception(f"Invalid Google Token: {str(e)}")
+            error_str = str(e).lower()
+            
+            # Check for specific error types
+            if "expired" in error_str:
+                raise TokenExpiredError(
+                    f"Token has expired: {str(e)}"
+                )
+            elif "invalid" in error_str or "malformed" in error_str:
+                raise InvalidTokenError(
+                    f"Invalid Google Token: {str(e)}",
+                    reason="verification_failed"
+                )
+            elif "audience" in error_str or "client_id" in error_str:
+                raise InvalidTokenError(
+                    f"Token audience mismatch: {str(e)}",
+                    reason="audience_mismatch"
+                )
+            elif "issuer" in error_str:
+                raise InvalidTokenError(
+                    f"Invalid token issuer: {str(e)}",
+                    reason="invalid_issuer"
+                )
+            else:
+                # Generic verification failure
+                raise InvalidTokenError(
+                    f"Token verification failed: {str(e)}",
+                    reason="verification_failed"
+                )
+        except Exception as e:
+            # Catch any other unexpected errors during verification
+            raise InvalidTokenError(
+                f"Unexpected error during token verification: {str(e)}",
+                reason="unexpected_error"
+            )
 
     def login_with_google(self, token: str) -> Dict:
         """

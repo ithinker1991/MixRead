@@ -1,27 +1,55 @@
 // MixRead Review Page Script
 
-// Initialize review manager
-const userId =
-  new URLSearchParams(window.location.search).get("user_id") || "test_user";
+// Initialize review manager - get user from URL or storage
+async function getUserId() {
+  const urlParams = new URLSearchParams(window.location.search);
+  let userId = urlParams.get("user_id") || urlParams.get("user");
 
-console.log(`[Review Page] Initializing for user: ${userId}`);
+  if (!userId && typeof chrome !== "undefined" && chrome.storage) {
+    // Try to get from storage if not in URL
+    // Priority: auth_user (Google login) > mixread_current_user
+    const result = await new Promise((resolve) => {
+      chrome.storage.local.get(
+        ["auth_user", "mixread_current_user", "mixread_user_id"],
+        resolve
+      );
+    });
 
-let reviewManager;
-try {
-  if (typeof ReviewManager === "undefined") {
-    throw new Error(
-      "ReviewManager class is not defined. Script might have failed to load."
-    );
+    // Prefer Google authenticated user
+    if (result.auth_user && result.auth_user.user_id) {
+      userId = result.auth_user.user_id;
+    } else {
+      userId = result.mixread_current_user || result.mixread_user_id;
+    }
   }
-  reviewManager = new ReviewManager(userId);
-  console.log("[Review Page] ReviewManager initialized successfully");
-} catch (error) {
-  console.error(
-    "[Review Page] Critical error initializing ReviewManager:",
-    error
-  );
-  alert(`Error: ${error.message}`);
+
+  return userId || "test_user";
 }
+
+let userId;
+let reviewManager;
+
+// Initialize asynchronously
+(async function initReview() {
+  userId = await getUserId();
+  console.log(`[Review Page] Initializing for user: ${userId}`);
+
+  try {
+    if (typeof ReviewManager === "undefined") {
+      throw new Error(
+        "ReviewManager class is not defined. Script might have failed to load."
+      );
+    }
+    reviewManager = new ReviewManager(userId);
+    console.log("[Review Page] ReviewManager initialized successfully");
+  } catch (error) {
+    console.error(
+      "[Review Page] Critical error initializing ReviewManager:",
+      error
+    );
+    alert(`Error: ${error.message}`);
+  }
+})();
 
 // Initialize when DOM is ready
 document.addEventListener("DOMContentLoaded", () => {
