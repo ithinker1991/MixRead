@@ -1474,8 +1474,14 @@ async function handleLoginClick() {
       return;
     }
 
-    // Login successful - update UI (Req 2.5)
-    updateAuthUI(true, session);
+    // Login successful - convert session to userData format and update UI (Req 2.5)
+    const userData = {
+      user_id: session.user_id,
+      email: session.email,
+      name: session.name,
+      avatar: session.avatar,
+    };
+    updateAuthUI(true, userData);
     console.log("[Popup] Login successful for user:", session.user_id);
   } catch (error) {
     console.error("[Popup] Login failed:", error);
@@ -1574,17 +1580,21 @@ function updateAuthUI(isLoggedIn, userData) {
   const loggedInView = document.getElementById("logged-in-view");
   const devUserSection = document.getElementById("dev-user-section");
   const recentUsersSection = document.getElementById("recent-users-section");
+  const currentUserSection = document.getElementById("current-user-section");
   const userAvatar = document.getElementById("user-avatar");
   const userName = document.getElementById("user-name");
   const btnLogin = document.getElementById("btn-login");
   const userIdDisplay = document.getElementById("user-id-display");
 
+  console.log("[Popup] updateAuthUI called:", { isLoggedIn, userData });
+
   if (isLoggedIn && userData) {
     // Show logged-in view (Req 3.2)
     loginView.style.display = "none";
     loggedInView.style.display = "flex";
-    devUserSection.style.display = "none"; // Hide dev input when logged in
+    if (devUserSection) devUserSection.style.display = "none"; // Hide dev input when logged in
     if (recentUsersSection) recentUsersSection.style.display = "none"; // Hide recent users
+    if (currentUserSection) currentUserSection.style.display = "none"; // Hide current user display
 
     // Display user info (Req 2.5)
     if (userData.avatar && userAvatar) {
@@ -1645,8 +1655,9 @@ function updateAuthUI(isLoggedIn, userData) {
     // Show login view (Req 3.4)
     loginView.style.display = "block";
     loggedInView.style.display = "none";
-    devUserSection.style.display = "block"; // Show dev input for testing
+    if (devUserSection) devUserSection.style.display = "block"; // Show dev input for testing
     if (recentUsersSection) recentUsersSection.style.display = "block"; // Show recent users
+    if (currentUserSection) currentUserSection.style.display = "block"; // Show current user display
 
     // Reset login button state
     if (btnLogin) {
