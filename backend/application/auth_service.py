@@ -60,8 +60,11 @@ class AuthService:
 
     def verify_google_token(self, token: str) -> Dict:
         """
-        Verify Google ID Token
+        Verify Google Token (access_token or ID token)
         Returns user info if valid
+        
+        For access_token: calls Google userinfo endpoint
+        For ID token: verifies with Google's public keys
         
         Raises:
             InvalidTokenError: When token is invalid, malformed, or verification fails
@@ -84,15 +87,50 @@ class AuthService:
                 reason="invalid_format"
             )
         
+        # Try to use token as access_token first (for launchWebAuthFlow)
         try:
-            # Specify the CLIENT_ID of the app that accesses the backend:
+            import httpx
+            
+            # Call Google userinfo endpoint with access_token
+            response = httpx.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+            
+            if response.status_code == 200:
+                user_info = response.json()
+                return {
+                    "google_id": user_info.get("sub"),
+                    "email": user_info.get("email"),
+                    "name": user_info.get("name"),
+                    "picture": user_info.get("picture"),
+                    "email_verified": user_info.get("email_verified", False)
+                }
+            elif response.status_code == 401:
+                # Token might be an ID token, try that approach
+                pass
+            else:
+                raise InvalidTokenError(
+                    f"Google API error: {response.status_code}",
+                    reason="api_error"
+                )
+        except httpx.RequestError as e:
+            # Network error, try ID token verification as fallback
+            pass
+        except Exception as e:
+            if "InvalidTokenError" in str(type(e)):
+                raise
+            # Continue to try ID token verification
+            pass
+        
+        # Fallback: Try to verify as ID token
+        try:
             id_info = id_token.verify_oauth2_token(
                 token, 
                 requests.Request(), 
                 self.GOOGLE_CLIENT_ID
             )
 
-            # ID token is valid. Get the user's Google Account ID from the decoded token.
             return {
                 "google_id": id_info["sub"],
                 "email": id_info.get("email"),
@@ -103,34 +141,19 @@ class AuthService:
         except ValueError as e:
             error_str = str(e).lower()
             
-            # Check for specific error types
             if "expired" in error_str:
-                raise TokenExpiredError(
-                    f"Token has expired: {str(e)}"
-                )
+                raise TokenExpiredError(f"Token has expired: {str(e)}")
             elif "invalid" in error_str or "malformed" in error_str:
                 raise InvalidTokenError(
                     f"Invalid Google Token: {str(e)}",
                     reason="verification_failed"
                 )
-            elif "audience" in error_str or "client_id" in error_str:
-                raise InvalidTokenError(
-                    f"Token audience mismatch: {str(e)}",
-                    reason="audience_mismatch"
-                )
-            elif "issuer" in error_str:
-                raise InvalidTokenError(
-                    f"Invalid token issuer: {str(e)}",
-                    reason="invalid_issuer"
-                )
             else:
-                # Generic verification failure
                 raise InvalidTokenError(
                     f"Token verification failed: {str(e)}",
                     reason="verification_failed"
                 )
         except Exception as e:
-            # Catch any other unexpected errors during verification
             raise InvalidTokenError(
                 f"Unexpected error during token verification: {str(e)}",
                 reason="unexpected_error"
